@@ -5,6 +5,7 @@ import '../models/holiday.dart';
 import '../models/person.dart';
 import '../models/role.dart';
 import '../models/roster_settings.dart';
+import 'person_totals.dart';
 import 'turkish_collation.dart';
 import 'turkish_dates.dart';
 
@@ -86,6 +87,7 @@ class RosterGenerator {
     this.settings = const RosterSettings(),
     this.seed = 0,
     this.previousMonthTail = const [],
+    this.yearToDate = const {},
     this.attempts = 400,
   }) : people = people.where((p) => p.isActive).toList()
          ..sort((a, b) => a.id.compareTo(b.id));
@@ -106,6 +108,12 @@ class RosterGenerator {
   /// önceki ayın son günüdür. Art arda gün ve gün aşırı zincir kuralları
   /// ay sınırında da uygulanır.
   final List<Set<String>> previousMonthTail;
+
+  /// Kişi → bu yıl önceki aylarda biriken toplamlar. Ay içinde nöbetler
+  /// tam bölünmüyorsa (ör. 62 / 7 = 8,86) fazla nöbet yıl içi toplamı en
+  /// düşük olanlara gider; hafta sonu ve gün aşırı çift için de aynısı.
+  /// Ay içi denge (fark ≤ 1) yine önceliklidir.
+  final Map<String, PersonTotals> yearToDate;
 
   /// Rol başına açgözlü deneme sayısı.
   final int attempts;
@@ -167,6 +175,7 @@ class RosterGenerator {
         },
         weekend: weekend,
         tail: _tailFor(members),
+        yearToDate: yearToDate,
         settings: settings,
       );
       perRole[role] = solver.solve(rng, attempts, _polishCount);
@@ -236,8 +245,12 @@ class _RoleSolver {
     required this.available,
     required this.weekend,
     required this.tail,
+    required Map<String, PersonTotals> yearToDate,
     required RosterSettings settings,
-  }) : forbidConsecutive = settings.forbidConsecutiveDays,
+  }) : ytdShifts = _relative(members, yearToDate, (t) => t.shifts),
+       ytdWeekend = _relative(members, yearToDate, (t) => t.weekendShifts),
+       ytdPairs = _relative(members, yearToDate, (t) => t.everyOtherDayPairs),
+       forbidConsecutive = settings.forbidConsecutiveDays,
        maxChain = max(1, settings.maxEveryOtherDayChain),
        ids = [for (final p in members) p.id],
        cap = settings.maxExtraOverAverage == null || members.isEmpty
@@ -256,6 +269,43 @@ class _RoleSolver {
   final bool forbidConsecutive;
   final int maxChain;
   final int? cap;
+
+  /// Kişinin yıl içi toplamının grup ortalamasından farkı, ±[_ytdClamp]
+  /// ile sınırlı. Pozitif: yıl içinde diğerlerinden fazla tutmuş.
+  final Map<String, double> ytdShifts;
+  final Map<String, double> ytdWeekend;
+  final Map<String, double> ytdPairs;
+
+  static const _ytdClamp = 2.0;
+
+  /// Ay içi sapma karelerinin ağırlığı. Ay içi dengeyi bozan en küçük
+  /// değişiklik (ör. 9-9 → 10-8) 2 × 3 = 6 puandır.
+  static const _balanceWeight = 3.0;
+
+  /// Yıllık denge teriminin ağırlığı. Bir hamle üç yıllık terimin her birini
+  /// en fazla 2 × 2 × 0,4 = 1,6, toplamda 4,8 puan değiştirir; bu, ay içi
+  /// dengeyi bozmanın bedelinden (6) küçüktür. Böylece yıllık denge yalnızca
+  /// "fazla nöbet kime" seçimini belirler, ay içi farkı büyütmez.
+  static const _ytdWeight = 0.4;
+
+  /// Açgözlü adımda yıllık farkın her birimi için ceza.
+  static const _ytdGreedyWeight = 3.0;
+
+  static Map<String, double> _relative(
+    List<Person> members,
+    Map<String, PersonTotals> ytd,
+    int Function(PersonTotals) pick,
+  ) {
+    if (members.isEmpty) return const {};
+    final values = {
+      for (final p in members) p.id: pick(ytd[p.id] ?? const PersonTotals()),
+    };
+    final mean = values.values.fold(0, (a, b) => a + b) / values.length;
+    return {
+      for (final e in values.entries)
+        e.key: (e.value - mean).clamp(-_ytdClamp, _ytdClamp).toDouble(),
+    };
+  }
 
   late List<List<String>> _slots;
   late Map<String, Set<int>> _worked;
@@ -339,11 +389,20 @@ class _RoleSolver {
       return values.fold(0.0, (s, v) => s + (v - mean) * (v - mean));
     }
 
+    double yearly(List<int> values, Map<String, double> ytd) {
+      var sum = 0.0;
+      for (var i = 0; i < n; i++) {
+        sum += values[i] * ytd[ids[i]]!;
+      }
+      return sum * _ytdWeight;
+    }
+
     final totalPairs = pairs.fold(0, (a, b) => a + b);
-    return sq(counts) +
-        sq(weekends) +
-        sq(pairs) +
-        0.25 * totalPairs +
+    return _balanceWeight * (sq(counts) + sq(weekends) + sq(pairs)) +
+        yearly(counts, ytdShifts) +
+        yearly(weekends, ytdWeekend) +
+        yearly(pairs, ytdPairs) +
+        0.75 * totalPairs +
         _emptySlots() * RosterGenerator.emptySlotPenalty;
   }
 
@@ -419,14 +478,17 @@ class _RoleSolver {
   double _cost(String id, int d) {
     final n = ids.length;
     var cost = (_worked[id]!.length + 1 - _totalSlots / n) * 10;
+    cost += ytdShifts[id]! * _ytdGreedyWeight;
     if (weekend.contains(d)) {
       cost += (_weekendCount(id) + 1 - weekend.length * perDay / n) * 10;
+      cost += ytdWeekend[id]! * _ytdGreedyWeight;
     }
     final newPairs =
         (d - 2 >= 1 && _works(id, d - 2) ? 1 : 0) + (_works(id, d + 2) ? 1 : 0);
     if (newPairs > 0) {
       final meanPairs = ids.map(_pairs).fold(0, (a, b) => a + b) / n;
       cost += newPairs * ((_pairs(id) + 1 - meanPairs) * 10 + 3);
+      cost += newPairs * ytdPairs[id]! * _ytdGreedyWeight;
     }
     // Nöbetler aralıklı dağılsın: 3 gün arayla nöbete küçük ceza.
     if (_works(id, d - 3) || _works(id, d + 3)) cost += 1;

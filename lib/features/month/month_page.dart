@@ -8,6 +8,7 @@ import '../../shared/widgets/section_header.dart';
 import '../people/people_controller.dart';
 import '../roster/roster_flow.dart';
 import '../roster/roster_page.dart';
+import '../roster/yearly_summary_page.dart';
 import 'month_plan_controller.dart';
 import 'unavailable_days_page.dart';
 
@@ -35,7 +36,20 @@ class MonthPage extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Ay Planı')),
+      appBar: AppBar(
+        title: const Text('Ay Planı'),
+        actions: [
+          IconButton(
+            tooltip: 'Yıllık Özet',
+            icon: const Icon(Icons.insights),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => YearlySummaryPage(initialYear: month.year),
+              ),
+            ),
+          ),
+        ],
+      ),
       floatingActionButton: active.isEmpty
           ? null
           : plan.hasRoster
@@ -62,8 +76,19 @@ class MonthPage extends ConsumerWidget {
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: ListTile(
                 leading: const Icon(Icons.lock_outline),
-                title: const Text('Bu ay kilitli.'),
-                subtitle: const Text('İstenmeyen günler değiştirilemez.'),
+                title: Text(
+                  ref.read(monthPlanProvider.notifier).isPastMonth(plan)
+                      ? 'Geçmiş ay: liste salt okunur.'
+                      : 'Bu ay kilitli.',
+                ),
+                subtitle: const Text(
+                  'İstenmeyen günler ve liste değiştirilemez.',
+                ),
+                trailing: TextButton(
+                  onPressed: () =>
+                      ref.read(monthPlanProvider.notifier).setLocked(false),
+                  child: const Text('Kilidi aç'),
+                ),
                 tileColor: theme.colorScheme.surfaceContainerHighest,
               ),
             ),

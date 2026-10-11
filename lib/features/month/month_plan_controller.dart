@@ -7,6 +7,7 @@ import '../../data/providers.dart';
 import '../../logic/feasibility_checker.dart';
 import '../../logic/roster_generator.dart';
 import '../../logic/roster_validator.dart';
+import '../../logic/yearly_summary.dart';
 import '../../models/models.dart';
 import '../../shared/providers.dart';
 import '../holidays/holidays_controller.dart';
@@ -32,17 +33,48 @@ final planMonthProvider = NotifierProvider<PlanMonthController, DateTime>(
   PlanMonthController.new,
 );
 
+/// Bu oturumda kullanıcının kilidini açtığı geçmiş aylar (`yyyy-MM`).
+/// Uygulama yeniden açılınca geçmiş aylar yine kilitlenir.
+class UnlockedPastMonths extends Notifier<Set<String>> {
+  @override
+  Set<String> build() => {};
+
+  void add(String key) => state = {...state, key};
+}
+
+final unlockedPastMonthsProvider =
+    NotifierProvider<UnlockedPastMonths, Set<String>>(UnlockedPastMonths.new);
+
 /// Seçili ayın planı. Kayıtlı plan yoksa boş bir plan oluşturulup kaydedilir.
+/// Geçmiş aylardaki listeler salt okunurdur: açılınca kilitlenir, kullanıcı
+/// kilidi açabilir.
 class MonthPlanController extends Notifier<MonthPlan> {
   @override
   MonthPlan build() {
     final month = ref.watch(planMonthProvider);
     final repo = ref.read(monthPlanRepositoryProvider);
     final existing = repo.get(month.year, month.month);
-    if (existing != null) return existing;
-    final plan = MonthPlan(year: month.year, month: month.month);
-    repo.save(plan);
-    return plan;
+    if (existing == null) {
+      final plan = MonthPlan(year: month.year, month: month.month);
+      repo.save(plan);
+      return plan;
+    }
+    if (existing.hasRoster &&
+        !existing.isLocked &&
+        isPastMonth(existing) &&
+        !ref.read(unlockedPastMonthsProvider).contains(existing.key)) {
+      final locked = existing.copyWith(isLocked: true);
+      repo.save(locked);
+      return locked;
+    }
+    return existing;
+  }
+
+  /// [plan] bugünün ayından önce mi?
+  bool isPastMonth(MonthPlan plan) {
+    final today = ref.read(todayProvider);
+    return plan.year < today.year ||
+        (plan.year == today.year && plan.month < today.month);
   }
 
   /// Kişinin [day] gününü istenmeyen gün yapar ya da bundan çıkarır.
@@ -85,6 +117,14 @@ class MonthPlanController extends Notifier<MonthPlan> {
       settings: ref.read(rosterSettingsProvider),
       seed: seed ?? Random().nextInt(1 << 31),
       previousMonthTail: previousMonthTail(),
+      yearToDate: YearlySummary.build(
+        year: plan.year,
+        plans: ref.read(monthPlanRepositoryProvider).getAll(),
+        people: ref.read(peopleProvider),
+        holidays: ref.read(holidaysProvider),
+        settings: ref.read(rosterSettingsProvider),
+        beforeMonth: plan.month,
+      ).byId,
     );
     final result = await ref.read(rosterRunnerProvider)(generator);
     state = state.copyWith(
@@ -106,6 +146,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
   }
 
   Future<void> setLocked(bool locked) async {
+    if (!locked) ref.read(unlockedPastMonthsProvider.notifier).add(state.key);
     state = state.copyWith(isLocked: locked);
     await ref.read(monthPlanRepositoryProvider).save(state);
   }

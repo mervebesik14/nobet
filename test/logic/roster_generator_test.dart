@@ -2,7 +2,9 @@ import 'dart:isolate';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nobet_listesi/data/turkish_holidays.dart';
+import 'package:nobet_listesi/logic/person_totals.dart';
 import 'package:nobet_listesi/logic/roster_generator.dart';
+import 'package:nobet_listesi/logic/yearly_summary.dart';
 import 'package:nobet_listesi/models/models.dart';
 
 List<Person> team(int nurses, int techs) => [
@@ -316,5 +318,147 @@ void main() {
     final g = generator(seed: 5, attempts: 30);
     final inIsolate = await Isolate.run(g.generate);
     expect(inIsolate.assignments, g.generate().assignments);
+  });
+
+  group('yıllık denge', () {
+    test('fazla nöbet yıl içi toplamı düşük olanlara gider', () {
+      // 62 hemşire nöbeti / 7 = 8,86: altı kişi 9, bir kişi 8 tutar.
+      // Yıl içinde en çok tutmuş olan n4 o 8'lik kişi olmalı.
+      final people = team(7, 4);
+      for (final seed in [1, 2, 3]) {
+        final r = RosterGenerator(
+          year: 2026,
+          month: 10,
+          people: people,
+          holidays: holidays,
+          seed: seed,
+          attempts: 150,
+          yearToDate: {
+            for (var i = 1; i <= 7; i++)
+              'n$i': PersonTotals(shifts: i == 4 ? 60 : 54),
+          },
+        ).generate();
+        expectHardRules(r, people, const {}, settings);
+        final worked = workedDays(r);
+        expect(worked['n4']!.length, 8, reason: 'tohum $seed');
+        for (final id in ['n1', 'n2', 'n3', 'n5', 'n6', 'n7']) {
+          expect(worked[id]!.length, 9, reason: '$id tohum $seed');
+        }
+      }
+    });
+
+    test('hafta sonu fazlası da yıl içi az tutana gider', () {
+      // 4 tekniker, Ekim: 10 hafta sonu günü → 2, 3, 3, 2 gibi dağılır.
+      // Yıl içi hafta sonu en az olan t1 ve t2 3'er tutmalı.
+      final people = team(7, 4);
+      final weekend = RosterGenerator.weekendDays(2026, 10, holidays, settings);
+      final r = RosterGenerator(
+        year: 2026,
+        month: 10,
+        people: people,
+        holidays: holidays,
+        seed: 4,
+        attempts: 150,
+        yearToDate: const {
+          't1': PersonTotals(weekendShifts: 10),
+          't2': PersonTotals(weekendShifts: 10),
+          't3': PersonTotals(weekendShifts: 14),
+          't4': PersonTotals(weekendShifts: 14),
+        },
+      ).generate();
+      final worked = workedDays(r);
+      int w(String id) => worked[id]!.where(weekend.contains).length;
+      expect(w('t1'), 3);
+      expect(w('t2'), 3);
+      expect(w('t3'), 2);
+      expect(w('t4'), 2);
+    });
+
+    test('6 ay art arda: yıl toplamları eşitlenir, ay içi fark ≤ 1', () {
+      // Ay içi denge (fark ≤ 1) önceliklidir; yıllık denge fazlalığın kime
+      // gideceğini seçer. Toplam nöbet yıl sonunda da ≤ 1 farkla eşitlenir;
+      // hafta sonu ve gün aşırı çiftte ay içi kısıtlar yüzünden ≤ 2 kalabilir.
+      final people = team(7, 4);
+      final plans = <MonthPlan>[];
+      for (var month = 1; month <= 6; month++) {
+        final ytd = YearlySummary.build(
+          year: 2026,
+          plans: plans,
+          people: people,
+          holidays: holidays,
+          settings: settings,
+        ).byId;
+        final previous = plans.lastOrNull;
+        final r = RosterGenerator(
+          year: 2026,
+          month: month,
+          people: people,
+          holidays: holidays,
+          seed: month,
+          attempts: 120,
+          yearToDate: ytd,
+          previousMonthTail: previous == null
+              ? const []
+              : [
+                  for (
+                    var d = previous.daysInMonth - 3;
+                    d <= previous.daysInMonth;
+                    d++
+                  )
+                    previous.assignments[d]!.personIds.toSet(),
+                ],
+        ).generate();
+        final days = DateTime(2026, month + 1, 0).day;
+        expectHardRules(r, people, const {}, settings, days: days);
+        final weekend = RosterGenerator.weekendDays(
+          2026,
+          month,
+          holidays,
+          settings,
+        );
+        for (final role in Role.values) {
+          final s = spreads(r, people, role, weekend);
+          expect(s.total, lessThanOrEqualTo(1), reason: 'ay $month $role');
+        }
+        // Ay sınırı: önceki ayın son günü nöbetçisi 1'inde yok.
+        if (previous != null) {
+          final last = previous.assignments[previous.daysInMonth]!.personIds;
+          expect(
+            r.assignments[1]!.personIds.toSet().intersection(last.toSet()),
+            isEmpty,
+            reason: 'ay $month',
+          );
+        }
+        plans.add(
+          MonthPlan(year: 2026, month: month, assignments: r.assignments),
+        );
+      }
+
+      final year = YearlySummary.build(
+        year: 2026,
+        plans: plans,
+        people: people,
+        holidays: holidays,
+        settings: settings,
+      );
+      for (final role in Role.values) {
+        final rows = year.rows.where((r) => r.role == role);
+        expect(
+          spread(rows.map((r) => r.totals.shifts)),
+          lessThanOrEqualTo(1),
+          reason: '$role yıllık toplam',
+        );
+        expect(
+          spread(rows.map((r) => r.totals.weekendShifts)),
+          lessThanOrEqualTo(2),
+          reason: '$role yıllık hafta sonu',
+        );
+        expect(
+          spread(rows.map((r) => r.totals.everyOtherDayPairs)),
+          lessThanOrEqualTo(2),
+          reason: '$role yıllık gün aşırı',
+        );
+      }
+    });
   });
 }
