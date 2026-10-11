@@ -18,9 +18,10 @@ final peopleRepositoryProvider = Provider<PeopleRepository>(
   (ref) => PeopleRepository(ref.watch(hiveBoxesProvider).people),
 );
 
-final holidayRepositoryProvider = Provider<HolidayRepository>(
-  (ref) => HolidayRepository(ref.watch(hiveBoxesProvider).holidays),
-);
+final holidayRepositoryProvider = Provider<HolidayRepository>((ref) {
+  final boxes = ref.watch(hiveBoxesProvider);
+  return HolidayRepository(boxes.holidays, boxes.meta);
+});
 
 final monthPlanRepositoryProvider = Provider<MonthPlanRepository>(
   (ref) => MonthPlanRepository(ref.watch(hiveBoxesProvider).monthPlans),
@@ -28,4 +29,9 @@ final monthPlanRepositoryProvider = Provider<MonthPlanRepository>(
 
 final settingsRepositoryProvider = Provider<SettingsRepository>(
   (ref) => SettingsRepository(ref.watch(hiveBoxesProvider).settings),
+);
+
+/// Kayıtlı nöbet ve mesai ayarları.
+final rosterSettingsProvider = Provider(
+  (ref) => ref.watch(settingsRepositoryProvider).load(),
 );

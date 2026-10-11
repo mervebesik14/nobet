@@ -65,7 +65,7 @@ types:
         index: 5
   RosterSettings:
     typeId: 5
-    nextIndex: 8
+    nextIndex: 9
     fields:
       nursesPerDay:
         index: 0
@@ -83,3 +83,5 @@ types:
         index: 6
       holidayCountsAsWeekend:
         index: 7
+      halfDayHolidayIsHalfWorkday:
+        index: 8

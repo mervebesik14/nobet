@@ -13,17 +13,22 @@ class HiveBoxes {
     required this.holidays,
     required this.monthPlans,
     required this.settings,
+    required this.meta,
   });
 
   static const peopleBox = 'people';
   static const holidaysBox = 'holidays';
   static const monthPlansBox = 'month_plans';
   static const settingsBox = 'settings';
+  static const metaBox = 'app_meta';
 
   final Box<Person> people;
   final Box<Holiday> holidays;
   final Box<MonthPlan> monthPlans;
   final Box<RosterSettings> settings;
+
+  /// Uygulamanın kendi kayıtları (ör. hazır tatillerin yüklendiği yıllar).
+  final Box<dynamic> meta;
 
   static bool _adaptersRegistered = false;
 
@@ -39,6 +44,7 @@ class HiveBoxes {
       holidays: await Hive.openBox<Holiday>(holidaysBox, bytes: bytes()),
       monthPlans: await Hive.openBox<MonthPlan>(monthPlansBox, bytes: bytes()),
       settings: await Hive.openBox<RosterSettings>(settingsBox, bytes: bytes()),
+      meta: await Hive.openBox<dynamic>(metaBox, bytes: bytes()),
     );
   }
 
@@ -47,5 +53,6 @@ class HiveBoxes {
     await holidays.close();
     await monthPlans.close();
     await settings.close();
+    await meta.close();
   }
 }

@@ -1,12 +1,16 @@
 import 'package:hive_ce/hive_ce.dart';
 
 import '../models/models.dart';
+import 'turkish_holidays.dart';
 
 /// Tatilleri saklar; anahtar `yyyy-MM-dd`, yani bir güne tek tatil düşer.
 class HolidayRepository {
-  HolidayRepository(this._box);
+  HolidayRepository(this._box, this._meta);
+
+  static const _seededYearsKey = 'seededHolidayYears';
 
   final Box<Holiday> _box;
+  final Box<dynamic> _meta;
 
   /// Tüm tatiller, tarihe göre sıralı.
   List<Holiday> getAll() =>
@@ -27,6 +31,25 @@ class HolidayRepository {
       _box.putAll({for (final h in holidays) h.key: h});
 
   Future<void> delete(DateTime date) => _box.delete(Holiday.keyFor(date));
+
+  /// Hazır Türkiye tatilleri yüklenmiş yıllar.
+  Set<int> get seededYears => {
+    ...(_meta.get(_seededYearsKey) as List? ?? const []).cast<int>(),
+  };
+
+  /// [year] yılının hazır tatillerini ilk seferde yükler, sonra dokunmaz:
+  /// kullanıcının sildiği ya da düzenlediği tatiller geri gelmez. Aynı güne
+  /// kullanıcının eklediği bir tatil varsa o korunur. Yükleme yapıldıysa true.
+  Future<bool> ensureYearSeeded(int year) async {
+    final seeded = seededYears;
+    if (seeded.contains(year)) return false;
+    await _box.putAll({
+      for (final h in TurkishHolidays.forYear(year))
+        if (!_box.containsKey(h.key)) h.key: h,
+    });
+    await _meta.put(_seededYearsKey, (seeded..add(year)).toList()..sort());
+    return true;
+  }
 
   Stream<BoxEvent> watch() => _box.watch();
 }

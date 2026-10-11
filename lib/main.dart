@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import 'app.dart';
 import 'data/hive_boxes.dart';
+import 'data/holiday_repository.dart';
 import 'data/providers.dart';
 
 Future<void> main() async {
@@ -18,6 +19,12 @@ Future<void> main() async {
   // Tüm veri cihazda Hive ile saklanır.
   await Hive.initFlutter();
   final boxes = await HiveBoxes.open();
+
+  // Bu yılın ve gelecek yılın Türkiye tatilleri ilk açılışta yüklenir.
+  final holidays = HolidayRepository(boxes.holidays, boxes.meta);
+  final thisYear = DateTime.now().year;
+  await holidays.ensureYearSeeded(thisYear);
+  await holidays.ensureYearSeeded(thisYear + 1);
 
   runApp(
     ProviderScope(

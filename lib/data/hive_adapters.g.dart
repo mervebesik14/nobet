@@ -249,13 +249,14 @@ class RosterSettingsAdapter extends TypeAdapter<RosterSettings> {
       maxExtraOverAverage: (fields[5] as num?)?.toInt(),
       forbidConsecutiveDays: fields[6] == null ? true : fields[6] as bool,
       holidayCountsAsWeekend: fields[7] == null ? true : fields[7] as bool,
+      halfDayHolidayIsHalfWorkday: fields[8] == null ? true : fields[8] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, RosterSettings obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.nursesPerDay)
       ..writeByte(1)
@@ -271,7 +272,9 @@ class RosterSettingsAdapter extends TypeAdapter<RosterSettings> {
       ..writeByte(6)
       ..write(obj.forbidConsecutiveDays)
       ..writeByte(7)
-      ..write(obj.holidayCountsAsWeekend);
+      ..write(obj.holidayCountsAsWeekend)
+      ..writeByte(8)
+      ..write(obj.halfDayHolidayIsHalfWorkday);
   }
 
   @override

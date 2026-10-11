@@ -9,6 +9,7 @@ class RosterSettings {
     this.maxExtraOverAverage,
     this.forbidConsecutiveDays = true,
     this.holidayCountsAsWeekend = true,
+    this.halfDayHolidayIsHalfWorkday = true,
   });
 
   /// Her gün nöbet tutacak hemşire sayısı.
@@ -36,6 +37,10 @@ class RosterSettings {
   /// Resmi tatiller hafta sonu nöbeti olarak sayılır.
   final bool holidayCountsAsWeekend;
 
+  /// Yarım gün tatil (arife) gereken saate günlük saatin yarısı olarak
+  /// eklenir. Kapalıysa arife tam iş günü sayılır.
+  final bool halfDayHolidayIsHalfWorkday;
+
   RosterSettings copyWith({
     int? nursesPerDay,
     int? techsPerDay,
@@ -46,6 +51,7 @@ class RosterSettings {
     bool clearMaxExtraOverAverage = false,
     bool? forbidConsecutiveDays,
     bool? holidayCountsAsWeekend,
+    bool? halfDayHolidayIsHalfWorkday,
   }) {
     return RosterSettings(
       nursesPerDay: nursesPerDay ?? this.nursesPerDay,
@@ -61,6 +67,8 @@ class RosterSettings {
           forbidConsecutiveDays ?? this.forbidConsecutiveDays,
       holidayCountsAsWeekend:
           holidayCountsAsWeekend ?? this.holidayCountsAsWeekend,
+      halfDayHolidayIsHalfWorkday:
+          halfDayHolidayIsHalfWorkday ?? this.halfDayHolidayIsHalfWorkday,
     );
   }
 
@@ -73,6 +81,7 @@ class RosterSettings {
     'maxExtraOverAverage': maxExtraOverAverage,
     'forbidConsecutiveDays': forbidConsecutiveDays,
     'holidayCountsAsWeekend': holidayCountsAsWeekend,
+    'halfDayHolidayIsHalfWorkday': halfDayHolidayIsHalfWorkday,
   };
 
   /// Eksik alanlar varsayılan değerini alır (eski yedeklerle uyum için).
@@ -92,6 +101,9 @@ class RosterSettings {
           json['forbidConsecutiveDays'] as bool? ?? d.forbidConsecutiveDays,
       holidayCountsAsWeekend:
           json['holidayCountsAsWeekend'] as bool? ?? d.holidayCountsAsWeekend,
+      halfDayHolidayIsHalfWorkday:
+          json['halfDayHolidayIsHalfWorkday'] as bool? ??
+          d.halfDayHolidayIsHalfWorkday,
     );
   }
 
@@ -105,7 +117,8 @@ class RosterSettings {
       other.maxEveryOtherDayChain == maxEveryOtherDayChain &&
       other.maxExtraOverAverage == maxExtraOverAverage &&
       other.forbidConsecutiveDays == forbidConsecutiveDays &&
-      other.holidayCountsAsWeekend == holidayCountsAsWeekend;
+      other.holidayCountsAsWeekend == holidayCountsAsWeekend &&
+      other.halfDayHolidayIsHalfWorkday == halfDayHolidayIsHalfWorkday;
 
   @override
   int get hashCode => Object.hash(
@@ -117,5 +130,6 @@ class RosterSettings {
     maxExtraOverAverage,
     forbidConsecutiveDays,
     holidayCountsAsWeekend,
+    halfDayHolidayIsHalfWorkday,
   );
 }

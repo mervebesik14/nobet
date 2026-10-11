@@ -83,13 +83,14 @@ void main() {
     final newYear = Holiday(date: DateTime(2027, 1, 1), name: 'Yılbaşı');
 
     test('kaydeder, aya göre listeler, yeniden açınca geri gelir', () async {
-      expect(HolidayRepository(boxes.holidays).isEmpty, isTrue);
+      expect(HolidayRepository(boxes.holidays, boxes.meta).isEmpty, isTrue);
       await HolidayRepository(
         boxes.holidays,
+        boxes.meta,
       ).saveAll([newYear, republic, republicEve]);
       await reopen();
 
-      final repo = HolidayRepository(boxes.holidays);
+      final repo = HolidayRepository(boxes.holidays, boxes.meta);
       expect(repo.getAll(), [republicEve, republic, newYear]);
       expect(repo.getForMonth(2026, 10), [republicEve, republic]);
       expect(repo.getForMonth(2026, 11), isEmpty);
@@ -97,7 +98,7 @@ void main() {
     });
 
     test('aynı güne yazmak üzerine yazar, silme çalışır', () async {
-      final repo = HolidayRepository(boxes.holidays);
+      final repo = HolidayRepository(boxes.holidays, boxes.meta);
       await repo.save(republic);
       await repo.save(republic.copyWith(isHalfDay: true));
       expect(repo.getAll().single.isHalfDay, isTrue);
