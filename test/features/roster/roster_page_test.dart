@@ -79,18 +79,41 @@ void main() {
       expect(a.techId, isNotNull);
     }
 
-    // Tablo: satır başlıkları, gün başlıkları, eksik yok.
-    expect(find.text('Hemşire 1'), findsOneWidget);
-    expect(find.text('Hemşire 2'), findsOneWidget);
-    expect(find.text('Radyoloji Teknikeri'), findsWidgets);
-    expect(find.text('1 Per'), findsOneWidget);
-    expect(find.text('31 Cmt'), findsOneWidget);
-    expect(find.text('Eksik'), findsNothing);
+    // Tablo: satırlarda kişiler (tabloda ve özette), sütunlarda günler,
+    // nöbet olan her hücrede "24": 31 gün × 3 kişi (+1: 24. günün başlığı).
+    final table = find.byType(RosterTable);
+    Finder inTable(String text) =>
+        find.descendant(of: table, matching: find.text(text));
+    expect(inTable('Hemşireler'), findsOneWidget);
+    expect(inTable('Radyoloji Teknikerleri'), findsOneWidget);
+    for (final p in _team) {
+      expect(inTable(p.name), findsOneWidget);
+    }
+    expect(inTable('1'), findsOneWidget);
+    expect(inTable('Per'), findsWidgets);
+    expect(inTable('31'), findsOneWidget);
+    expect(inTable('24'), findsNWidgets(31 * 3 + 1));
+    expect(inTable('Eksik'), findsNothing);
+
+    // Ayşe'nin satırındaki "24"ler kayıtlı nöbet sayısıyla aynı.
+    final ayseShifts = plan.assignments.values
+        .where((a) => a.includes('n1'))
+        .length;
+    final ayseRowY = tester.getCenter(inTable('Ayşe Yılmaz')).dy;
+    final ayseCells = tester
+        .widgetList<Text>(inTable('24'))
+        .map((w) => find.byWidget(w))
+        .where((f) => (tester.getCenter(f).dy - ayseRowY).abs() < 1)
+        .where(
+          (f) => tester.widget<Text>(f).style?.fontWeight == FontWeight.bold,
+        )
+        .length;
+    expect(ayseCells, ayseShifts);
 
     // Özet: kişiler, rol ortalamaları, gereken saat.
     expect(find.text('Özet'), findsOneWidget);
     expect(find.text('Ortalama'), findsNWidgets(2));
-    expect(find.text('Ayşe Yılmaz'), findsOneWidget);
+    expect(find.text('Ayşe Yılmaz'), findsNWidgets(2)); // tablo + özet
     expect(find.text('145'), findsWidgets);
 
     await tester.pageBack();
@@ -146,7 +169,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Ekim 2026 Nöbet Listesi'), findsOneWidget);
-    expect(find.text('Eksik'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(RosterTable),
+        matching: find.text('Eksik'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('1 günde eksik nöbetçi var: 18 Ekim'), findsOneWidget);
     expect(saved().assignments[18]!.techId, isNull);
   });
@@ -196,11 +225,5 @@ void main() {
     expect(find.text('Bu ay kilitli'), findsNothing);
     expect(saved().seed, isNot(firstSeed));
     expect(saved().assignments.length, 31);
-  });
-
-  test('shortName', () {
-    expect(RosterTable.shortName('Ayşe Yılmaz'), 'Ayşe Y.');
-    expect(RosterTable.shortName('Ali Rıza Öztürk'), 'Ali Ö.');
-    expect(RosterTable.shortName('Banu'), 'Banu');
   });
 }

@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -37,13 +39,16 @@ class RosterPage extends ConsumerWidget {
       holidays: holidays,
       settings: settings,
     );
-    final missingDays = [
-      for (var d = 1; d <= plan.daysInMonth; d++)
-        if ((plan.assignments[d]?.nurseIds.length ?? 0) <
-                settings.nursesPerDay ||
-            (settings.techsPerDay > 0 && plan.assignments[d]?.techId == null))
-          d,
-    ];
+    // Gün → boş kalan koltuk sayısı.
+    final missingByDay = <int, int>{};
+    for (var d = 1; d <= plan.daysInMonth; d++) {
+      final a = plan.assignments[d];
+      final missing =
+          max(0, settings.nursesPerDay - (a?.nurseIds.length ?? 0)) +
+          (settings.techsPerDay > 0 && a?.techId == null ? 1 : 0);
+      if (missing > 0) missingByDay[d] = missing;
+    }
+    final missingDays = missingByDay.keys.toList();
     final monthTitle = DateFormat.yMMMM(
       'tr_TR',
     ).format(DateTime(plan.year, plan.month));
@@ -103,7 +108,10 @@ class RosterPage extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: RosterTable(
               plan: plan,
-              namesById: {for (final p in people) p.id: p.name},
+              rows: [
+                for (final r in summary.people)
+                  (id: r.personId, name: r.name, role: r.role),
+              ],
               weekendDays: RosterGenerator.weekendDays(
                 plan.year,
                 plan.month,
@@ -114,7 +122,8 @@ class RosterPage extends ConsumerWidget {
                 for (final h in holidays)
                   if (!h.isHalfDay) h.date.day,
               },
-              nursesPerDay: settings.nursesPerDay,
+              shiftHours: settings.shiftHours,
+              missingByDay: missingByDay,
             ),
           ),
           Padding(

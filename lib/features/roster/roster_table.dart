@@ -3,68 +3,73 @@ import 'package:intl/intl.dart';
 
 import '../../models/models.dart';
 
-/// Nöbet tablosu: sütunlar günler, satırlar Hemşire 1..N ve Radyoloji
-/// Teknikeri. Tablo yatay kayar, soldaki satır başlıkları sabit kalır.
+/// Tablodaki bir kişi satırı.
+typedef RosterRow = ({String id, String name, Role role});
+
+/// Nöbet tablosu: sütunlar ayın günleri, satırlar kişiler (rol gruplarına
+/// ayrılmış). Kişinin nöbetçi olduğu günde nöbet süresi ("24") yazar.
+/// Tablo yatay kayar, soldaki isim sütunu sabit kalır.
 class RosterTable extends StatelessWidget {
   const RosterTable({
     super.key,
     required this.plan,
-    required this.namesById,
+    required this.rows,
     required this.weekendDays,
     required this.holidayDays,
-    required this.nursesPerDay,
+    required this.shiftHours,
+    this.missingByDay = const {},
   });
 
   final MonthPlan plan;
-  final Map<String, String> namesById;
+
+  /// Satır sırası; aynı roldekiler art arda gelmeli.
+  final List<RosterRow> rows;
   final Set<int> weekendDays;
   final Set<int> holidayDays;
-  final int nursesPerDay;
+  final int shiftHours;
 
-  static const _labelWidth = 116.0;
-  static const _cellWidth = 84.0;
-  static const _headerHeight = 48.0;
-  static const _rowHeight = 44.0;
+  /// Gün → boş kalan koltuk sayısı; doluysa en altta "Eksik" satırı çıkar.
+  final Map<int, int> missingByDay;
 
-  /// "Ayşe Yılmaz" → "Ayşe Y."; tek kelimelik ad olduğu gibi kalır.
-  static String shortName(String name) {
-    final parts = name.trim().split(RegExp(r'\s+'));
-    if (parts.length < 2) return name;
-    return '${parts.first} ${parts.last.characters.first}.';
-  }
+  static const _labelWidth = 140.0;
+  static const _cellWidth = 44.0;
+  static const _headerHeight = 56.0;
+  static const _rowHeight = 36.0;
+  static const _groupHeight = 28.0;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final rows = <(String, String? Function(DayAssignment?))>[
-      for (var i = 0; i < nursesPerDay; i++)
-        (
-          'Hemşire ${i + 1}',
-          (a) => (a != null && i < a.nurseIds.length) ? a.nurseIds[i] : null,
-        ),
-      ('Radyoloji Teknikeri', (a) => a?.techId),
-    ];
+    final scheme = theme.colorScheme;
     final dayFormat = DateFormat.E('tr_TR');
     final border = BorderSide(color: theme.dividerColor);
+    final days = [for (var d = 1; d <= plan.daysInMonth; d++) d];
+
+    // Kişi → nöbet günleri.
+    final worked = <String, Set<int>>{};
+    for (final a in plan.assignments.values) {
+      for (final id in a.personIds) {
+        (worked[id] ??= {}).add(a.day);
+      }
+    }
 
     Color? columnColor(int day) {
-      if (holidayDays.contains(day)) return theme.colorScheme.tertiaryContainer;
-      if (weekendDays.contains(day)) {
-        return theme.colorScheme.secondaryContainer;
-      }
+      if (holidayDays.contains(day)) return scheme.tertiaryContainer;
+      if (weekendDays.contains(day)) return scheme.secondaryContainer;
       return null;
     }
 
-    Widget cell({
+    Widget box({
       required double width,
       required double height,
-      required Widget child,
+      Widget? child,
       Color? color,
+      Alignment alignment = Alignment.center,
     }) => Container(
       width: width,
       height: height,
-      alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      alignment: alignment,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
       decoration: BoxDecoration(
         color: color,
         border: Border(bottom: border, right: border),
@@ -72,28 +77,125 @@ class RosterTable extends StatelessWidget {
       child: child,
     );
 
+    // Satırlar: rol değişiminde grup başlığı, ardından kişiler.
+    final left = <Widget>[];
+    final right = <Widget>[];
+    Role? currentRole;
+    for (final row in rows) {
+      if (row.role != currentRole) {
+        currentRole = row.role;
+        left.add(
+          box(
+            width: _labelWidth,
+            height: _groupHeight,
+            color: scheme.primaryContainer,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              row.role.pluralLabel,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: scheme.onPrimaryContainer,
+              ),
+            ),
+          ),
+        );
+        right.add(
+          Row(
+            children: [
+              for (final _ in days)
+                box(
+                  width: _cellWidth,
+                  height: _groupHeight,
+                  color: scheme.primaryContainer,
+                ),
+            ],
+          ),
+        );
+      }
+      left.add(
+        box(
+          width: _labelWidth,
+          height: _rowHeight,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            row.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium,
+          ),
+        ),
+      );
+      final personDays = worked[row.id] ?? const <int>{};
+      right.add(
+        Row(
+          children: [
+            for (final d in days)
+              box(
+                width: _cellWidth,
+                height: _rowHeight,
+                color: columnColor(d),
+                child: personDays.contains(d)
+                    ? Text(
+                        '$shiftHours',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: scheme.primary,
+                        ),
+                      )
+                    : null,
+              ),
+          ],
+        ),
+      );
+    }
+
+    if (missingByDay.isNotEmpty) {
+      left.add(
+        box(
+          width: _labelWidth,
+          height: _rowHeight,
+          color: scheme.errorContainer,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Eksik',
+            style: TextStyle(color: scheme.onErrorContainer),
+          ),
+        ),
+      );
+      right.add(
+        Row(
+          children: [
+            for (final d in days)
+              box(
+                width: _cellWidth,
+                height: _rowHeight,
+                color: missingByDay.containsKey(d)
+                    ? scheme.errorContainer
+                    : columnColor(d),
+                child: missingByDay.containsKey(d)
+                    ? Text(
+                        '${missingByDay[d]}',
+                        style: TextStyle(color: scheme.onErrorContainer),
+                      )
+                    : null,
+              ),
+          ],
+        ),
+      );
+    }
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Column(
           children: [
-            cell(
+            box(
               width: _labelWidth,
               height: _headerHeight,
-              color: theme.colorScheme.surfaceContainerHighest,
-              child: const Text('Gün'),
+              color: scheme.surfaceContainerHighest,
+              alignment: Alignment.centerLeft,
+              child: const Text('Ad Soyad'),
             ),
-            for (final (label, _) in rows)
-              cell(
-                width: _labelWidth,
-                height: _rowHeight,
-                color: theme.colorScheme.surfaceContainerHighest,
-                child: Text(
-                  label,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.labelMedium,
-                ),
-              ),
+            ...left,
           ],
         ),
         Expanded(
@@ -103,75 +205,35 @@ class RosterTable extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    for (var d = 1; d <= plan.daysInMonth; d++)
-                      cell(
+                    for (final d in days)
+                      box(
                         width: _cellWidth,
                         height: _headerHeight,
-                        color:
-                            columnColor(d) ??
-                            theme.colorScheme.surfaceContainerHighest,
-                        child: Text(
-                          '$d ${dayFormat.format(DateTime(plan.year, plan.month, d))}',
-                          style: theme.textTheme.labelLarge,
+                        color: columnColor(d) ?? scheme.surfaceContainerHighest,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text('$d', style: theme.textTheme.labelLarge),
+                              Text(
+                                dayFormat.format(
+                                  DateTime(plan.year, plan.month, d),
+                                ),
+                                style: theme.textTheme.labelSmall,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                   ],
                 ),
-                for (final (_, pick) in rows)
-                  Row(
-                    children: [
-                      for (var d = 1; d <= plan.daysInMonth; d++)
-                        _assigneeCell(
-                          context,
-                          pick(plan.assignments[d]),
-                          cell,
-                          columnColor(d),
-                        ),
-                    ],
-                  ),
+                ...right,
               ],
             ),
           ),
         ),
       ],
-    );
-  }
-
-  Widget _assigneeCell(
-    BuildContext context,
-    String? id,
-    Widget Function({
-      required double width,
-      required double height,
-      required Widget child,
-      Color? color,
-    })
-    cell,
-    Color? color,
-  ) {
-    final theme = Theme.of(context);
-    if (id == null) {
-      return cell(
-        width: _cellWidth,
-        height: _rowHeight,
-        color: theme.colorScheme.errorContainer,
-        child: Text(
-          'Eksik',
-          style: TextStyle(color: theme.colorScheme.onErrorContainer),
-        ),
-      );
-    }
-    return cell(
-      width: _cellWidth,
-      height: _rowHeight,
-      color: color,
-      child: Text(
-        shortName(namesById[id] ?? 'Silinmiş kişi'),
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.center,
-        style: theme.textTheme.bodySmall,
-      ),
     );
   }
 }
