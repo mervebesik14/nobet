@@ -8,7 +8,7 @@
 - (İsteğe bağlı, varsayılan kapalı) Kişi, rol grubunun ortalamasından en fazla N fazla nöbet tutabilir.
 - Toplam nöbet, hafta sonu nöbeti ve gün aşırı çift sayısı rol grubu içinde eşit dağıtılır (fark ≤ 1 hedef). Öncelik adalet.
 - Hafta sonu = Cumartesi + Pazar (+ resmi tatiller, ayarla).
-- Gereken saat = ayın resmi tatil olmayan hafta içi günleri × 7; arife yarım gün = 3,5 saat.
+- Gereken saat = ayın resmi tatil olmayan hafta içi günleri × 7; arife (yarım gün tatil) = 5 saat (ayarlanabilir).
 - Çalışılan saat = nöbet × 24; fazla mesai = max(0, çalışılan − gereken).
 - Liste sonunda kişi başı: toplam nöbet, hafta sonu nöbet, çalışılan saat, gereken saat, fazla mesai.
 - Algoritma ve hesaplar lib/logic altında saf Dart, birim testli; arayüz metinleri Türkçe.

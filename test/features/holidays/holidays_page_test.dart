@@ -34,15 +34,15 @@ void main() {
     );
   }
 
-  testWidgets('Ekim 2026: tatiller ve 143,5 saat gereken', (tester) async {
+  testWidgets('Ekim 2026: tatiller ve 145 saat gereken', (tester) async {
     await pumpPage(tester, DateTime(2026, 10, 11));
 
     expect(find.text('Ekim 2026'), findsOneWidget);
     expect(find.text('Cumhuriyet Bayramı'), findsOneWidget);
     expect(find.text('Cumhuriyet Bayramı Arifesi'), findsOneWidget);
     expect(find.text('Yarım gün'), findsOneWidget);
-    expect(find.text('Bu ay çalışılması gereken: 143,5 saat'), findsOneWidget);
-    expect(find.text('20 iş günü + 1 yarım gün × 7 saat'), findsOneWidget);
+    expect(find.text('Bu ay çalışılması gereken: 145 saat'), findsOneWidget);
+    expect(find.text('20 iş günü × 7 saat + 1 arife × 5 saat'), findsOneWidget);
     expect(find.textContaining('tanımlı değil'), findsNothing);
   });
 
@@ -84,14 +84,14 @@ void main() {
   ) async {
     await pumpPage(tester, DateTime(2026, 10, 11));
 
-    // 29 Ekim'i yarım gün yap: 20 tam + 2 yarım = 147 saat.
+    // 29 Ekim'i yarım gün yap: 20 × 7 + 2 arife × 5 = 150 saat.
     await tester.tap(find.byTooltip('Seçenekler').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Yarım gün yap'));
     await tester.pumpAndSettle();
 
     expect(find.text('Yarım gün'), findsNWidgets(2));
-    expect(find.text('Bu ay çalışılması gereken: 147 saat'), findsOneWidget);
+    expect(find.text('Bu ay çalışılması gereken: 150 saat'), findsOneWidget);
     expect(boxes.holidays.get('2026-10-29')!.isHalfDay, isTrue);
   });
 
@@ -108,7 +108,7 @@ void main() {
 
     expect(find.text('Cumhuriyet Bayramı'), findsNothing);
     expect(boxes.holidays.get('2026-10-29'), isNull);
-    expect(find.text('Bu ay çalışılması gereken: 150,5 saat'), findsOneWidget);
+    expect(find.text('Bu ay çalışılması gereken: 152 saat'), findsOneWidget);
   });
 
   testWidgets('elle tatil eklenir', (tester) async {
@@ -139,6 +139,6 @@ void main() {
     final saved = boxes.holidays.get('2026-10-02')!;
     expect(saved.isPredefined, isFalse);
     expect(saved.isHalfDay, isFalse);
-    expect(find.text('Bu ay çalışılması gereken: 136,5 saat'), findsOneWidget);
+    expect(find.text('Bu ay çalışılması gereken: 138 saat'), findsOneWidget);
   });
 }

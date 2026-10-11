@@ -28,7 +28,8 @@ class RequiredHours {
 /// Mesai hesabı: gereken saat, çalışılan saat, fazla mesai.
 ///
 /// Gereken saat = ayın resmi tatil olmayan hafta içi günleri × günlük saat;
-/// arife (yarım gün tatil) günlük saatin yarısı sayılır.
+/// hafta içine denk gelen arife (yarım gün tatil) ayardaki arife saati
+/// (varsayılan 5) kadar sayılır.
 /// Çalışılan saat = nöbet sayısı × nöbet süresi.
 class WorkHoursCalculator {
   const WorkHoursCalculator(this.settings);
@@ -66,11 +67,12 @@ class WorkHoursCalculator {
       }
     }
 
-    final daily = settings.dailyRequiredHours;
     return RequiredHours(
       fullWorkdays: full,
       halfWorkdays: half,
-      hours: full * daily + half * daily / 2,
+      hours:
+          full * settings.dailyRequiredHours +
+          half * settings.halfDayRequiredHours,
     );
   }
 

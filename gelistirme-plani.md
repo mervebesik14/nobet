@@ -142,11 +142,11 @@ Pasif kişiler listenin altında soluk görünsün.
 
 **Mesai hesabı (`WorkHoursCalculator`, saf Dart)**
 - `requiredHours(year, month)` = (o aydaki Pazartesi to Cuma günlerinden resmi tatil olmayanların sayısı) × 7.
-- Yarım gün tatil (arife) için varsayılan: o gün 3,5 saat sayılır. Bunu istemezsen ayardan "arifeyi tam iş günü say" seçilebilir.
+- Yarım gün tatil (arife) için varsayılan: o gün 5 saat sayılır (ayarlanabilir). Bunu istemezsen ayardan "arifeyi tam iş günü say" seçilebilir.
 - `workedHours(person)` = nöbet sayısı × 24.
 - `overtimeHours` = max(0, çalışılan − gereken). Eksik çalışma varsa negatif değeri ayrıca "eksik saat" olarak gösterebiliriz.
 
-**Örnek (Ekim 2026):** 22 hafta içi gün, 29 Ekim Perşembe tatil, 28 Ekim Çarşamba yarım gün. Gereken = 20 × 7 + 3,5 = 143,5 saat. 7 nöbet tutan kişi: 168 saat, fazla mesai 24,5 saat.
+**Örnek (Ekim 2026):** 22 hafta içi gün, 29 Ekim Perşembe tatil, 28 Ekim Çarşamba yarım gün. Gereken = 20 × 7 + 5 = 145 saat. 7 nöbet tutan kişi: 168 saat, fazla mesai 23 saat.
 
 **Bitince çalışan:** Tatiller sekmesinde ayın tatilleri görünür ve düzenlenir; her ay için "Bu ay çalışılması gereken: X saat" bilgisi doğru hesaplanır.
 
@@ -159,8 +159,8 @@ Ramazan ve Kurban Bayramı yıl bazlı tabloda olsun (arife yarım gün). 2026: 
 İlk açılışta bu tatiller Hive'a isPredefined=true olarak yüklensin.
 Tatiller sekmesi: ay seçici, o ayın tatil listesi, ekle/sil/yarım gün işaretle.
 lib/logic/work_hours_calculator.dart: requiredHours(year, month, holidays, settings) = tatil olmayan hafta içi gün sayısı × dailyRequiredHours,
-yarım gün tatil o gün için dailyRequiredHours/2 eklesin. workedHours = nöbet × shiftHours, overtime = max(0, worked - required).
-Ekim 2026 için gereken saatin 143.5 çıktığını doğrulayan test dahil kapsamlı birim testleri yaz.
+yarım gün tatil (arife) o gün için halfDayRequiredHours (varsayılan 5) eklesin. workedHours = nöbet × shiftHours, overtime = max(0, worked - required).
+Ekim 2026 için gereken saatin 145 çıktığını doğrulayan test dahil kapsamlı birim testleri yaz.
 ```
 
 ---
@@ -262,7 +262,7 @@ Tüm testler geçene kadar düzelt.
 
 | Ad | Görev | Toplam nöbet | Hafta sonu nöbet | Gün aşırı | Çalışılan saat | Çalışılması gereken saat | Fazla mesai |
 |---|---|---|---|---|---|---|---|
-| Ayşe | Hemşire | 9 | 3 | 2 | 216 | 143,5 | 72,5 |
+| Ayşe | Hemşire | 9 | 3 | 2 | 216 | 145 | 71 |
 
 - Grup ortalamaları özetin altında ayrı satır olarak.
 - **"Yeniden oluştur"** (farklı tohum) ve **"Kaydet/Kilitle"** butonları. Kilitli ay yanlışlıkla yeniden oluşturulamaz.
@@ -376,7 +376,7 @@ Bilerek önermediklerim: sürükle-bırak (telefonda dar tabloda zahmetli; dokun
 - (İsteğe bağlı, varsayılan kapalı) Kişi, rol grubunun ortalamasından en fazla N fazla nöbet tutabilir.
 - Toplam nöbet, hafta sonu nöbeti ve gün aşırı çift sayısı rol grubu içinde eşit dağıtılır (fark ≤ 1 hedef). Öncelik adalet.
 - Hafta sonu = Cumartesi + Pazar (+ resmi tatiller, ayarla).
-- Gereken saat = ayın resmi tatil olmayan hafta içi günleri × 7; arife yarım gün = 3,5 saat.
+- Gereken saat = ayın resmi tatil olmayan hafta içi günleri × 7; arife (yarım gün tatil) = 5 saat (ayarlanabilir).
 - Çalışılan saat = nöbet × 24; fazla mesai = max(0, çalışılan − gereken).
 - Liste sonunda kişi başı: toplam nöbet, hafta sonu nöbet, çalışılan saat, gereken saat, fazla mesai.
 - Algoritma ve hesaplar lib/logic altında saf Dart, birim testli; arayüz metinleri Türkçe.

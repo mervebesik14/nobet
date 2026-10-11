@@ -91,6 +91,7 @@ void main() {
       expect(s.forbidConsecutiveDays, isTrue);
       expect(s.holidayCountsAsWeekend, isTrue);
       expect(s.halfDayHolidayIsHalfWorkday, isTrue);
+      expect(s.halfDayRequiredHours, 5);
     });
 
     test('JSON gidiş-dönüş ve eksik alanlarda varsayılan', () {

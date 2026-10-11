@@ -10,6 +10,7 @@ class RosterSettings {
     this.forbidConsecutiveDays = true,
     this.holidayCountsAsWeekend = true,
     this.halfDayHolidayIsHalfWorkday = true,
+    this.halfDayRequiredHours = 5,
   });
 
   /// Her gün nöbet tutacak hemşire sayısı.
@@ -37,9 +38,12 @@ class RosterSettings {
   /// Resmi tatiller hafta sonu nöbeti olarak sayılır.
   final bool holidayCountsAsWeekend;
 
-  /// Yarım gün tatil (arife) gereken saate günlük saatin yarısı olarak
+  /// Yarım gün tatil (arife) gereken saate [halfDayRequiredHours] olarak
   /// eklenir. Kapalıysa arife tam iş günü sayılır.
   final bool halfDayHolidayIsHalfWorkday;
+
+  /// Hafta içine denk gelen arife gününün gerektirdiği çalışma saati.
+  final double halfDayRequiredHours;
 
   RosterSettings copyWith({
     int? nursesPerDay,
@@ -52,6 +56,7 @@ class RosterSettings {
     bool? forbidConsecutiveDays,
     bool? holidayCountsAsWeekend,
     bool? halfDayHolidayIsHalfWorkday,
+    double? halfDayRequiredHours,
   }) {
     return RosterSettings(
       nursesPerDay: nursesPerDay ?? this.nursesPerDay,
@@ -69,6 +74,7 @@ class RosterSettings {
           holidayCountsAsWeekend ?? this.holidayCountsAsWeekend,
       halfDayHolidayIsHalfWorkday:
           halfDayHolidayIsHalfWorkday ?? this.halfDayHolidayIsHalfWorkday,
+      halfDayRequiredHours: halfDayRequiredHours ?? this.halfDayRequiredHours,
     );
   }
 
@@ -82,6 +88,7 @@ class RosterSettings {
     'forbidConsecutiveDays': forbidConsecutiveDays,
     'holidayCountsAsWeekend': holidayCountsAsWeekend,
     'halfDayHolidayIsHalfWorkday': halfDayHolidayIsHalfWorkday,
+    'halfDayRequiredHours': halfDayRequiredHours,
   };
 
   /// Eksik alanlar varsayılan değerini alır (eski yedeklerle uyum için).
@@ -104,6 +111,9 @@ class RosterSettings {
       halfDayHolidayIsHalfWorkday:
           json['halfDayHolidayIsHalfWorkday'] as bool? ??
           d.halfDayHolidayIsHalfWorkday,
+      halfDayRequiredHours:
+          (json['halfDayRequiredHours'] as num?)?.toDouble() ??
+          d.halfDayRequiredHours,
     );
   }
 
@@ -118,7 +128,8 @@ class RosterSettings {
       other.maxExtraOverAverage == maxExtraOverAverage &&
       other.forbidConsecutiveDays == forbidConsecutiveDays &&
       other.holidayCountsAsWeekend == holidayCountsAsWeekend &&
-      other.halfDayHolidayIsHalfWorkday == halfDayHolidayIsHalfWorkday;
+      other.halfDayHolidayIsHalfWorkday == halfDayHolidayIsHalfWorkday &&
+      other.halfDayRequiredHours == halfDayRequiredHours;
 
   @override
   int get hashCode => Object.hash(
@@ -131,5 +142,6 @@ class RosterSettings {
     forbidConsecutiveDays,
     holidayCountsAsWeekend,
     halfDayHolidayIsHalfWorkday,
+    halfDayRequiredHours,
   );
 }

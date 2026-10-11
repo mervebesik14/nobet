@@ -93,9 +93,12 @@ class _RequiredHoursCard extends ConsumerWidget {
       settings,
     ).requiredHoursBreakdown(month.year, month.month, holidays);
     final theme = Theme.of(context);
-    final days = [
-      '${r.fullWorkdays} iş günü',
-      if (r.halfWorkdays > 0) '${r.halfWorkdays} yarım gün',
+    final details = [
+      '${r.fullWorkdays} iş günü × '
+          '${_formatHours(settings.dailyRequiredHours)} saat',
+      if (r.halfWorkdays > 0)
+        '${r.halfWorkdays} arife × '
+            '${_formatHours(settings.halfDayRequiredHours)} saat',
     ].join(' + ');
 
     return Card(
@@ -111,7 +114,7 @@ class _RequiredHoursCard extends ConsumerWidget {
           style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
         ),
         subtitle: Text(
-          '$days × ${_formatHours(settings.dailyRequiredHours)} saat',
+          details,
           style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
         ),
       ),

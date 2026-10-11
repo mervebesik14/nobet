@@ -250,13 +250,16 @@ class RosterSettingsAdapter extends TypeAdapter<RosterSettings> {
       forbidConsecutiveDays: fields[6] == null ? true : fields[6] as bool,
       holidayCountsAsWeekend: fields[7] == null ? true : fields[7] as bool,
       halfDayHolidayIsHalfWorkday: fields[8] == null ? true : fields[8] as bool,
+      halfDayRequiredHours: fields[9] == null
+          ? 5
+          : (fields[9] as num).toDouble(),
     );
   }
 
   @override
   void write(BinaryWriter writer, RosterSettings obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.nursesPerDay)
       ..writeByte(1)
@@ -274,7 +277,9 @@ class RosterSettingsAdapter extends TypeAdapter<RosterSettings> {
       ..writeByte(7)
       ..write(obj.holidayCountsAsWeekend)
       ..writeByte(8)
-      ..write(obj.halfDayHolidayIsHalfWorkday);
+      ..write(obj.halfDayHolidayIsHalfWorkday)
+      ..writeByte(9)
+      ..write(obj.halfDayRequiredHours);
   }
 
   @override

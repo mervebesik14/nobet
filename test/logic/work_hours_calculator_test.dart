@@ -8,12 +8,12 @@ void main() {
   final holidays2026 = TurkishHolidays.forYear(2026);
 
   group('requiredHours', () {
-    test('Ekim 2026: 20 tam gün + 28 Ekim yarım gün = 143,5 saat', () {
+    test('Ekim 2026: 20 tam gün × 7 + 28 Ekim arifesi 5 = 145 saat', () {
       final r = calc.requiredHoursBreakdown(2026, 10, holidays2026);
       expect(r.fullWorkdays, 20);
       expect(r.halfWorkdays, 1);
-      expect(r.hours, 143.5);
-      expect(calc.requiredHours(2026, 10, holidays2026), 143.5);
+      expect(r.hours, 145);
+      expect(calc.requiredHours(2026, 10, holidays2026), 145);
     });
 
     test('tatilsiz ay: Kasım 2026, 21 iş günü = 147 saat', () {
@@ -37,7 +37,7 @@ void main() {
         final r = calc.requiredHoursBreakdown(2026, 3, holidays2026);
         expect(r.fullWorkdays, 20);
         expect(r.halfWorkdays, 1);
-        expect(r.hours, 143.5);
+        expect(r.hours, 145);
       },
     );
 
@@ -47,7 +47,7 @@ void main() {
       final r = calc.requiredHoursBreakdown(2026, 5, holidays2026);
       expect(r.fullWorkdays, 21 - 5 - 1);
       expect(r.halfWorkdays, 1);
-      expect(r.hours, 15 * 7 + 3.5);
+      expect(r.hours, 15 * 7 + 5);
     });
 
     test('başka aylardaki tatiller yok sayılır', () {
@@ -68,9 +68,12 @@ void main() {
       expect(r.hours, 147);
     });
 
-    test('günlük saat ayardan gelir', () {
+    test('günlük saat ve arife saati ayardan gelir', () {
       const c = WorkHoursCalculator(RosterSettings(dailyRequiredHours: 8));
-      expect(c.requiredHours(2026, 10, holidays2026), 20 * 8 + 4);
+      expect(c.requiredHours(2026, 10, holidays2026), 20 * 8 + 5);
+
+      const c2 = WorkHoursCalculator(RosterSettings(halfDayRequiredHours: 3.5));
+      expect(c2.requiredHours(2026, 10, holidays2026), 143.5);
     });
 
     test('Şubat artık yıl: 2028, Ramazan Bayramı hafta sonu, arife Cuma', () {
@@ -87,10 +90,10 @@ void main() {
   });
 
   group('çalışılan saat ve fazla mesai', () {
-    test('plandaki örnek: 7 nöbet, Ekim 2026', () {
+    test('örnek: 7 nöbet, Ekim 2026 (145 saat gereken)', () {
       final required = calc.requiredHours(2026, 10, holidays2026);
       expect(calc.workedHours(7), 168);
-      expect(calc.overtimeHours(7, required), 24.5);
+      expect(calc.overtimeHours(7, required), 23);
       expect(calc.missingHours(7, required), 0);
     });
 
