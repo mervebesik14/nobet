@@ -1,17 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'data/providers.dart';
 
 import 'features/shell/main_shell.dart';
 
 /// Uygulamanın kökü: tema, Türkçe locale ve ana iskelet.
-class NobetApp extends StatelessWidget {
+class NobetApp extends ConsumerWidget {
   const NobetApp({super.key});
 
   static const _seedColor = Colors.teal;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
+      themeMode: ref.watch(themeModeProvider),
       title: 'Nöbet Listesi',
       debugShowCheckedModeBanner: false,
       locale: const Locale('tr', 'TR'),

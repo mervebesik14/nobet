@@ -15,7 +15,9 @@ import '../../models/models.dart';
 import '../holidays/holidays_controller.dart';
 import '../month/month_plan_controller.dart';
 import '../people/people_controller.dart';
+import '../../shared/platform_services.dart';
 import 'edit_sheet.dart';
+import 'roster_pdf.dart';
 import 'roster_flow.dart';
 import 'roster_table.dart';
 import 'summary_table.dart';
@@ -276,6 +278,51 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     }
   }
 
+  /// Listeyi PDF / PNG olarak paylaşır ya da yazdırır.
+  Future<void> _share(
+    _ShareAction action, {
+    required MonthPlan plan,
+    required List<RosterRow> rows,
+    required RosterSummary summary,
+    required Set<int> weekendDays,
+    required Set<int> holidayDays,
+    required Map<int, int> missingByDay,
+    required int shiftHours,
+  }) async {
+    final services = ref.read(platformServicesProvider);
+    final fileBase =
+        'nobet-listesi-${plan.year}-${plan.month.toString().padLeft(2, '0')}';
+    final title =
+        '${DateFormat.yMMMM('tr_TR').format(DateTime(plan.year, plan.month))} '
+        'Nöbet Listesi';
+    try {
+      final fonts = await services.loadPdfFonts();
+      final pdf = await buildRosterPdf(
+        plan: plan,
+        rows: rows,
+        summary: summary,
+        weekendDays: weekendDays,
+        holidayDays: holidayDays,
+        shiftHours: shiftHours,
+        missingByDay: missingByDay,
+        font: fonts.regular,
+        boldFont: fonts.bold,
+        singlePage: action == _ShareAction.png,
+      );
+      switch (action) {
+        case _ShareAction.pdf:
+          await services.sharePdf(pdf, '$fileBase.pdf');
+        case _ShareAction.png:
+          final png = await services.pdfToPng(pdf);
+          await services.shareFile(png, '$fileBase.png', 'image/png');
+        case _ShareAction.print:
+          await services.printPdf(pdf, title);
+      }
+    } catch (e) {
+      if (mounted) _notify('Paylaşılamadı: $e');
+    }
+  }
+
   /// Kişinin o gün oturduğu koltuğun rolü.
   Role? _roleOf(String id, int day) {
     final a = _plan.assignments[day];
@@ -319,6 +366,16 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         (id: r.personId, name: r.name, role: r.role),
     ];
     final roleById = {for (final r in rows) r.id: r.role};
+    final weekendDays = RosterGenerator.weekendDays(
+      plan.year,
+      plan.month,
+      holidays,
+      settings,
+    );
+    final holidayDays = {
+      for (final h in holidays)
+        if (!h.isHalfDay) h.date.day,
+    };
     final monthTitle = DateFormat.yMMMM(
       'tr_TR',
     ).format(DateTime(plan.year, plan.month));
@@ -342,6 +399,43 @@ class _RosterPageState extends ConsumerState<RosterPage> {
               setState(() => _swapFrom = null);
               generateRoster(context, ref);
             },
+          ),
+          PopupMenuButton<_ShareAction>(
+            tooltip: 'Paylaş',
+            icon: const Icon(Icons.share),
+            onSelected: (action) => _share(
+              action,
+              plan: plan,
+              rows: rows,
+              summary: summary,
+              weekendDays: weekendDays,
+              holidayDays: holidayDays,
+              missingByDay: missingByDay,
+              shiftHours: settings.shiftHours,
+            ),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: _ShareAction.pdf,
+                child: ListTile(
+                  leading: Icon(Icons.picture_as_pdf_outlined),
+                  title: Text('PDF olarak paylaş'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.png,
+                child: ListTile(
+                  leading: Icon(Icons.image_outlined),
+                  title: Text('Görsel (PNG) olarak paylaş'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.print,
+                child: ListTile(
+                  leading: Icon(Icons.print_outlined),
+                  title: Text('Yazdır'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -395,16 +489,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             child: RosterTable(
               plan: plan,
               rows: rows,
-              weekendDays: RosterGenerator.weekendDays(
-                plan.year,
-                plan.month,
-                holidays,
-                settings,
-              ),
-              holidayDays: {
-                for (final h in holidays)
-                  if (!h.isHalfDay) h.date.day,
-              },
+              weekendDays: weekendDays,
+              holidayDays: holidayDays,
               shiftHours: settings.shiftHours,
               missingByDay: missingByDay,
               violationCells: {
@@ -474,3 +560,5 @@ class _ViolationList extends StatelessWidget {
     );
   }
 }
+
+enum _ShareAction { pdf, png, print }
