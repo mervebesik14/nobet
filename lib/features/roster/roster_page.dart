@@ -5,25 +5,292 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../data/providers.dart';
+import '../../logic/roster_editor.dart';
 import '../../logic/roster_generator.dart';
 import '../../logic/roster_summary.dart';
+import '../../logic/roster_validator.dart';
+import '../../logic/turkish_collation.dart';
 import '../../logic/turkish_dates.dart';
+import '../../models/models.dart';
 import '../holidays/holidays_controller.dart';
 import '../month/month_plan_controller.dart';
 import '../people/people_controller.dart';
+import 'edit_sheet.dart';
 import 'roster_flow.dart';
 import 'roster_table.dart';
 import 'summary_table.dart';
 
-/// Seçili ayın nöbet listesi ve özet tablosu.
-class RosterPage extends ConsumerWidget {
+/// Seçili ayın nöbet listesi, elle düzenleme, kural uyarıları ve özet.
+///
+/// Hücreye dokun: o gün için seçenekler (kaldır / başkasıyla değiştir /
+/// bu kişiyi ata). Nöbete uzun bas: takas modu; ikinci nöbete dokununca iki
+/// nöbet yer değiştirir. Her değişiklikten sonra kurallar yeniden denetlenir.
+class RosterPage extends ConsumerStatefulWidget {
   const RosterPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<RosterPage> createState() => _RosterPageState();
+}
+
+class _RosterPageState extends ConsumerState<RosterPage> {
+  /// Takas modunda seçilen ilk nöbet.
+  RosterCell? _swapFrom;
+
+  MonthPlan get _plan => ref.read(monthPlanProvider);
+
+  void _notify(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Map<String, Person> get _peopleById => {
+    for (final p in ref.read(peopleProvider)) p.id: p,
+  };
+
+  String _name(String id) => _peopleById[id]?.name ?? 'Silinmiş kişi';
+
+  String _dayLabel(int day) => DateFormat(
+    'd MMMM EEEE',
+    'tr_TR',
+  ).format(DateTime(_plan.year, _plan.month, day));
+
+  List<RuleViolation> _validate(Map<int, DayAssignment> assignments) {
+    final plan = _plan;
+    return RosterValidator(ref.read(rosterSettingsProvider)).validate(
+      year: plan.year,
+      month: plan.month,
+      assignments: assignments,
+      people: ref.read(peopleProvider),
+      unavailableDays: plan.unavailableDays,
+      previousMonthTail: ref
+          .read(monthPlanProvider.notifier)
+          .previousMonthTail(),
+    );
+  }
+
+  /// [after] uygulanırsa [personId] için yeni çıkan ihlaller.
+  List<String> _newWarnings(
+    String personId,
+    Map<int, DayAssignment> after,
+    Set<String> before,
+  ) => [
+    for (final v in _validate(after))
+      if (v.personId == personId &&
+          v.kind != ViolationKind.missing &&
+          !before.contains(v.message))
+        v.message,
+  ];
+
+  Set<String> _currentMessages() => {
+    for (final v in ref.read(rosterViolationsProvider)) v.message,
+  };
+
+  bool _ensureUnlocked() {
+    if (!_plan.isLocked) return true;
+    _notify('Liste kilitli; düzenlemek için kilidi açın.');
+    return false;
+  }
+
+  Future<void> _apply(Map<int, DayAssignment>? result) async {
+    if (result == null) return;
+    await ref.read(monthPlanProvider.notifier).setAssignments(result);
+  }
+
+  /// Aynı roldeki aktif kişiler, Türkçe ada göre.
+  List<Person> _activeOfRole(Role role) =>
+      ref
+          .read(peopleProvider)
+          .where((p) => p.isActive && p.role == role)
+          .toList()
+        ..sort((a, b) => compareTurkish(a.name, b.name));
+
+  Future<void> _onCellTap(RosterCell cell, Role role) async {
+    if (_swapFrom != null) return _completeSwap(cell, role);
+    if (!_ensureUnlocked()) return;
+
+    final plan = _plan;
+    final nursesPerDay = ref.read(rosterSettingsProvider).nursesPerDay;
+    final day = cell.day;
+    final id = cell.personId;
+    final current = plan.assignments[day] ?? DayAssignment(day: day);
+    final before = _currentMessages();
+    final roleIds = role == Role.nurse ? current.nurseIds : [?current.techId];
+
+    Map<int, DayAssignment> replace(String? oldId, String? newId) =>
+        RosterEditor.replace(
+          plan.assignments,
+          day: day,
+          role: role,
+          oldId: oldId,
+          newId: newId,
+          nursesPerDay: nursesPerDay,
+        );
+
+    final Map<int, DayAssignment>? result;
+    if (current.includes(id)) {
+      result = await showEditSheet(
+        context,
+        title: '${_name(id)} · ${_dayLabel(day)}',
+        actions: [
+          EditOption(
+            title: 'Nöbeti kaldır',
+            subtitle: 'Koltuk boş kalır.',
+            icon: Icons.remove_circle_outline,
+            result: replace(id, null),
+          ),
+        ],
+        candidatesTitle: 'Yerine atanabilecekler',
+        candidates: [
+          for (final p in _activeOfRole(role))
+            if (!current.includes(p.id))
+              () {
+                final after = replace(id, p.id);
+                return EditOption(
+                  title: p.name,
+                  result: after,
+                  warnings: _newWarnings(p.id, after, before),
+                );
+              }(),
+        ],
+      );
+    } else {
+      final perDay = role == Role.nurse ? nursesPerDay : 1;
+      result = await showEditSheet(
+        context,
+        title: '${_name(id)} · ${_dayLabel(day)}',
+        subtitle: 'Bu güne ata',
+        candidates: [
+          if (roleIds.length < perDay)
+            () {
+              final after = replace(null, id);
+              return EditOption(
+                title: 'Boş koltuğa ata',
+                result: after,
+                warnings: _newWarnings(id, after, before),
+              );
+            }(),
+          for (final other in roleIds)
+            () {
+              final after = replace(other, id);
+              return EditOption(
+                title: '${_name(other)} yerine ata',
+                result: after,
+                warnings: _newWarnings(id, after, before),
+              );
+            }(),
+        ],
+      );
+    }
+    await _apply(result);
+  }
+
+  Future<void> _onMissingTap(int day) async {
+    if (_swapFrom != null) {
+      _notify('Takas için başka bir nöbete (24) dokunun.');
+      return;
+    }
+    if (!_ensureUnlocked()) return;
+    final plan = _plan;
+    final settings = ref.read(rosterSettingsProvider);
+    final current = plan.assignments[day] ?? DayAssignment(day: day);
+    final before = _currentMessages();
+
+    final candidates = <EditOption>[];
+    for (final role in Role.values) {
+      final empty = role == Role.nurse
+          ? current.nurseIds.length < settings.nursesPerDay
+          : settings.techsPerDay > 0 && current.techId == null;
+      if (!empty) continue;
+      for (final p in _activeOfRole(role)) {
+        if (current.includes(p.id)) continue;
+        final after = RosterEditor.replace(
+          plan.assignments,
+          day: day,
+          role: role,
+          newId: p.id,
+          nursesPerDay: settings.nursesPerDay,
+        );
+        candidates.add(
+          EditOption(
+            title: '${p.name} (${role.label})',
+            result: after,
+            warnings: _newWarnings(p.id, after, before),
+          ),
+        );
+      }
+    }
+    final result = await showEditSheet(
+      context,
+      title: '${_dayLabel(day)} · boş koltuk',
+      candidatesTitle: 'Atanabilecekler',
+      candidates: candidates,
+    );
+    await _apply(result);
+  }
+
+  void _onCellLongPress(RosterCell cell) {
+    if (!_ensureUnlocked()) return;
+    if (!(_plan.assignments[cell.day]?.includes(cell.personId) ?? false)) {
+      _notify('Takas için nöbet olan bir hücreye (24) uzun basın.');
+      return;
+    }
+    setState(() => _swapFrom = cell);
+  }
+
+  Future<void> _completeSwap(RosterCell cell, Role role) async {
+    final from = _swapFrom!;
+    if (from == cell) {
+      setState(() => _swapFrom = null);
+      return;
+    }
+    final plan = _plan;
+    if (!(plan.assignments[cell.day]?.includes(cell.personId) ?? false)) {
+      _notify('Takas için başka bir nöbete (24) dokunun.');
+      return;
+    }
+    final fromRole = _roleOf(from.personId, from.day);
+    if (fromRole != role) {
+      _notify('Takas yalnızca aynı görevdeki kişiler arasında yapılır.');
+      return;
+    }
+    try {
+      final result = RosterEditor.swap(
+        plan.assignments,
+        a: from.personId,
+        dayA: from.day,
+        b: cell.personId,
+        dayB: cell.day,
+        role: role,
+        nursesPerDay: ref.read(rosterSettingsProvider).nursesPerDay,
+      );
+      setState(() => _swapFrom = null);
+      await _apply(result);
+      _notify(
+        '${_name(from.personId)} ${formatDayMonth(from.day, plan.month)} ↔ '
+        '${_name(cell.personId)} ${formatDayMonth(cell.day, plan.month)} '
+        'takas edildi.',
+      );
+    } on RosterEditException catch (e) {
+      _notify('Takas yapılamaz: ${e.message}');
+    }
+  }
+
+  /// Kişinin o gün oturduğu koltuğun rolü.
+  Role? _roleOf(String id, int day) {
+    final a = _plan.assignments[day];
+    if (a == null) return null;
+    if (a.nurseIds.contains(id)) return Role.nurse;
+    if (a.techId == id) return Role.radiologyTech;
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final plan = ref.watch(monthPlanProvider);
     final people = ref.watch(peopleProvider);
     final settings = ref.watch(rosterSettingsProvider);
+    final violations = ref.watch(rosterViolationsProvider);
     final holidays = ref
         .watch(holidaysProvider)
         .where((h) => h.date.year == plan.year && h.date.month == plan.month)
@@ -39,7 +306,6 @@ class RosterPage extends ConsumerWidget {
       holidays: holidays,
       settings: settings,
     );
-    // Gün → boş kalan koltuk sayısı.
     final missingByDay = <int, int>{};
     for (var d = 1; d <= plan.daysInMonth; d++) {
       final a = plan.assignments[d];
@@ -48,7 +314,11 @@ class RosterPage extends ConsumerWidget {
           (settings.techsPerDay > 0 && a?.techId == null ? 1 : 0);
       if (missing > 0) missingByDay[d] = missing;
     }
-    final missingDays = missingByDay.keys.toList();
+    final rows = [
+      for (final r in summary.people)
+        (id: r.personId, name: r.name, role: r.role),
+    ];
+    final roleById = {for (final r in rows) r.id: r.role};
     final monthTitle = DateFormat.yMMMM(
       'tr_TR',
     ).format(DateTime(plan.year, plan.month));
@@ -60,12 +330,18 @@ class RosterPage extends ConsumerWidget {
           IconButton(
             tooltip: plan.isLocked ? 'Kilidi aç' : 'Kilitle',
             icon: Icon(plan.isLocked ? Icons.lock : Icons.lock_open),
-            onPressed: () => controller.setLocked(!plan.isLocked),
+            onPressed: () {
+              setState(() => _swapFrom = null);
+              controller.setLocked(!plan.isLocked);
+            },
           ),
           IconButton(
             tooltip: 'Yeniden oluştur',
             icon: const Icon(Icons.refresh),
-            onPressed: () => generateRoster(context, ref),
+            onPressed: () {
+              setState(() => _swapFrom = null);
+              generateRoster(context, ref);
+            },
           ),
         ],
       ),
@@ -76,42 +352,49 @@ class RosterPage extends ConsumerWidget {
             ListTile(
               leading: const Icon(Icons.lock),
               title: const Text('Liste kilitli'),
-              subtitle: const Text('Yeniden oluşturmak için onay istenir.'),
+              subtitle: const Text(
+                'Düzenleme kapalı; yeniden oluşturmak onay ister.',
+              ),
               tileColor: theme.colorScheme.surfaceContainerHighest,
+            )
+          else if (_swapFrom case final from?)
+            MaterialBanner(
+              leading: const Icon(Icons.swap_horiz),
+              content: Text(
+                'Takas: ${_name(from.personId)} – '
+                '${formatDayMonth(from.day, plan.month)} seçildi. '
+                'Takas edilecek ikinci nöbete dokunun.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => setState(() => _swapFrom = null),
+                  child: const Text('İptal'),
+                ),
+              ],
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Text(
+                'Düzenlemek için hücreye dokunun; takas için nöbete uzun '
+                'basın.',
+                style: theme.textTheme.bodySmall,
+              ),
             ),
           if (plan.generatedAt != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: Text(
                 'Oluşturulma: '
                 '${DateFormat('d MMMM y HH:mm', 'tr_TR').format(plan.generatedAt!)}',
                 style: theme.textTheme.bodySmall,
               ),
             ),
-          if (missingDays.isNotEmpty)
-            Card(
-              margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              color: theme.colorScheme.errorContainer,
-              child: ListTile(
-                leading: Icon(
-                  Icons.warning_amber_rounded,
-                  color: theme.colorScheme.onErrorContainer,
-                ),
-                title: Text(
-                  '${missingDays.length} günde eksik nöbetçi var: '
-                  '${missingDays.map((d) => formatDayMonth(d, plan.month)).join(', ')}',
-                  style: TextStyle(color: theme.colorScheme.onErrorContainer),
-                ),
-              ),
-            ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: RosterTable(
               plan: plan,
-              rows: [
-                for (final r in summary.people)
-                  (id: r.personId, name: r.name, role: r.role),
-              ],
+              rows: rows,
               weekendDays: RosterGenerator.weekendDays(
                 plan.year,
                 plan.month,
@@ -124,14 +407,69 @@ class RosterPage extends ConsumerWidget {
               },
               shiftHours: settings.shiftHours,
               missingByDay: missingByDay,
+              violationCells: {
+                for (final v in violations)
+                  if (v.personId case final id?)
+                    for (final d in v.days) (personId: id, day: d),
+              },
+              selectedCell: _swapFrom,
+              onCellTap: (cell) => _onCellTap(cell, roleById[cell.personId]!),
+              onCellLongPress: _onCellLongPress,
+              onMissingTap: _onMissingTap,
             ),
           ),
+          _ViolationList(violations: violations),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: Text('Özet', style: theme.textTheme.titleMedium),
           ),
           SummaryTable(summary: summary),
         ],
+      ),
+    );
+  }
+}
+
+class _ViolationList extends StatelessWidget {
+  const _ViolationList({required this.violations});
+
+  final List<RuleViolation> violations;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    if (violations.isEmpty) {
+      return ListTile(
+        leading: Icon(
+          Icons.check_circle_outline,
+          color: theme.colorScheme.primary,
+        ),
+        title: const Text('Kural ihlali yok'),
+      );
+    }
+    final onColor = theme.colorScheme.onErrorContainer;
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      color: theme.colorScheme.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              leading: Icon(Icons.warning_amber_rounded, color: onColor),
+              title: Text(
+                'Kural ihlalleri (${violations.length})',
+                style: TextStyle(color: onColor),
+              ),
+            ),
+            for (final v in violations)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text('• ${v.message}', style: TextStyle(color: onColor)),
+              ),
+          ],
+        ),
       ),
     );
   }

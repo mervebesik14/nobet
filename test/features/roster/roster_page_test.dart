@@ -176,7 +176,10 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('1 günde eksik nöbetçi var: 18 Ekim'), findsOneWidget);
+    expect(
+      find.text('• 18 Ekim: 1 radyoloji teknikeri eksik.'),
+      findsOneWidget,
+    );
     expect(saved().assignments[18]!.techId, isNull);
   });
 

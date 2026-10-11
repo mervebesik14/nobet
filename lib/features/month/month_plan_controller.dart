@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../logic/feasibility_checker.dart';
 import '../../logic/roster_generator.dart';
+import '../../logic/roster_validator.dart';
 import '../../models/models.dart';
 import '../../shared/providers.dart';
 import '../holidays/holidays_controller.dart';
@@ -83,7 +84,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       holidays: ref.read(holidaysProvider),
       settings: ref.read(rosterSettingsProvider),
       seed: seed ?? Random().nextInt(1 << 31),
-      previousMonthTail: _previousMonthTail(plan),
+      previousMonthTail: previousMonthTail(),
     );
     final result = await ref.read(rosterRunnerProvider)(generator);
     state = state.copyWith(
@@ -95,6 +96,15 @@ class MonthPlanController extends Notifier<MonthPlan> {
     return result;
   }
 
+  /// Elle düzenlenmiş atamaları kaydeder. Kilitli ayda değişiklik
+  /// yapılmaz ve false döner.
+  Future<bool> setAssignments(Map<int, DayAssignment> assignments) async {
+    if (state.isLocked) return false;
+    state = state.copyWith(assignments: assignments);
+    await ref.read(monthPlanRepositoryProvider).save(state);
+    return true;
+  }
+
   Future<void> setLocked(bool locked) async {
     state = state.copyWith(isLocked: locked);
     await ref.read(monthPlanRepositoryProvider).save(state);
@@ -102,7 +112,8 @@ class MonthPlanController extends Notifier<MonthPlan> {
 
   /// Önceki ayın son 4 gününün nöbetçileri (ay sınırında art arda gün ve
   /// gün aşırı zincir kuralları için).
-  List<Set<String>> _previousMonthTail(MonthPlan plan) {
+  List<Set<String>> previousMonthTail() {
+    final plan = state;
     final prev = DateTime(plan.year, plan.month - 1);
     final previous = ref
         .read(monthPlanRepositoryProvider)
@@ -115,6 +126,20 @@ class MonthPlanController extends Notifier<MonthPlan> {
     ];
   }
 }
+
+/// Seçili ayın listesindeki kural ihlalleri; her değişiklikte yenilenir.
+final rosterViolationsProvider = Provider<List<RuleViolation>>((ref) {
+  final plan = ref.watch(monthPlanProvider);
+  if (!plan.hasRoster) return const [];
+  return RosterValidator(ref.watch(rosterSettingsProvider)).validate(
+    year: plan.year,
+    month: plan.month,
+    assignments: plan.assignments,
+    people: ref.watch(peopleProvider),
+    unavailableDays: plan.unavailableDays,
+    previousMonthTail: ref.read(monthPlanProvider.notifier).previousMonthTail(),
+  );
+});
 
 RosterResult _runGenerator(RosterGenerator generator) => generator.generate();
 

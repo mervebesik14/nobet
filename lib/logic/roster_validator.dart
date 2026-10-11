@@ -1,0 +1,243 @@
+import 'dart:math';
+
+import '../models/day_assignment.dart';
+import '../models/person.dart';
+import '../models/role.dart';
+import '../models/roster_settings.dart';
+import 'turkish_collation.dart';
+import 'turkish_dates.dart';
+
+/// Kural ihlalinin türü.
+enum ViolationKind {
+  /// O gün o rolde koltuk boş.
+  missing,
+
+  /// Kişi istemediği güne atanmış.
+  unavailable,
+
+  /// Kişi art arda iki gün nöbette.
+  consecutive,
+
+  /// Gün aşırı zincir sınırı aşılmış (ör. 3-5-7).
+  chain,
+
+  /// Fazla nöbet sınırı (grup ortalaması + N) aşılmış.
+  overCap,
+
+  /// Kişi kendi görevi olmayan koltukta (ör. tekniker hemşire satırında).
+  wrongRole,
+}
+
+/// Bir kural ihlali.
+class RuleViolation {
+  const RuleViolation({
+    required this.kind,
+    required this.days,
+    required this.message,
+    this.personId,
+    this.role,
+  });
+
+  final ViolationKind kind;
+
+  /// İlgili günler (bu ayın günleri; önceki aya ait günler yer almaz).
+  final List<int> days;
+
+  /// İlgili kişi (eksik koltukta boş).
+  final String? personId;
+  final Role? role;
+
+  /// Türkçe açıklama, ör. "Mehmet 14 ve 15 Ekim art arda nöbette."
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+/// Bir ay listesini kurallara göre denetler (saf Dart). Elle düzenlemeden
+/// sonra ihlalleri göstermek için kullanılır; ihlale izin verilir ama
+/// uyarı kalır.
+class RosterValidator {
+  const RosterValidator(this.settings);
+
+  final RosterSettings settings;
+
+  List<RuleViolation> validate({
+    required int year,
+    required int month,
+    required Map<int, DayAssignment> assignments,
+    required Iterable<Person> people,
+    Map<String, List<int>> unavailableDays = const {},
+    List<Set<String>> previousMonthTail = const [],
+  }) {
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    final byId = {for (final p in people) p.id: p};
+    String name(String id) => byId[id]?.name ?? 'Silinmiş kişi';
+    String date(int d) => d >= 1
+        ? formatDayMonth(d, month)
+        : d == 0
+        ? 'önceki ayın son günü'
+        : 'önceki ayın ${1 - d}. son günü';
+
+    final violations = <RuleViolation>[];
+
+    // Kişi → nöbet günleri (önceki ay: 0, -1, ...), kişi → atandığı rol.
+    final worked = <String, Set<int>>{};
+    for (var i = 0; i < previousMonthTail.length; i++) {
+      final offset = i - (previousMonthTail.length - 1);
+      for (final id in previousMonthTail[i]) {
+        (worked[id] ??= {}).add(offset);
+      }
+    }
+    final seatRole = <String, Role>{};
+
+    for (var d = 1; d <= daysInMonth; d++) {
+      final a = assignments[d] ?? DayAssignment(day: d);
+      final seats = [
+        for (final id in a.nurseIds) (id, Role.nurse),
+        if (a.techId != null) (a.techId!, Role.radiologyTech),
+      ];
+      for (final (id, role) in seats) {
+        (worked[id] ??= {}).add(d);
+        seatRole[id] = role;
+        final person = byId[id];
+        if (person != null && person.role != role) {
+          violations.add(
+            RuleViolation(
+              kind: ViolationKind.wrongRole,
+              days: [d],
+              personId: id,
+              role: role,
+              message:
+                  '${person.name} ${person.role.label} ama ${date(d)} '
+                  '${turkishLowerCase(role.label)} koltuğunda.',
+            ),
+          );
+        }
+        if ((unavailableDays[id] ?? const []).contains(d)) {
+          violations.add(
+            RuleViolation(
+              kind: ViolationKind.unavailable,
+              days: [d],
+              personId: id,
+              role: role,
+              message: '${name(id)} istemediği güne (${date(d)}) atandı.',
+            ),
+          );
+        }
+      }
+
+      final missingNurses = max(0, settings.nursesPerDay - a.nurseIds.length);
+      final missingTechs = settings.techsPerDay > 0 && a.techId == null ? 1 : 0;
+      for (final (role, missing) in [
+        (Role.nurse, missingNurses),
+        (Role.radiologyTech, missingTechs),
+      ]) {
+        if (missing == 0) continue;
+        violations.add(
+          RuleViolation(
+            kind: ViolationKind.missing,
+            days: [d],
+            role: role,
+            message:
+                '${date(d)}: $missing ${turkishLowerCase(role.label)} eksik.',
+          ),
+        );
+      }
+    }
+
+    final chainLimit = max(1, settings.maxEveryOtherDayChain);
+    final ids = worked.keys.toList()
+      ..sort((a, b) => compareTurkish(name(a), name(b)));
+    for (final id in ids) {
+      final days = worked[id]!;
+      final role = seatRole[id] ?? byId[id]?.role;
+      if (!days.any((d) => d >= 1)) continue; // yalnız önceki ayda
+
+      if (settings.forbidConsecutiveDays) {
+        for (final d in days.toList()..sort()) {
+          if (d + 1 > daysInMonth || !days.contains(d + 1)) continue;
+          violations.add(
+            RuleViolation(
+              kind: ViolationKind.consecutive,
+              days: [if (d >= 1) d, d + 1],
+              personId: id,
+              role: role,
+              message: d >= 1
+                  ? '${name(id)} $d ve ${formatDayMonth(d + 1, month)} '
+                        'art arda nöbette.'
+                  : '${name(id)} ${date(d)} ve ${date(d + 1)} '
+                        'art arda nöbette.',
+            ),
+          );
+        }
+      }
+
+      // Gün aşırı zincirler: d, d+2, d+4, ... en uzun diziler.
+      for (final start in days.toList()..sort()) {
+        if (days.contains(start - 2)) continue; // zincirin başı değil
+        final chain = [start];
+        while (days.contains(chain.last + 2)) {
+          chain.add(chain.last + 2);
+        }
+        if (chain.length <= chainLimit || !chain.any((d) => d >= 1)) {
+          continue;
+        }
+        final inMonth = chain.where((d) => d >= 1).toList();
+        final labels = chain.map((d) => d >= 1 ? '$d' : date(d)).toList();
+        final listed =
+            '${labels.sublist(0, labels.length - 1).join(', ')} ve '
+            '${labels.last} ${turkishMonthNames[month - 1]}';
+        violations.add(
+          RuleViolation(
+            kind: ViolationKind.chain,
+            days: inMonth,
+            personId: id,
+            role: role,
+            message:
+                '${name(id)} $listed gün aşırı nöbette '
+                '(en fazla $chainLimit olabilir).',
+          ),
+        );
+      }
+    }
+
+    final extra = settings.maxExtraOverAverage;
+    if (extra != null) {
+      for (final role in Role.values) {
+        final perDay = role == Role.nurse
+            ? settings.nursesPerDay
+            : settings.techsPerDay;
+        final members = byId.values.where((p) => p.isActive && p.role == role);
+        if (members.isEmpty || perDay == 0) continue;
+        final cap = (daysInMonth * perDay / members.length).ceil() + extra;
+        for (final id in ids) {
+          if (seatRole[id] != role) continue;
+          final inMonth = worked[id]!.where((d) => d >= 1).toList()..sort();
+          if (inMonth.length <= cap) continue;
+          violations.add(
+            RuleViolation(
+              kind: ViolationKind.overCap,
+              days: inMonth,
+              personId: id,
+              role: role,
+              message:
+                  '${name(id)} ${inMonth.length} nöbet tutuyor; sınır $cap '
+                  '(grup ortalaması + $extra).',
+            ),
+          );
+        }
+      }
+    }
+
+    violations.sort((a, b) {
+      final c = (a.days.firstOrNull ?? 0).compareTo(b.days.firstOrNull ?? 0);
+      if (c != 0) return c;
+      final k = a.kind.index.compareTo(b.kind.index);
+      if (k != 0) return k;
+      final r = (a.role?.index ?? -1).compareTo(b.role?.index ?? -1);
+      return r != 0 ? r : a.message.compareTo(b.message);
+    });
+    return violations;
+  }
+}

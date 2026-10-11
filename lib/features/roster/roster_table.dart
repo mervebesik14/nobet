@@ -6,9 +6,14 @@ import '../../models/models.dart';
 /// Tablodaki bir kişi satırı.
 typedef RosterRow = ({String id, String name, Role role});
 
+/// Tablodaki bir hücre: kişi ve gün.
+typedef RosterCell = ({String personId, int day});
+
 /// Nöbet tablosu: sütunlar ayın günleri, satırlar kişiler (rol gruplarına
 /// ayrılmış). Kişinin nöbetçi olduğu günde nöbet süresi ("24") yazar.
-/// Tablo yatay kayar, soldaki isim sütunu sabit kalır.
+/// Tablo yatay kayar, soldaki isim sütunu sabit kalır. Hücrelere dokunma ve
+/// uzun basma elle düzenleme için dışarı bildirilir; kural ihlali olan
+/// hücreler renklenir.
 class RosterTable extends StatelessWidget {
   const RosterTable({
     super.key,
@@ -18,6 +23,11 @@ class RosterTable extends StatelessWidget {
     required this.holidayDays,
     required this.shiftHours,
     this.missingByDay = const {},
+    this.violationCells = const {},
+    this.selectedCell,
+    this.onCellTap,
+    this.onCellLongPress,
+    this.onMissingTap,
   });
 
   final MonthPlan plan;
@@ -30,6 +40,16 @@ class RosterTable extends StatelessWidget {
 
   /// Gün → boş kalan koltuk sayısı; doluysa en altta "Eksik" satırı çıkar.
   final Map<int, int> missingByDay;
+
+  /// Kural ihlali olan hücreler.
+  final Set<RosterCell> violationCells;
+
+  /// Takas için seçilmiş hücre.
+  final RosterCell? selectedCell;
+
+  final void Function(RosterCell cell)? onCellTap;
+  final void Function(RosterCell cell)? onCellLongPress;
+  final void Function(int day)? onMissingTap;
 
   static const _labelWidth = 140.0;
   static const _cellWidth = 44.0;
@@ -129,19 +149,21 @@ class RosterTable extends StatelessWidget {
         Row(
           children: [
             for (final d in days)
-              box(
-                width: _cellWidth,
-                height: _rowHeight,
-                color: columnColor(d),
-                child: personDays.contains(d)
-                    ? Text(
-                        '$shiftHours',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: scheme.primary,
-                        ),
-                      )
-                    : null,
+              _tappable(
+                key: ValueKey('cell-${row.id}-$d'),
+                onTap: onCellTap == null
+                    ? null
+                    : () => onCellTap!((personId: row.id, day: d)),
+                onLongPress: onCellLongPress == null
+                    ? null
+                    : () => onCellLongPress!((personId: row.id, day: d)),
+                child: _personCell(
+                  context,
+                  box: box,
+                  cell: (personId: row.id, day: d),
+                  works: personDays.contains(d),
+                  columnColor: columnColor(d),
+                ),
               ),
           ],
         ),
@@ -165,18 +187,24 @@ class RosterTable extends StatelessWidget {
         Row(
           children: [
             for (final d in days)
-              box(
-                width: _cellWidth,
-                height: _rowHeight,
-                color: missingByDay.containsKey(d)
-                    ? scheme.errorContainer
-                    : columnColor(d),
-                child: missingByDay.containsKey(d)
-                    ? Text(
-                        '${missingByDay[d]}',
-                        style: TextStyle(color: scheme.onErrorContainer),
-                      )
+              _tappable(
+                key: ValueKey('missing-$d'),
+                onTap: missingByDay.containsKey(d) && onMissingTap != null
+                    ? () => onMissingTap!(d)
                     : null,
+                child: box(
+                  width: _cellWidth,
+                  height: _rowHeight,
+                  color: missingByDay.containsKey(d)
+                      ? scheme.errorContainer
+                      : columnColor(d),
+                  child: missingByDay.containsKey(d)
+                      ? Text(
+                          '${missingByDay[d]}',
+                          style: TextStyle(color: scheme.onErrorContainer),
+                        )
+                      : null,
+                ),
               ),
           ],
         ),
@@ -234,6 +262,67 @@ class RosterTable extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  static Widget _tappable({
+    required Key key,
+    required Widget child,
+    VoidCallback? onTap,
+    VoidCallback? onLongPress,
+  }) {
+    if (onTap == null && onLongPress == null) {
+      return KeyedSubtree(key: key, child: child);
+    }
+    return InkWell(
+      key: key,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: child,
+    );
+  }
+
+  Widget _personCell(
+    BuildContext context, {
+    required Widget Function({
+      required double width,
+      required double height,
+      Widget? child,
+      Color? color,
+      Alignment alignment,
+    })
+    box,
+    required RosterCell cell,
+    required bool works,
+    required Color? columnColor,
+  }) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final selected = selectedCell == cell;
+    final violated = violationCells.contains(cell);
+    final color = selected
+        ? scheme.primary
+        : violated
+        ? scheme.errorContainer
+        : columnColor;
+    final textColor = selected
+        ? scheme.onPrimary
+        : violated
+        ? scheme.onErrorContainer
+        : scheme.primary;
+    return box(
+      width: _cellWidth,
+      height: _rowHeight,
+      color: color,
+      child: works
+          ? Text(
+              '$shiftHours',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
+            )
+          : null,
     );
   }
 }
