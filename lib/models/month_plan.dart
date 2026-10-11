@@ -11,6 +11,7 @@ class MonthPlan {
     this.assignments = const {},
     this.generatedAt,
     this.isLocked = false,
+    this.seed,
   });
 
   final int year;
@@ -29,6 +30,12 @@ class MonthPlan {
 
   /// Kilitli ay yanlışlıkla yeniden oluşturulamaz.
   final bool isLocked;
+
+  /// Listeyi üreten tohum; aynı girdilerle aynı liste yeniden üretilebilir.
+  final int? seed;
+
+  /// Nöbet listesi oluşturulmuş mu?
+  bool get hasRoster => assignments.isNotEmpty;
 
   /// Saklama anahtarı: `yyyy-MM`.
   String get key => keyFor(year, month);
@@ -53,6 +60,7 @@ class MonthPlan {
     Map<int, DayAssignment>? assignments,
     DateTime? generatedAt,
     bool? isLocked,
+    int? seed,
   }) {
     return MonthPlan(
       year: year,
@@ -61,6 +69,7 @@ class MonthPlan {
       assignments: assignments ?? this.assignments,
       generatedAt: generatedAt ?? this.generatedAt,
       isLocked: isLocked ?? this.isLocked,
+      seed: seed ?? this.seed,
     );
   }
 
@@ -74,6 +83,7 @@ class MonthPlan {
     },
     'generatedAt': generatedAt?.toIso8601String(),
     'isLocked': isLocked,
+    'seed': seed,
   };
 
   factory MonthPlan.fromJson(Map<String, dynamic> json) {
@@ -95,6 +105,7 @@ class MonthPlan {
       },
       generatedAt: generatedAt == null ? null : DateTime.parse(generatedAt),
       isLocked: json['isLocked'] as bool? ?? false,
+      seed: json['seed'] as int?,
     );
   }
 
@@ -111,7 +122,8 @@ class MonthPlan {
       _unavailableEquality.equals(other.unavailableDays, unavailableDays) &&
       _assignmentsEquality.equals(other.assignments, assignments) &&
       other.generatedAt == generatedAt &&
-      other.isLocked == isLocked;
+      other.isLocked == isLocked &&
+      other.seed == seed;
 
   @override
   int get hashCode => Object.hash(
@@ -121,6 +133,7 @@ class MonthPlan {
     _assignmentsEquality.hash(assignments),
     generatedAt,
     isLocked,
+    seed,
   );
 
   @override

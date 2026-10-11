@@ -49,7 +49,7 @@ types:
         index: 2
   MonthPlan:
     typeId: 4
-    nextIndex: 6
+    nextIndex: 7
     fields:
       year:
         index: 0
@@ -63,6 +63,8 @@ types:
         index: 4
       isLocked:
         index: 5
+      seed:
+        index: 6
   RosterSettings:
     typeId: 5
     nextIndex: 10

@@ -1,3 +1,5 @@
+import 'dart:isolate';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nobet_listesi/data/turkish_holidays.dart';
 import 'package:nobet_listesi/logic/roster_generator.dart';
@@ -308,5 +310,11 @@ void main() {
     final sw = Stopwatch()..start();
     generator(attempts: 400).generate();
     expect(sw.elapsed, lessThan(const Duration(seconds: 10)));
+  });
+
+  test('ayrı isolate içinde çalışır ve aynı sonucu verir', () async {
+    final g = generator(seed: 5, attempts: 30);
+    final inIsolate = await Isolate.run(g.generate);
+    expect(inIsolate.assignments, g.generate().assignments);
   });
 }

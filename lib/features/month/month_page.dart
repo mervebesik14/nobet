@@ -6,6 +6,8 @@ import '../../models/models.dart';
 import '../../shared/widgets/month_selector.dart';
 import '../../shared/widgets/section_header.dart';
 import '../people/people_controller.dart';
+import '../roster/roster_flow.dart';
+import '../roster/roster_page.dart';
 import 'month_plan_controller.dart';
 import 'unavailable_days_page.dart';
 
@@ -13,6 +15,16 @@ import 'unavailable_days_page.dart';
 /// liste oluşturmadan önceki uygunluk uyarıları.
 class MonthPage extends ConsumerWidget {
   const MonthPage({super.key});
+
+  static void _openRoster(BuildContext context) => Navigator.of(
+    context,
+  ).push(MaterialPageRoute<void>(builder: (_) => const RosterPage()));
+
+  Future<void> _create(BuildContext context, WidgetRef ref) async {
+    if (await generateRoster(context, ref) && context.mounted) {
+      _openRoster(context);
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -24,8 +36,22 @@ class MonthPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Ay Planı')),
+      floatingActionButton: active.isEmpty
+          ? null
+          : plan.hasRoster
+          ? FloatingActionButton.extended(
+              onPressed: () => _openRoster(context),
+              icon: const Icon(Icons.table_chart_outlined),
+              label: const Text('Listeyi Gör'),
+            )
+          : FloatingActionButton.extended(
+              onPressed: () => _create(context, ref),
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Listeyi Oluştur'),
+            ),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
+        // FAB son kartı örtmesin.
+        padding: const EdgeInsets.only(bottom: 96),
         children: [
           MonthSelector(
             month: month,

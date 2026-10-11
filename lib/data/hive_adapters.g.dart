@@ -198,13 +198,14 @@ class MonthPlanAdapter extends TypeAdapter<MonthPlan> {
           : (fields[3] as Map).cast<int, DayAssignment>(),
       generatedAt: fields[4] as DateTime?,
       isLocked: fields[5] == null ? false : fields[5] as bool,
+      seed: (fields[6] as num?)?.toInt(),
     );
   }
 
   @override
   void write(BinaryWriter writer, MonthPlan obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.year)
       ..writeByte(1)
@@ -216,7 +217,9 @@ class MonthPlanAdapter extends TypeAdapter<MonthPlan> {
       ..writeByte(4)
       ..write(obj.generatedAt)
       ..writeByte(5)
-      ..write(obj.isLocked);
+      ..write(obj.isLocked)
+      ..writeByte(6)
+      ..write(obj.seed);
   }
 
   @override

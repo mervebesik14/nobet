@@ -1,7 +1,11 @@
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../logic/feasibility_checker.dart';
+import '../../logic/roster_generator.dart';
 import '../../models/models.dart';
 import '../../shared/providers.dart';
 import '../holidays/holidays_controller.dart';
@@ -65,7 +69,62 @@ class MonthPlanController extends Notifier<MonthPlan> {
     await ref.read(monthPlanRepositoryProvider).save(state);
     return true;
   }
+
+  /// Nöbet listesini oluşturur ve plana kaydeder. [seed] verilmezse yeni
+  /// rastgele tohum kullanılır (her "Yeniden oluştur" farklı liste verir).
+  /// Kilit burada kontrol edilmez; onayı ekran ister.
+  Future<RosterResult> generate({int? seed}) async {
+    final plan = state;
+    final generator = RosterGenerator(
+      year: plan.year,
+      month: plan.month,
+      people: ref.read(peopleProvider),
+      unavailableDays: plan.unavailableDays,
+      holidays: ref.read(holidaysProvider),
+      settings: ref.read(rosterSettingsProvider),
+      seed: seed ?? Random().nextInt(1 << 31),
+      previousMonthTail: _previousMonthTail(plan),
+    );
+    final result = await ref.read(rosterRunnerProvider)(generator);
+    state = state.copyWith(
+      assignments: result.assignments,
+      generatedAt: DateTime.now(),
+      seed: result.seed,
+    );
+    await ref.read(monthPlanRepositoryProvider).save(state);
+    return result;
+  }
+
+  Future<void> setLocked(bool locked) async {
+    state = state.copyWith(isLocked: locked);
+    await ref.read(monthPlanRepositoryProvider).save(state);
+  }
+
+  /// Önceki ayın son 4 gününün nöbetçileri (ay sınırında art arda gün ve
+  /// gün aşırı zincir kuralları için).
+  List<Set<String>> _previousMonthTail(MonthPlan plan) {
+    final prev = DateTime(plan.year, plan.month - 1);
+    final previous = ref
+        .read(monthPlanRepositoryProvider)
+        .get(prev.year, prev.month);
+    if (previous == null || !previous.hasRoster) return const [];
+    final last = previous.daysInMonth;
+    return [
+      for (var d = last - 3; d <= last; d++)
+        {...?previous.assignments[d]?.personIds},
+    ];
+  }
 }
+
+RosterResult _runGenerator(RosterGenerator generator) => generator.generate();
+
+/// Algoritmayı arayüzü dondurmadan ayrı bir isolate'te çalıştırır.
+/// Testlerde doğrudan çalıştıran bir sürümle override edilir.
+final rosterRunnerProvider =
+    Provider<Future<RosterResult> Function(RosterGenerator)>(
+      (ref) =>
+          (generator) => compute(_runGenerator, generator),
+    );
 
 final monthPlanProvider = NotifierProvider<MonthPlanController, MonthPlan>(
   MonthPlanController.new,

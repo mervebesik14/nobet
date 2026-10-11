@@ -1,0 +1,206 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hive_ce/hive_ce.dart';
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:nobet_listesi/data/hive_boxes.dart';
+import 'package:nobet_listesi/data/holiday_repository.dart';
+import 'package:nobet_listesi/features/month/month_page.dart';
+import 'package:nobet_listesi/features/month/month_plan_controller.dart';
+import 'package:nobet_listesi/features/roster/roster_table.dart';
+import 'package:nobet_listesi/models/models.dart';
+import 'package:nobet_listesi/shared/providers.dart';
+
+import '../../helpers.dart';
+
+const _team = [
+  Person(id: 'n1', name: 'Ayşe Yılmaz', role: Role.nurse),
+  Person(id: 'n2', name: 'Banu', role: Role.nurse),
+  Person(id: 'n3', name: 'Cemile', role: Role.nurse),
+  Person(id: 'n4', name: 'Derya', role: Role.nurse),
+  Person(id: 'n5', name: 'Elif', role: Role.nurse),
+  Person(id: 'n6', name: 'Fatma', role: Role.nurse),
+  Person(id: 'n7', name: 'Gül', role: Role.nurse),
+  Person(id: 't1', name: 'Ali', role: Role.radiologyTech),
+  Person(id: 't2', name: 'Burak', role: Role.radiologyTech),
+  Person(id: 't3', name: 'Can', role: Role.radiologyTech),
+  Person(id: 't4', name: 'Deniz', role: Role.radiologyTech),
+];
+
+void main() {
+  late HiveBoxes boxes;
+
+  setUpAll(() => initializeDateFormatting('tr_TR'));
+
+  setUp(() async {
+    boxes = await openTestBoxes();
+    await HolidayRepository(boxes.holidays, boxes.meta).ensureYearSeeded(2026);
+    for (final p in _team) {
+      await boxes.people.put(p.id, p);
+    }
+  });
+
+  tearDown(() => Hive.close());
+
+  Future<void> pumpMonthPage(WidgetTester tester) async {
+    tester.view.physicalSize = const Size(1600, 3200);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ...boxOverrides(boxes),
+          todayProvider.overrideWithValue(DateTime(2026, 10, 11)),
+          // Testte isolate yerine aynı iş parçacığında, az denemeyle.
+          rosterRunnerProvider.overrideWithValue((g) async => g.generate()),
+        ],
+        child: const MaterialApp(home: MonthPage()),
+      ),
+    );
+  }
+
+  MonthPlan saved() => boxes.monthPlans.get('2026-10')!;
+
+  testWidgets('Listeyi Oluştur: liste kaydedilir ve tablo + özet açılır', (
+    tester,
+  ) async {
+    await pumpMonthPage(tester);
+
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ekim 2026 Nöbet Listesi'), findsOneWidget);
+    final plan = saved();
+    expect(plan.assignments.length, 31);
+    expect(plan.seed, isNotNull);
+    expect(plan.generatedAt, isNotNull);
+    for (final a in plan.assignments.values) {
+      expect(a.nurseIds.length, 2);
+      expect(a.techId, isNotNull);
+    }
+
+    // Tablo: satır başlıkları, gün başlıkları, eksik yok.
+    expect(find.text('Hemşire 1'), findsOneWidget);
+    expect(find.text('Hemşire 2'), findsOneWidget);
+    expect(find.text('Radyoloji Teknikeri'), findsWidgets);
+    expect(find.text('1 Per'), findsOneWidget);
+    expect(find.text('31 Cmt'), findsOneWidget);
+    expect(find.text('Eksik'), findsNothing);
+
+    // Özet: kişiler, rol ortalamaları, gereken saat.
+    expect(find.text('Özet'), findsOneWidget);
+    expect(find.text('Ortalama'), findsNWidgets(2));
+    expect(find.text('Ayşe Yılmaz'), findsOneWidget);
+    expect(find.text('145'), findsWidgets);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Listeyi Gör'), findsOneWidget);
+  });
+
+  testWidgets('uygunluk sorunu varsa sorar; vazgeçince oluşturulmaz', (
+    tester,
+  ) async {
+    await boxes.monthPlans.put(
+      '2026-10',
+      const MonthPlan(
+        year: 2026,
+        month: 10,
+        unavailableDays: {
+          't1': [18],
+          't2': [18],
+          't3': [18],
+          't4': [18],
+        },
+      ),
+    );
+    await pumpMonthPage(tester);
+
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    expect(find.text('Uygunluk sorunları var'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.textContaining(
+          '18 Ekim: uygun radyoloji teknikeri yok.',
+        ),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Vazgeç'));
+    await tester.pumpAndSettle();
+    expect(saved().hasRoster, isFalse);
+
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Yine de dene'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Liste tam kurulamadı'), findsOneWidget);
+    expect(
+      find.textContaining('18 Ekim: 1 radyoloji teknikeri eksik'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Tamam'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ekim 2026 Nöbet Listesi'), findsOneWidget);
+    expect(find.text('Eksik'), findsOneWidget);
+    expect(find.text('1 günde eksik nöbetçi var: 18 Ekim'), findsOneWidget);
+    expect(saved().assignments[18]!.techId, isNull);
+  });
+
+  testWidgets('kilitle; kilitliyken yeniden oluşturma onay ister', (
+    tester,
+  ) async {
+    await pumpMonthPage(tester);
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    final first = saved();
+
+    await tester.tap(find.byTooltip('Kilitle'));
+    await tester.pumpAndSettle();
+    expect(saved().isLocked, isTrue);
+    expect(find.text('Liste kilitli'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Yeniden oluştur'));
+    await tester.pumpAndSettle();
+    expect(find.text('Bu ay kilitli'), findsOneWidget);
+    await tester.tap(find.text('Vazgeç'));
+    await tester.pumpAndSettle();
+    expect(saved().assignments, first.assignments);
+
+    await tester.tap(find.byTooltip('Yeniden oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Yeniden oluştur'));
+    await tester.pumpAndSettle();
+    expect(saved().seed, isNot(first.seed));
+    expect(saved().isLocked, isTrue);
+
+    await tester.tap(find.byTooltip('Kilidi aç'));
+    await tester.pumpAndSettle();
+    expect(saved().isLocked, isFalse);
+  });
+
+  testWidgets('kilitsiz listede yeniden oluşturma onaysız yeni tohum', (
+    tester,
+  ) async {
+    await pumpMonthPage(tester);
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    final firstSeed = saved().seed;
+
+    await tester.tap(find.byTooltip('Yeniden oluştur'));
+    await tester.pumpAndSettle();
+    expect(find.text('Bu ay kilitli'), findsNothing);
+    expect(saved().seed, isNot(firstSeed));
+    expect(saved().assignments.length, 31);
+  });
+
+  test('shortName', () {
+    expect(RosterTable.shortName('Ayşe Yılmaz'), 'Ayşe Y.');
+    expect(RosterTable.shortName('Ali Rıza Öztürk'), 'Ali Ö.');
+    expect(RosterTable.shortName('Banu'), 'Banu');
+  });
+}
