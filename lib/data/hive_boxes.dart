@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:hive_ce/hive_ce.dart';
 
 import 'hive_registrar.g.dart';
@@ -25,16 +27,18 @@ class HiveBoxes {
 
   static bool _adaptersRegistered = false;
 
-  static Future<HiveBoxes> open() async {
+  /// [inMemory] true ise kutular diske yazılmaz (widget testleri için).
+  static Future<HiveBoxes> open({bool inMemory = false}) async {
     if (!_adaptersRegistered) {
       Hive.registerAdapters();
       _adaptersRegistered = true;
     }
+    Uint8List? bytes() => inMemory ? Uint8List(0) : null;
     return HiveBoxes._(
-      people: await Hive.openBox<Person>(peopleBox),
-      holidays: await Hive.openBox<Holiday>(holidaysBox),
-      monthPlans: await Hive.openBox<MonthPlan>(monthPlansBox),
-      settings: await Hive.openBox<RosterSettings>(settingsBox),
+      people: await Hive.openBox<Person>(peopleBox, bytes: bytes()),
+      holidays: await Hive.openBox<Holiday>(holidaysBox, bytes: bytes()),
+      monthPlans: await Hive.openBox<MonthPlan>(monthPlansBox, bytes: bytes()),
+      settings: await Hive.openBox<RosterSettings>(settingsBox, bytes: bytes()),
     );
   }
 

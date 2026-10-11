@@ -1,5 +1,6 @@
 import 'package:hive_ce/hive_ce.dart';
 
+import '../logic/turkish_collation.dart';
 import '../models/models.dart';
 
 /// Kişileri saklar; anahtar kişinin kimliğidir.
@@ -8,9 +9,9 @@ class PeopleRepository {
 
   final Box<Person> _box;
 
-  /// Tüm kişiler, ada göre sıralı.
+  /// Tüm kişiler, ada göre Türkçe alfabe sırasıyla.
   List<Person> getAll() =>
-      _box.values.toList()..sort((a, b) => a.name.compareTo(b.name));
+      _box.values.toList()..sort((a, b) => compareTurkish(a.name, b.name));
 
   List<Person> getActive() => getAll().where((p) => p.isActive).toList();
 
