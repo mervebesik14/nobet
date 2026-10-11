@@ -5,6 +5,8 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:intl/intl.dart';
 
 import 'app.dart';
+import 'data/hive_boxes.dart';
+import 'data/providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,8 +15,14 @@ Future<void> main() async {
   await initializeDateFormatting('tr_TR');
   Intl.defaultLocale = 'tr_TR';
 
-  // Tüm veri cihazda Hive ile saklanır; kutular Level 1'de açılacak.
+  // Tüm veri cihazda Hive ile saklanır.
   await Hive.initFlutter();
+  final boxes = await HiveBoxes.open();
 
-  runApp(const ProviderScope(child: NobetApp()));
+  runApp(
+    ProviderScope(
+      overrides: [hiveBoxesProvider.overrideWithValue(boxes)],
+      child: const NobetApp(),
+    ),
+  );
 }

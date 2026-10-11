@@ -17,7 +17,7 @@
 - `lib/logic` altındaki kod **saf Dart** olmalı: `package:flutter` import edilmez. Her sınıfın `test/logic` altında birim testi olur. Ekranlar bu sınıfları yalnızca çağırır.
 - Durum yönetimi Riverpod (`flutter_riverpod`); repository'ler provider olarak sunulur.
 - Yerel saklama Hive CE (`hive_ce`, `hive_ce_flutter`); adaptörler `hive_ce_generator` + `build_runner` ile üretilir:
-  `dart run build_runner build --delete-conflicting-outputs`
+  `dart run build_runner build` (üretilen `*.g.dart` ve `hive_adapters.g.yaml` commit edilir)
 - Klasörler:
   - `lib/models`: Person, Role, Holiday, MonthPlan, DayAssignment, RosterSettings
   - `lib/data`: Hive kutuları, repository'ler, Türkiye tatil verisi
