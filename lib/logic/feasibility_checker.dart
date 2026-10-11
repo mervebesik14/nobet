@@ -3,6 +3,8 @@ import 'dart:math';
 import '../models/person.dart';
 import '../models/role.dart';
 import '../models/roster_settings.dart';
+import 'turkish_collation.dart';
+import 'turkish_dates.dart';
 
 /// Uygunluk sorununun türü.
 enum FeasibilityIssueKind {
@@ -60,11 +62,6 @@ class FeasibilityChecker {
 
   final RosterSettings settings;
 
-  static const _monthNames = [
-    'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', //
-    'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık',
-  ];
-
   FeasibilityReport check({
     required int year,
     required int month,
@@ -91,7 +88,7 @@ class FeasibilityChecker {
           FeasibilityIssue(
             kind: FeasibilityIssueKind.noPeople,
             role: role,
-            message: 'Hiç aktif ${_lower(role.label)} yok.',
+            message: 'Hiç aktif ${turkishLowerCase(role.label)} yok.',
           ),
         );
         continue;
@@ -110,10 +107,7 @@ class FeasibilityChecker {
     Role.radiologyTech => settings.techsPerDay,
   };
 
-  String _date(int month, int day) => '$day ${_monthNames[month - 1]}';
-
-  static String _lower(String s) =>
-      s.replaceAll('I', 'ı').replaceAll('İ', 'i').toLowerCase();
+  String _date(int month, int day) => formatDayMonth(day, month);
 
   int _availableOn(Map<String, Set<int>> available, int day) =>
       available.values.where((days) => days.contains(day)).length;
@@ -125,7 +119,7 @@ class FeasibilityChecker {
     int month,
     int daysInMonth,
   ) sync* {
-    final label = _lower(role.label);
+    final label = turkishLowerCase(role.label);
     for (var d = 1; d <= daysInMonth; d++) {
       final count = _availableOn(available, d);
       if (count >= perDay) continue;
@@ -168,7 +162,7 @@ class FeasibilityChecker {
         message:
             '${_date(month, d)} – ${_date(month, d + 1)}: art arda gün '
             'yasağı nedeniyle iki güne ${2 * perDay} farklı '
-            '${_lower(role.label)} gerekiyor, uygun olan $either.',
+            '${turkishLowerCase(role.label)} gerekiyor, uygun olan $either.',
       );
     }
   }
@@ -219,7 +213,7 @@ class FeasibilityChecker {
 
     if (withCap >= needed) return;
 
-    final label = _lower(role.pluralLabel);
+    final label = turkishLowerCase(role.pluralLabel);
     final base = 'Bu ay $label için $needed nöbet gerekiyor ($n kişi)';
     final plain = capacity(consecutive: false, chain: false);
 
