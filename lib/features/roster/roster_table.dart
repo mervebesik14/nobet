@@ -161,7 +161,7 @@ class RosterTable extends StatelessWidget {
                   context,
                   box: box,
                   cell: (personId: row.id, day: d),
-                  works: personDays.contains(d),
+                  label: _labelFor(row.id, d, personDays.contains(d)),
                   columnColor: columnColor(d),
                 ),
               ),
@@ -282,6 +282,14 @@ class RosterTable extends StatelessWidget {
     );
   }
 
+  /// Hücre yazısı: nöbet yoksa null, 16B teknikeri ise "16B", yoksa "24".
+  String? _labelFor(String id, int day, bool works) {
+    if (!works) return null;
+    return (plan.assignments[day]?.isSecondaryTech(id) ?? false)
+        ? '16B'
+        : '$shiftHours';
+  }
+
   Widget _personCell(
     BuildContext context, {
     required Widget Function({
@@ -293,7 +301,7 @@ class RosterTable extends StatelessWidget {
     })
     box,
     required RosterCell cell,
-    required bool works,
+    required String? label,
     required Color? columnColor,
   }) {
     final theme = Theme.of(context);
@@ -314,15 +322,18 @@ class RosterTable extends StatelessWidget {
       width: _cellWidth,
       height: _rowHeight,
       color: color,
-      child: works
-          ? Text(
-              '$shiftHours',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: textColor,
+      child: label == null
+          ? null
+          : FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
               ),
-            )
-          : null,
+            ),
     );
   }
 }

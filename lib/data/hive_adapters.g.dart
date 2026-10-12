@@ -148,19 +148,22 @@ class DayAssignmentAdapter extends TypeAdapter<DayAssignment> {
           ? const []
           : (fields[1] as List).cast<String>(),
       techId: fields[2] as String?,
+      tech16bId: fields[3] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, DayAssignment obj) {
     writer
-      ..writeByte(3)
+      ..writeByte(4)
       ..writeByte(0)
       ..write(obj.day)
       ..writeByte(1)
       ..write(obj.nurseIds)
       ..writeByte(2)
-      ..write(obj.techId);
+      ..write(obj.techId)
+      ..writeByte(3)
+      ..write(obj.tech16bId);
   }
 
   @override
@@ -250,6 +253,9 @@ class RosterSettingsAdapter extends TypeAdapter<RosterSettings> {
       nursesPerDay: fields[0] == null ? 2 : (fields[0] as num).toInt(),
       techsPerDay: fields[1] == null ? 1 : (fields[1] as num).toInt(),
       shiftHours: fields[2] == null ? 24 : (fields[2] as num).toInt(),
+      secondaryTechShiftHours: fields[10] == null
+          ? 16
+          : (fields[10] as num).toInt(),
       dailyRequiredHours: fields[3] == null ? 7 : (fields[3] as num).toDouble(),
       maxEveryOtherDayChain: fields[4] == null ? 2 : (fields[4] as num).toInt(),
       maxExtraOverAverage: (fields[5] as num?)?.toInt(),
@@ -265,7 +271,7 @@ class RosterSettingsAdapter extends TypeAdapter<RosterSettings> {
   @override
   void write(BinaryWriter writer, RosterSettings obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(11)
       ..writeByte(0)
       ..write(obj.nursesPerDay)
       ..writeByte(1)
@@ -285,7 +291,9 @@ class RosterSettingsAdapter extends TypeAdapter<RosterSettings> {
       ..writeByte(8)
       ..write(obj.halfDayHolidayIsHalfWorkday)
       ..writeByte(9)
-      ..write(obj.halfDayRequiredHours);
+      ..write(obj.halfDayRequiredHours)
+      ..writeByte(10)
+      ..write(obj.secondaryTechShiftHours);
   }
 
   @override

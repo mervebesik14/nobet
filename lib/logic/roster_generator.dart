@@ -153,51 +153,89 @@ class RosterGenerator {
   RosterResult generate() {
     final rng = Random(seed);
     final weekend = weekendDays(year, month, holidays, settings);
-    final perRole = <Role, _RoleSolution>{};
 
-    for (final role in Role.values) {
-      final perDay = switch (role) {
-        Role.nurse => settings.nursesPerDay,
-        Role.radiologyTech => settings.techsPerDay,
-      };
-      final members = people.where((p) => p.role == role).toList();
-      final solver = _RoleSolver(
-        role: role,
-        members: members,
-        perDay: perDay,
-        days: daysInMonth,
-        available: {
-          for (final p in members)
-            p.id: {
-              for (var d = 1; d <= daysInMonth; d++)
-                if (!(unavailableDays[p.id] ?? const []).contains(d)) d,
-            },
+    Map<String, Set<int>> availableOf(List<Person> members) => {
+      for (final p in members)
+        p.id: {
+          for (var d = 1; d <= daysInMonth; d++)
+            if (!(unavailableDays[p.id] ?? const []).contains(d)) d,
         },
+    };
+
+    final nurseMembers = people.where((p) => p.role == Role.nurse).toList();
+    final nurses = _RoleSolver(
+      role: Role.nurse,
+      members: nurseMembers,
+      perDay: settings.nursesPerDay,
+      days: daysInMonth,
+      available: availableOf(nurseMembers),
+      weekend: weekend,
+      tail: _tailFor(nurseMembers),
+      yearToDate: yearToDate,
+      settings: settings,
+    ).solve(rng, attempts, _polishCount);
+
+    final techMembers = people
+        .where((p) => p.role == Role.radiologyTech)
+        .toList();
+    final techAvailable = availableOf(techMembers);
+    final techTail = _tailFor(techMembers);
+
+    final assignments = <int, DayAssignment>{};
+    final issues = <RosterIssue>[];
+    double techScore;
+
+    if (settings.techsPerDay == 2) {
+      // Günde 2 tekniker: biri 24, biri 16B.
+      final tech = _TechSolver(
+        members: techMembers,
+        days: daysInMonth,
+        available: techAvailable,
         weekend: weekend,
-        tail: _tailFor(members),
+        tail: techTail,
         yearToDate: yearToDate,
         settings: settings,
-      );
-      perRole[role] = solver.solve(rng, attempts, _polishCount);
-    }
-
-    final nurses = perRole[Role.nurse]!;
-    final techs = perRole[Role.radiologyTech]!;
-    final assignments = {
-      for (var d = 1; d <= daysInMonth; d++)
-        d: DayAssignment(
+      ).solve(rng, attempts, _polishCount);
+      techScore = tech.score;
+      for (var d = 1; d <= daysInMonth; d++) {
+        assignments[d] = DayAssignment(
+          day: d,
+          nurseIds: [...nurses.slots[d]],
+          techId: tech.slot24[d],
+          tech16bId: tech.slot16[d],
+        );
+      }
+      issues.addAll(tech.issues(month));
+    } else {
+      final techs = _RoleSolver(
+        role: Role.radiologyTech,
+        members: techMembers,
+        perDay: settings.techsPerDay,
+        days: daysInMonth,
+        available: techAvailable,
+        weekend: weekend,
+        tail: techTail,
+        yearToDate: yearToDate,
+        settings: settings,
+      ).solve(rng, attempts, _polishCount);
+      techScore = techs.score;
+      for (var d = 1; d <= daysInMonth; d++) {
+        assignments[d] = DayAssignment(
           day: d,
           nurseIds: [...nurses.slots[d]],
           techId: techs.slots[d].firstOrNull,
-        ),
-    };
-    final issues = [
-      for (final role in Role.values) ...perRole[role]!.issues(month),
-    ]..sort((a, b) => a.day.compareTo(b.day));
+        );
+      }
+      issues.addAll(techs.issues(month));
+    }
+
+    issues
+      ..addAll(nurses.issues(month))
+      ..sort((a, b) => a.day.compareTo(b.day));
 
     return RosterResult(
       assignments: assignments,
-      score: nurses.score + techs.score,
+      score: nurses.score + techScore,
       issues: issues,
       seed: seed,
     );
@@ -616,6 +654,458 @@ class _RoleSolver {
       message:
           '${formatDayMonth(d, month)}: $missing $label eksik. '
           '${reasons.join('; ')}.',
+    );
+  }
+}
+
+/// Günde 2 tekniker çözümü: her gün bir 24 (ağır, ertesi gün çalışılamaz) ve
+/// bir 16B (hafif, ertesi gün çalışılabilir) teknikeri.
+class _TechSolution {
+  _TechSolution(this.solver, this.slot24, this.slot16, this.score);
+
+  final _TechSolver solver;
+
+  /// Gün → 24 teknikeri (boşsa null). İndeks 0 kullanılmaz.
+  final List<String?> slot24;
+
+  /// Gün → 16B teknikeri (boşsa null).
+  final List<String?> slot16;
+  final double score;
+
+  Iterable<RosterIssue> issues(int month) sync* {
+    for (var d = 1; d < slot24.length; d++) {
+      if (slot24[d] == null) {
+        yield solver.describeGap(d, is16b: false, month: month);
+      }
+      if (slot16[d] == null) {
+        yield solver.describeGap(d, is16b: true, month: month);
+      }
+    }
+  }
+}
+
+/// Teknikerleri 24 + 16B olarak dağıtır (saf Dart).
+///
+/// Kurallar: 24 çalışan ertesi gün hiç çalışamaz; 16B çalışan ertesi gün
+/// çalışabilir; gün aşırı zincir sınırı yalnız 24'lere uygulanır. Adalet:
+/// 24 sayıları, 16B sayıları ve hafta sonu sayıları grup içinde eşitlenir.
+class _TechSolver {
+  _TechSolver({
+    required this.members,
+    required this.days,
+    required this.available,
+    required this.weekend,
+    required this.tail,
+    required Map<String, PersonTotals> yearToDate,
+    required RosterSettings settings,
+  }) : ids = [for (final p in members) p.id],
+       maxChain = max(1, settings.maxEveryOtherDayChain),
+       cap = settings.maxExtraOverAverage == null || members.isEmpty
+           ? null
+           : (2 * days / members.length).ceil() +
+                 2 * settings.maxExtraOverAverage!,
+       ytd = _TechSolver._relative(members, yearToDate);
+
+  final List<Person> members;
+  final List<String> ids;
+  final int days;
+  final Map<String, Set<int>> available;
+  final Set<int> weekend;
+
+  /// Kişi → önceki aya ait çalıştığı günler (offset ≤ 0). Hepsi 24 (bloklayan)
+  /// kabul edilir.
+  final Map<String, Set<int>> tail;
+  final int maxChain;
+  final int? cap;
+  final Map<String, double> ytd;
+
+  late List<String?> _slot24;
+  late List<String?> _slot16;
+  late Map<String, Set<int>> _w24;
+  late Map<String, Set<int>> _w16;
+
+  static const _ytdClamp = 2.0;
+
+  static Map<String, double> _relative(
+    List<Person> members,
+    Map<String, PersonTotals> ytd,
+  ) {
+    if (members.isEmpty) return const {};
+    final values = {
+      for (final p in members) p.id: (ytd[p.id] ?? const PersonTotals()).shifts,
+    };
+    final mean = values.values.fold(0, (a, b) => a + b) / values.length;
+    return {
+      for (final e in values.entries)
+        e.key: (e.value - mean).clamp(-_ytdClamp, _ytdClamp).toDouble(),
+    };
+  }
+
+  void _reset() {
+    _slot24 = List.filled(days + 1, null);
+    _slot16 = List.filled(days + 1, null);
+    _w24 = {for (final id in ids) id: <int>{}};
+    _w16 = {for (final id in ids) id: <int>{}};
+  }
+
+  void _load(List<String?> s24, List<String?> s16) {
+    _reset();
+    for (var d = 1; d <= days; d++) {
+      if (s24[d] case final id?) _place24(id, d);
+      if (s16[d] case final id?) _place16(id, d);
+    }
+  }
+
+  void _place24(String id, int d) {
+    _slot24[d] = id;
+    _w24[id]!.add(d);
+  }
+
+  void _place16(String id, int d) {
+    _slot16[d] = id;
+    _w16[id]!.add(d);
+  }
+
+  void _remove24(int d) {
+    final id = _slot24[d];
+    if (id != null) _w24[id]!.remove(d);
+    _slot24[d] = null;
+  }
+
+  void _remove16(int d) {
+    final id = _slot16[d];
+    if (id != null) _w16[id]!.remove(d);
+    _slot16[d] = null;
+  }
+
+  bool _has24(String id, int d) =>
+      d <= 0 ? (tail[id]?.contains(d) ?? false) : _w24[id]!.contains(d);
+
+  bool _worksAny(String id, int d) {
+    if (d <= 0) return tail[id]?.contains(d) ?? false;
+    if (d > days) return false;
+    return _slot24[d] == id || _slot16[d] == id;
+  }
+
+  bool _breaks24Chain(String id, int d) {
+    for (var j = 0; j <= maxChain; j++) {
+      final start = d - 2 * j;
+      var full = true;
+      for (var k = 0; k <= maxChain && full; k++) {
+        final day = start + 2 * k;
+        if (day != d && !_has24(id, day)) full = false;
+      }
+      if (full) return true;
+    }
+    return false;
+  }
+
+  bool _overCap(String id) =>
+      cap != null && _w24[id]!.length + _w16[id]!.length >= cap!;
+
+  bool _canPlace24(String id, int d) =>
+      available[id]!.contains(d) &&
+      _slot24[d] == null &&
+      _slot16[d] != id &&
+      !_worksAny(id, d) &&
+      !_has24(id, d - 1) &&
+      !_worksAny(id, d + 1) &&
+      !_breaks24Chain(id, d) &&
+      !_overCap(id);
+
+  bool _canPlace16(String id, int d) =>
+      available[id]!.contains(d) &&
+      _slot16[d] == null &&
+      _slot24[d] != id &&
+      !_worksAny(id, d) &&
+      !_has24(id, d - 1) &&
+      !_overCap(id);
+
+  int _weekendCount(String id) =>
+      _w24[id]!.where(weekend.contains).length +
+      _w16[id]!.where(weekend.contains).length;
+
+  int _pairs24(String id) => RosterGenerator.everyOtherDayPairs(_w24[id]!);
+
+  int _emptySlots() {
+    var empty = 0;
+    for (var d = 1; d <= days; d++) {
+      if (_slot24[d] == null) empty++;
+      if (_slot16[d] == null) empty++;
+    }
+    return empty;
+  }
+
+  double _score() {
+    final empty = _emptySlots() * RosterGenerator.emptySlotPenalty;
+    if (ids.isEmpty) return empty;
+    final n = ids.length;
+    double sq(int Function(String) pick) {
+      final values = [for (final id in ids) pick(id)];
+      final mean = values.fold(0, (a, b) => a + b) / n;
+      return values.fold(0.0, (s, v) => s + (v - mean) * (v - mean));
+    }
+
+    final totalPairs = ids.fold(0, (a, id) => a + _pairs24(id));
+    const balance = 3.0;
+    return balance *
+            (sq((id) => _w24[id]!.length) +
+                sq((id) => _w16[id]!.length) +
+                sq(_weekendCount) +
+                sq(_pairs24)) +
+        0.75 * totalPairs +
+        empty;
+  }
+
+  _TechSolution solve(Random rng, int attempts, int polishCount) {
+    _reset();
+    if (ids.isEmpty) return _TechSolution(this, [..._slot24], [..._slot16], 0);
+
+    final candidates = <(double, List<String?>, List<String?>)>[];
+    for (var i = 0; i < max(1, attempts); i++) {
+      _greedy(rng, chronological: i.isEven);
+      candidates.add((_score(), [..._slot24], [..._slot16]));
+    }
+    candidates.sort((a, b) => a.$1.compareTo(b.$1));
+
+    var best = candidates.first;
+    for (final c in candidates.take(polishCount)) {
+      _load(c.$2, c.$3);
+      _improve(rng);
+      final score = _score();
+      if (score < best.$1) best = (score, [..._slot24], [..._slot16]);
+    }
+    _load(best.$2, best.$3);
+    return _TechSolution(this, best.$2, best.$3, best.$1);
+  }
+
+  void _greedy(Random rng, {required bool chronological}) {
+    _reset();
+    final order = [for (var d = 1; d <= days; d++) d];
+    if (!chronological) {
+      final availableCount = {
+        for (final d in order)
+          d: ids.where((id) => available[id]!.contains(d)).length,
+      };
+      final tie = {for (final d in order) d: rng.nextDouble()};
+      order.sort((a, b) {
+        final c = availableCount[a]!.compareTo(availableCount[b]!);
+        return c != 0 ? c : tie[a]!.compareTo(tie[b]!);
+      });
+    }
+    for (final d in order) {
+      _fillDay(d, rng);
+    }
+  }
+
+  void _fillDay(int d, Random rng) {
+    // Önce 24 (daha kısıtlı), sonra 16B.
+    final id24 = _pick(d, rng, is16b: false);
+    if (id24 != null) _place24(id24, d);
+    final id16 = _pick(d, rng, is16b: true);
+    if (id16 != null) _place16(id16, d);
+  }
+
+  String? _pick(int d, Random rng, {required bool is16b}) {
+    String? best;
+    var bestCost = double.infinity;
+    for (final id in ids) {
+      if (is16b ? !_canPlace16(id, d) : !_canPlace24(id, d)) continue;
+      final cost = _cost(id, d, is16b: is16b) + rng.nextDouble() * 2;
+      if (cost < bestCost) {
+        bestCost = cost;
+        best = id;
+      }
+    }
+    return best;
+  }
+
+  double _cost(String id, int d, {required bool is16b}) {
+    final n = ids.length;
+    final mean = days / n; // her gün 1 adet 24 ve 1 adet 16B
+    final own = is16b ? _w16[id]!.length : _w24[id]!.length;
+    var cost = (own + 1 - mean) * 10 + ytd[id]! * 1.5;
+    if (weekend.contains(d)) {
+      cost += (_weekendCount(id) + 1 - weekend.length * 2 / n) * 10;
+    }
+    if (!is16b) {
+      final newPairs =
+          (d - 2 >= 1 && _has24(id, d - 2) ? 1 : 0) +
+          (_has24(id, d + 2) ? 1 : 0);
+      if (newPairs > 0) {
+        final meanPairs = ids.map(_pairs24).fold(0, (a, b) => a + b) / n;
+        cost += newPairs * ((_pairs24(id) + 1 - meanPairs) * 10 + 3);
+      }
+    }
+    return cost;
+  }
+
+  void _improve(Random rng) {
+    var current = _score();
+    for (var pass = 0; pass < 30; pass++) {
+      var improved = false;
+
+      // Boş koltukları doldur.
+      for (var d = 1; d <= days; d++) {
+        if (_slot24[d] == null) {
+          final id = _pick(d, rng, is16b: false);
+          if (id != null) {
+            _place24(id, d);
+            improved = true;
+          }
+        }
+        if (_slot16[d] == null) {
+          final id = _pick(d, rng, is16b: true);
+          if (id != null) {
+            _place16(id, d);
+            improved = true;
+          }
+        }
+      }
+      if (improved) current = _score();
+
+      // Her koltukta kişiyi başkasıyla değiştir.
+      for (var d = 1; d <= days; d++) {
+        for (final is16b in const [false, true]) {
+          final a = is16b ? _slot16[d] : _slot24[d];
+          if (a == null) continue;
+          for (final b in ids) {
+            if (b == a) continue;
+            if (is16b) {
+              _remove16(d);
+              if (_canPlace16(b, d)) {
+                _place16(b, d);
+                if (_score() < current - 1e-9) {
+                  current = _score();
+                  improved = true;
+                  break;
+                }
+                _remove16(d);
+              }
+              _place16(a, d);
+            } else {
+              _remove24(d);
+              if (_canPlace24(b, d)) {
+                _place24(b, d);
+                if (_score() < current - 1e-9) {
+                  current = _score();
+                  improved = true;
+                  break;
+                }
+                _remove24(d);
+              }
+              _place24(a, d);
+            }
+          }
+        }
+      }
+
+      // Aynı tür iki koltuğu takas et.
+      for (final is16b in const [false, true]) {
+        final slot = is16b ? _slot16 : _slot24;
+        final filled = [
+          for (var d = 1; d <= days; d++)
+            if (slot[d] != null) d,
+        ];
+        for (var i = 0; i < filled.length; i++) {
+          for (var j = i + 1; j < filled.length; j++) {
+            final d1 = filled[i];
+            final d2 = filled[j];
+            final a = slot[d1];
+            final b = slot[d2];
+            if (a == null || b == null || a == b) continue;
+            if (_trySwap(a, d1, b, d2, is16b: is16b, current: current)) {
+              current = _score();
+              improved = true;
+            }
+          }
+        }
+      }
+
+      if (!improved) break;
+    }
+  }
+
+  bool _trySwap(
+    String a,
+    int d1,
+    String b,
+    int d2, {
+    required bool is16b,
+    required double current,
+  }) {
+    if (is16b) {
+      _remove16(d1);
+      _remove16(d2);
+      if (_canPlace16(b, d1) && _canPlace16(a, d2)) {
+        _place16(b, d1);
+        _place16(a, d2);
+        if (_score() < current - 1e-9) return true;
+        _remove16(d1);
+        _remove16(d2);
+      }
+      _place16(a, d1);
+      _place16(b, d2);
+    } else {
+      _remove24(d1);
+      _remove24(d2);
+      if (_canPlace24(b, d1) && _canPlace24(a, d2)) {
+        _place24(b, d1);
+        _place24(a, d2);
+        if (_score() < current - 1e-9) return true;
+        _remove24(d1);
+        _remove24(d2);
+      }
+      _place24(a, d1);
+      _place24(b, d2);
+    }
+    return false;
+  }
+
+  RosterIssue describeGap(int d, {required bool is16b, required int month}) {
+    const role = Role.radiologyTech;
+    final label = is16b ? '16B teknikeri' : '24 teknikeri';
+    if (members.isEmpty) {
+      return RosterIssue(
+        day: d,
+        role: role,
+        missing: 1,
+        message:
+            '${formatDayMonth(d, month)}: $label eksik. Hiç aktif radyoloji '
+            'teknikeri yok.',
+      );
+    }
+    String date(int day) => day >= 1
+        ? formatDayMonth(day, month)
+        : 'önceki ayın ${day == 0 ? 'son günü' : '${1 - day}. son günü'}';
+    final reasons = <String>[];
+    for (final p in [
+      ...members,
+    ]..sort((a, b) => compareTurkish(a.name, b.name))) {
+      final id = p.id;
+      if (_slot24[d] == id || _slot16[d] == id) continue;
+      final String? reason;
+      if (!available[id]!.contains(d)) {
+        reason = 'istemiyor';
+      } else if (_has24(id, d - 1)) {
+        reason = '${date(d - 1)} 24 nöbetçi (ertesi gün çalışamaz)';
+      } else if (!is16b && _worksAny(id, d + 1)) {
+        reason = '${date(d + 1)} nöbetçi (24 sonrası boş gün)';
+      } else if (!is16b && _breaks24Chain(id, d)) {
+        reason = 'gün aşırı zincir sınırında';
+      } else if (_slot24[d] == id || _slot16[d] == id) {
+        reason = null;
+      } else {
+        reason = 'uygun değil';
+      }
+      if (reason != null) reasons.add('${p.name} $reason');
+    }
+    return RosterIssue(
+      day: d,
+      role: role,
+      missing: 1,
+      message:
+          '${formatDayMonth(d, month)}: $label eksik. ${reasons.join('; ')}.',
     );
   }
 }

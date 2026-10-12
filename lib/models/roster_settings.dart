@@ -4,6 +4,7 @@ class RosterSettings {
     this.nursesPerDay = 2,
     this.techsPerDay = 1,
     this.shiftHours = 24,
+    this.secondaryTechShiftHours = 16,
     this.dailyRequiredHours = 7,
     this.maxEveryOtherDayChain = 2,
     this.maxExtraOverAverage,
@@ -21,6 +22,9 @@ class RosterSettings {
 
   /// Bir nöbetin süresi (saat).
   final int shiftHours;
+
+  /// Günde 2 tekniker tutulduğunda 16B vardiyasının mesai saati.
+  final int secondaryTechShiftHours;
 
   /// Resmi tatil olmayan bir hafta içi günün gerektirdiği çalışma saati.
   final double dailyRequiredHours;
@@ -49,6 +53,7 @@ class RosterSettings {
     int? nursesPerDay,
     int? techsPerDay,
     int? shiftHours,
+    int? secondaryTechShiftHours,
     double? dailyRequiredHours,
     int? maxEveryOtherDayChain,
     int? maxExtraOverAverage,
@@ -62,6 +67,8 @@ class RosterSettings {
       nursesPerDay: nursesPerDay ?? this.nursesPerDay,
       techsPerDay: techsPerDay ?? this.techsPerDay,
       shiftHours: shiftHours ?? this.shiftHours,
+      secondaryTechShiftHours:
+          secondaryTechShiftHours ?? this.secondaryTechShiftHours,
       dailyRequiredHours: dailyRequiredHours ?? this.dailyRequiredHours,
       maxEveryOtherDayChain:
           maxEveryOtherDayChain ?? this.maxEveryOtherDayChain,
@@ -82,6 +89,7 @@ class RosterSettings {
     'nursesPerDay': nursesPerDay,
     'techsPerDay': techsPerDay,
     'shiftHours': shiftHours,
+    'secondaryTechShiftHours': secondaryTechShiftHours,
     'dailyRequiredHours': dailyRequiredHours,
     'maxEveryOtherDayChain': maxEveryOtherDayChain,
     'maxExtraOverAverage': maxExtraOverAverage,
@@ -98,6 +106,8 @@ class RosterSettings {
       nursesPerDay: json['nursesPerDay'] as int? ?? d.nursesPerDay,
       techsPerDay: json['techsPerDay'] as int? ?? d.techsPerDay,
       shiftHours: json['shiftHours'] as int? ?? d.shiftHours,
+      secondaryTechShiftHours:
+          json['secondaryTechShiftHours'] as int? ?? d.secondaryTechShiftHours,
       dailyRequiredHours:
           (json['dailyRequiredHours'] as num?)?.toDouble() ??
           d.dailyRequiredHours,
@@ -123,6 +133,7 @@ class RosterSettings {
       other.nursesPerDay == nursesPerDay &&
       other.techsPerDay == techsPerDay &&
       other.shiftHours == shiftHours &&
+      other.secondaryTechShiftHours == secondaryTechShiftHours &&
       other.dailyRequiredHours == dailyRequiredHours &&
       other.maxEveryOtherDayChain == maxEveryOtherDayChain &&
       other.maxExtraOverAverage == maxExtraOverAverage &&
@@ -136,6 +147,7 @@ class RosterSettings {
     nursesPerDay,
     techsPerDay,
     shiftHours,
+    secondaryTechShiftHours,
     dailyRequiredHours,
     maxEveryOtherDayChain,
     maxExtraOverAverage,

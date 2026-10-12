@@ -82,11 +82,16 @@ class RosterValidator {
     final violations = <RuleViolation>[];
 
     // Kişi → nöbet günleri (önceki ay: 0, -1, ...), kişi → atandığı rol.
+    // blocking24: 24 saat (ağır) vardiyalar — ertesi gün çalışmayı engeller ve
+    // gün aşırı zinciri bunlar üzerinden sayılır. 16B günleri worked'tedir ama
+    // blocking24'te değildir. Önceki ay kuyruğu 24 kabul edilir.
     final worked = <String, Set<int>>{};
+    final blocking24 = <String, Set<int>>{};
     for (var i = 0; i < previousMonthTail.length; i++) {
       final offset = i - (previousMonthTail.length - 1);
       for (final id in previousMonthTail[i]) {
         (worked[id] ??= {}).add(offset);
+        (blocking24[id] ??= {}).add(offset);
       }
     }
     final seatRole = <String, Role>{};
@@ -94,10 +99,12 @@ class RosterValidator {
     for (var d = 1; d <= daysInMonth; d++) {
       final a = assignments[d] ?? DayAssignment(day: d);
       final seats = [
-        for (final id in a.nurseIds) (id, Role.nurse),
-        if (a.techId != null) (a.techId!, Role.radiologyTech),
+        for (final id in a.nurseIds) (id, Role.nurse, false),
+        if (a.techId != null) (a.techId!, Role.radiologyTech, false),
+        if (a.tech16bId != null) (a.tech16bId!, Role.radiologyTech, true),
       ];
-      for (final (id, role) in seats) {
+      for (final (id, role, light) in seats) {
+        if (!light) (blocking24[id] ??= {}).add(d);
         (worked[id] ??= {}).add(d);
         seatRole[id] = role;
         final person = byId[id];
@@ -128,19 +135,38 @@ class RosterValidator {
       }
 
       final missingNurses = max(0, settings.nursesPerDay - a.nurseIds.length);
-      final missingTechs = settings.techsPerDay > 0 && a.techId == null ? 1 : 0;
-      for (final (role, missing) in [
-        (Role.nurse, missingNurses),
-        (Role.radiologyTech, missingTechs),
-      ]) {
-        if (missing == 0) continue;
+      if (missingNurses > 0) {
         violations.add(
           RuleViolation(
             kind: ViolationKind.missing,
             days: [d],
-            role: role,
+            role: Role.nurse,
             message:
-                '${date(d)}: $missing ${turkishLowerCase(role.label)} eksik.',
+                '${date(d)}: $missingNurses ${turkishLowerCase(Role.nurse.label)} eksik.',
+          ),
+        );
+      }
+      // Tek tekniker: 24 koltuğu; iki tekniker: 24 + 16B koltukları.
+      if (settings.techsPerDay >= 1 && a.techId == null) {
+        final label = settings.techsPerDay >= 2
+            ? '24 teknikeri'
+            : '1 ${turkishLowerCase(Role.radiologyTech.label)}';
+        violations.add(
+          RuleViolation(
+            kind: ViolationKind.missing,
+            days: [d],
+            role: Role.radiologyTech,
+            message: '${date(d)}: $label eksik.',
+          ),
+        );
+      }
+      if (settings.techsPerDay >= 2 && a.tech16bId == null) {
+        violations.add(
+          RuleViolation(
+            kind: ViolationKind.missing,
+            days: [d],
+            role: Role.radiologyTech,
+            message: '${date(d)}: 16B teknikeri eksik.',
           ),
         );
       }
@@ -151,11 +177,17 @@ class RosterValidator {
       ..sort((a, b) => compareTurkish(name(a), name(b)));
     for (final id in ids) {
       final days = worked[id]!;
+      final heavy = blocking24[id] ?? const <int>{};
       final role = seatRole[id] ?? byId[id]?.role;
       if (!days.any((d) => d >= 1)) continue; // yalnız önceki ayda
 
-      if (settings.forbidConsecutiveDays) {
-        for (final d in days.toList()..sort()) {
+      // 24 vardiyası ertesi gün çalışmayı engeller. Teknikerde iki vardiya
+      // varken bu her zaman geçerli (16B hariç); hemşirede ve tek teknikerde
+      // ayardaki art arda gün yasağına bağlı.
+      final techSplit = settings.techsPerDay >= 2 && role == Role.radiologyTech;
+      final strictNextDay = techSplit || settings.forbidConsecutiveDays;
+      if (strictNextDay) {
+        for (final d in heavy.toList()..sort()) {
           if (d + 1 > daysInMonth || !days.contains(d + 1)) continue;
           violations.add(
             RuleViolation(
@@ -173,11 +205,11 @@ class RosterValidator {
         }
       }
 
-      // Gün aşırı zincirler: d, d+2, d+4, ... en uzun diziler.
-      for (final start in days.toList()..sort()) {
-        if (days.contains(start - 2)) continue; // zincirin başı değil
+      // Gün aşırı zincirler yalnız 24 vardiyalarında: d, d+2, d+4, ...
+      for (final start in heavy.toList()..sort()) {
+        if (heavy.contains(start - 2)) continue; // zincirin başı değil
         final chain = [start];
-        while (days.contains(chain.last + 2)) {
+        while (heavy.contains(chain.last + 2)) {
           chain.add(chain.last + 2);
         }
         if (chain.length <= chainLimit || !chain.any((d) => d >= 1)) {

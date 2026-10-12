@@ -111,76 +111,115 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     if (!_ensureUnlocked()) return;
 
     final plan = _plan;
-    final nursesPerDay = ref.read(effectiveSettingsProvider).nursesPerDay;
+    final settings = ref.read(effectiveSettingsProvider);
+    final nursesPerDay = settings.nursesPerDay;
+    final twoTechs = settings.techsPerDay >= 2;
     final day = cell.day;
     final id = cell.personId;
     final current = plan.assignments[day] ?? DayAssignment(day: day);
     final before = _currentMessages();
-    final roleIds = role == Role.nurse ? current.nurseIds : [?current.techId];
 
-    Map<int, DayAssignment> replace(String? oldId, String? newId) =>
-        RosterEditor.replace(
-          plan.assignments,
-          day: day,
-          role: role,
-          oldId: oldId,
-          newId: newId,
-          nursesPerDay: nursesPerDay,
-        );
+    Map<int, DayAssignment> replace(
+      String? oldId,
+      String? newId, {
+      bool secondary = false,
+    }) => RosterEditor.replace(
+      plan.assignments,
+      day: day,
+      role: role,
+      oldId: oldId,
+      newId: newId,
+      nursesPerDay: nursesPerDay,
+      secondary: secondary,
+    );
+
+    EditOption option(
+      String title,
+      Map<int, DayAssignment> after,
+      String warnFor, {
+      IconData? icon,
+      String? subtitle,
+    }) => EditOption(
+      title: title,
+      result: after,
+      icon: icon,
+      subtitle: subtitle,
+      warnings: _newWarnings(warnFor, after, before),
+    );
 
     final Map<int, DayAssignment>? result;
     if (current.includes(id)) {
+      // Dolu koltuğu düzenle: kişi 24 mü 16B mi oturuyorsa o koltuk.
+      final secondary = current.isSecondaryTech(id);
+      final shift = role == Role.radiologyTech
+          ? (secondary ? ' · 16B' : ' · 24')
+          : '';
       result = await showEditSheet(
         context,
-        title: '${_name(id)} · ${_dayLabel(day)}',
+        title: '${_name(id)} · ${_dayLabel(day)}$shift',
         actions: [
           EditOption(
             title: 'Nöbeti kaldır',
             subtitle: 'Koltuk boş kalır.',
             icon: Icons.remove_circle_outline,
-            result: replace(id, null),
+            result: replace(id, null, secondary: secondary),
           ),
         ],
         candidatesTitle: 'Yerine atanabilecekler',
         candidates: [
           for (final p in _activeOfRole(role))
             if (!current.includes(p.id))
-              () {
-                final after = replace(id, p.id);
-                return EditOption(
-                  title: p.name,
-                  result: after,
-                  warnings: _newWarnings(p.id, after, before),
-                );
-              }(),
+              option(p.name, replace(id, p.id, secondary: secondary), p.id),
         ],
       );
     } else {
-      final perDay = role == Role.nurse ? nursesPerDay : 1;
+      final candidates = <EditOption>[];
+      if (role == Role.nurse) {
+        if (current.nurseIds.length < nursesPerDay) {
+          candidates.add(option('Boş koltuğa ata', replace(null, id), id));
+        }
+        for (final other in current.nurseIds) {
+          candidates.add(
+            option('${_name(other)} yerine ata', replace(other, id), id),
+          );
+        }
+      } else {
+        // 24 koltuğu
+        candidates.add(
+          current.techId == null
+              ? option(
+                  twoTechs ? '24 koltuğuna ata' : 'Boş koltuğa ata',
+                  replace(null, id),
+                  id,
+                )
+              : option(
+                  '${_name(current.techId!)} yerine ata${twoTechs ? ' (24)' : ''}',
+                  replace(current.techId, id),
+                  id,
+                ),
+        );
+        // 16B koltuğu (yalnız 2 tekniker)
+        if (twoTechs) {
+          candidates.add(
+            current.tech16bId == null
+                ? option(
+                    '16B koltuğuna ata',
+                    replace(null, id, secondary: true),
+                    id,
+                  )
+                : option(
+                    '${_name(current.tech16bId!)} yerine ata (16B)',
+                    replace(current.tech16bId, id, secondary: true),
+                    id,
+                  ),
+          );
+        }
+      }
       result = await showEditSheet(
         context,
         title: '${_name(id)} · ${_dayLabel(day)}',
         subtitle: 'Bu güne ata',
-        candidates: [
-          if (roleIds.length < perDay)
-            () {
-              final after = replace(null, id);
-              return EditOption(
-                title: 'Boş koltuğa ata',
-                result: after,
-                warnings: _newWarnings(id, after, before),
-              );
-            }(),
-          for (final other in roleIds)
-            () {
-              final after = replace(other, id);
-              return EditOption(
-                title: '${_name(other)} yerine ata',
-                result: after,
-                warnings: _newWarnings(id, after, before),
-              );
-            }(),
-        ],
+        candidates: candidates,
       );
     }
     await _apply(result);
@@ -197,24 +236,36 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     final current = plan.assignments[day] ?? DayAssignment(day: day);
     final before = _currentMessages();
 
+    // Boş koltuklar: hemşire, 24 teknikeri, 16B teknikeri.
+    final slots = <({Role role, bool secondary, String label})>[
+      if (current.nurseIds.length < settings.nursesPerDay)
+        (role: Role.nurse, secondary: false, label: 'Hemşire'),
+      if (settings.techsPerDay >= 1 && current.techId == null)
+        (
+          role: Role.radiologyTech,
+          secondary: false,
+          label: settings.techsPerDay >= 2
+              ? '24 teknikeri'
+              : 'Radyoloji Teknikeri',
+        ),
+      if (settings.techsPerDay >= 2 && current.tech16bId == null)
+        (role: Role.radiologyTech, secondary: true, label: '16B teknikeri'),
+    ];
     final candidates = <EditOption>[];
-    for (final role in Role.values) {
-      final empty = role == Role.nurse
-          ? current.nurseIds.length < settings.nursesPerDay
-          : settings.techsPerDay > 0 && current.techId == null;
-      if (!empty) continue;
-      for (final p in _activeOfRole(role)) {
+    for (final slot in slots) {
+      for (final p in _activeOfRole(slot.role)) {
         if (current.includes(p.id)) continue;
         final after = RosterEditor.replace(
           plan.assignments,
           day: day,
-          role: role,
+          role: slot.role,
           newId: p.id,
           nursesPerDay: settings.nursesPerDay,
+          secondary: slot.secondary,
         );
         candidates.add(
           EditOption(
-            title: '${p.name} (${role.label})',
+            title: '${p.name} (${slot.label})',
             result: after,
             warnings: _newWarnings(p.id, after, before),
           ),

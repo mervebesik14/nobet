@@ -185,7 +185,11 @@ pw.Widget _rosterTable({
           nameCell(row.name),
           for (final d in days)
             cell(
-              personDays.contains(d) ? '$shiftHours' : '',
+              !personDays.contains(d)
+                  ? ''
+                  : (plan.assignments[d]?.isSecondaryTech(row.id) ?? false)
+                  ? '16B'
+                  : '$shiftHours',
               color: columnColor(d),
               bold: true,
             ),

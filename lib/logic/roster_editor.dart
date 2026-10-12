@@ -21,6 +21,8 @@ class RosterEditor {
   /// [day] gününde [role] koltuğundaki [oldId] yerine [newId] yazar.
   /// [oldId] boşsa boş koltuğa ekler; [newId] boşsa nöbeti kaldırır
   /// (koltuk boş kalır). Hemşire sırası korunur.
+  /// [secondary] true ise teknikerin 16B koltuğu, değilse 24 koltuğu
+  /// düzenlenir (hemşire rolünde yok sayılır).
   static Map<int, DayAssignment> replace(
     Map<int, DayAssignment> assignments, {
     required int day,
@@ -28,6 +30,7 @@ class RosterEditor {
     String? oldId,
     String? newId,
     required int nursesPerDay,
+    bool secondary = false,
   }) {
     final current = assignments[day] ?? DayAssignment(day: day);
     if (newId != null && current.includes(newId) && newId != oldId) {
@@ -55,15 +58,22 @@ class RosterEditor {
         }
         updated = current.copyWith(nurseIds: nurses);
       case Role.radiologyTech:
-        if (oldId != null && current.techId != oldId) {
+        final slotId = secondary ? current.tech16bId : current.techId;
+        if (oldId != null && slotId != oldId) {
           throw const RosterEditException('Değiştirilecek kişi o gün yok.');
         }
-        if (oldId == null && newId != null && current.techId != null) {
+        if (oldId == null && newId != null && slotId != null) {
           throw const RosterEditException('O gün boş tekniker koltuğu yok.');
         }
-        updated = newId == null
-            ? current.copyWith(clearTech: true)
-            : current.copyWith(techId: newId);
+        if (secondary) {
+          updated = newId == null
+              ? current.copyWith(clearTech16b: true)
+              : current.copyWith(tech16bId: newId);
+        } else {
+          updated = newId == null
+              ? current.copyWith(clearTech: true)
+              : current.copyWith(techId: newId);
+        }
     }
     return {...assignments, day: updated};
   }
@@ -96,6 +106,9 @@ class RosterEditor {
     if (onB.includes(a)) {
       throw const RosterEditException('İlk kişi ikinci gün zaten nöbetçi.');
     }
+    // Her kişi kendi günündeki koltuğunu (24 ya da 16B) korur.
+    final secondaryA = onA.isSecondaryTech(a);
+    final secondaryB = onB.isSecondaryTech(b);
     final step = replace(
       assignments,
       day: dayA,
@@ -103,6 +116,7 @@ class RosterEditor {
       oldId: a,
       newId: b,
       nursesPerDay: nursesPerDay,
+      secondary: secondaryA,
     );
     return replace(
       step,
@@ -111,6 +125,7 @@ class RosterEditor {
       oldId: b,
       newId: a,
       nursesPerDay: nursesPerDay,
+      secondary: secondaryB,
     );
   }
 }

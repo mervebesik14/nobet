@@ -41,11 +41,25 @@ class SettingsPage extends ConsumerWidget {
           ),
           _NumberSetting(
             title: 'Günlük radyoloji teknikeri sayısı',
+            subtitle: s.techsPerDay >= 2
+                ? 'İki tekniker: biri 24, biri 16B. 24 çalışan ertesi gün '
+                      'çalışamaz; 16B çalışabilir.'
+                : null,
             value: s.techsPerDay,
             min: 0,
-            max: 1,
+            max: 2,
             onChanged: (v) => update(s.copyWith(techsPerDay: v.toInt())),
           ),
+          if (s.techsPerDay >= 2)
+            _NumberSetting(
+              title: '16B vardiyası çalışma saati',
+              value: s.secondaryTechShiftHours,
+              min: 1,
+              max: 24,
+              suffix: 'saat',
+              onChanged: (v) =>
+                  update(s.copyWith(secondaryTechShiftHours: v.toInt())),
+            ),
           SwitchListTile(
             title: const Text('Art arda gün yasağı'),
             subtitle: const Text(

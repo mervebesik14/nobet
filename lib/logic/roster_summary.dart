@@ -18,6 +18,7 @@ class PersonSummary {
     required this.everyOtherDayPairs,
     required this.workedHours,
     required this.requiredHours,
+    this.secondaryShifts = 0,
   });
 
   final String personId;
@@ -28,6 +29,12 @@ class PersonSummary {
   final int everyOtherDayPairs;
   final int workedHours;
   final double requiredHours;
+
+  /// Bunların kaçı 16B (hafif) vardiyası; teknikerler için anlamlıdır.
+  final int secondaryShifts;
+
+  /// 24 saat vardiyası sayısı.
+  int get primaryShifts => shifts - secondaryShifts;
 
   /// max(0, çalışılan − gereken)
   double get overtimeHours =>
@@ -104,6 +111,8 @@ class RosterSummary {
 
     final worked = <String, Set<int>>{};
     final assignedRole = <String, Role>{};
+    // 16B (hafif) vardiyadaki tekniker günleri; çalışılan saat farklı.
+    final secondary = <String, Set<int>>{};
     for (final a in assignments.values) {
       for (final id in a.nurseIds) {
         (worked[id] ??= {}).add(a.day);
@@ -112,6 +121,11 @@ class RosterSummary {
       if (a.techId case final id?) {
         (worked[id] ??= {}).add(a.day);
         assignedRole[id] = Role.radiologyTech;
+      }
+      if (a.tech16bId case final id?) {
+        (worked[id] ??= {}).add(a.day);
+        assignedRole[id] = Role.radiologyTech;
+        (secondary[id] ??= {}).add(a.day);
       }
     }
 
@@ -129,15 +143,21 @@ class RosterSummary {
     for (final id in included) {
       final person = byId[id];
       final days = worked[id] ?? const <int>{};
+      final light = secondary[id] ?? const <int>{};
+      final full = days.length - light.length;
       rows.add(
         PersonSummary(
           personId: id,
           name: person?.name ?? 'Silinmiş kişi',
           role: person?.role ?? assignedRole[id]!,
           shifts: days.length,
+          secondaryShifts: light.length,
           weekendShifts: days.where(weekend.contains).length,
           everyOtherDayPairs: RosterGenerator.everyOtherDayPairs(days),
-          workedHours: calc.workedHours(days.length),
+          // 24 vardiyaları tam saat, 16B vardiyaları kısa saat sayılır.
+          workedHours:
+              calc.workedHours(full) +
+              light.length * settings.secondaryTechShiftHours,
           requiredHours: required,
         ),
       );

@@ -39,7 +39,7 @@ types:
         index: 3
   DayAssignment:
     typeId: 3
-    nextIndex: 3
+    nextIndex: 4
     fields:
       day:
         index: 0
@@ -47,6 +47,8 @@ types:
         index: 1
       techId:
         index: 2
+      tech16bId:
+        index: 3
   MonthPlan:
     typeId: 4
     nextIndex: 8
@@ -69,7 +71,7 @@ types:
         index: 7
   RosterSettings:
     typeId: 5
-    nextIndex: 10
+    nextIndex: 11
     fields:
       nursesPerDay:
         index: 0
@@ -91,3 +93,5 @@ types:
         index: 8
       halfDayRequiredHours:
         index: 9
+      secondaryTechShiftHours:
+        index: 10
