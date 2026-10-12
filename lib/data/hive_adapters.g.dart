@@ -199,13 +199,14 @@ class MonthPlanAdapter extends TypeAdapter<MonthPlan> {
       generatedAt: fields[4] as DateTime?,
       isLocked: fields[5] == null ? false : fields[5] as bool,
       seed: (fields[6] as num?)?.toInt(),
+      nurseOnly: fields[7] == null ? false : fields[7] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, MonthPlan obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.year)
       ..writeByte(1)
@@ -219,7 +220,9 @@ class MonthPlanAdapter extends TypeAdapter<MonthPlan> {
       ..writeByte(5)
       ..write(obj.isLocked)
       ..writeByte(6)
-      ..write(obj.seed);
+      ..write(obj.seed)
+      ..writeByte(7)
+      ..write(obj.nurseOnly);
   }
 
   @override

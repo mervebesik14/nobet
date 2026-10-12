@@ -106,15 +106,17 @@ class MonthPlanController extends Notifier<MonthPlan> {
   /// Nöbet listesini oluşturur ve plana kaydeder. [seed] verilmezse yeni
   /// rastgele tohum kullanılır (her "Yeniden oluştur" farklı liste verir).
   /// Kilit burada kontrol edilmez; onayı ekran ister.
-  Future<RosterResult> generate({int? seed}) async {
+  Future<RosterResult> generate({int? seed, bool? nurseOnly}) async {
     final plan = state;
+    final onlyNurses = nurseOnly ?? plan.nurseOnly;
+    final base = ref.read(rosterSettingsProvider);
     final generator = RosterGenerator(
       year: plan.year,
       month: plan.month,
       people: ref.read(peopleProvider),
       unavailableDays: plan.unavailableDays,
       holidays: ref.read(holidaysProvider),
-      settings: ref.read(rosterSettingsProvider),
+      settings: effectiveSettings(base, nurseOnly: onlyNurses),
       seed: seed ?? Random().nextInt(1 << 31),
       previousMonthTail: previousMonthTail(),
       yearToDate: YearlySummary.build(
@@ -122,7 +124,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
         plans: ref.read(monthPlanRepositoryProvider).getAll(),
         people: ref.read(peopleProvider),
         holidays: ref.read(holidaysProvider),
-        settings: ref.read(rosterSettingsProvider),
+        settings: base,
         beforeMonth: plan.month,
       ).byId,
     );
@@ -131,6 +133,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       assignments: result.assignments,
       generatedAt: DateTime.now(),
       seed: result.seed,
+      nurseOnly: onlyNurses,
     );
     await ref.read(monthPlanRepositoryProvider).save(state);
     return result;
@@ -169,10 +172,25 @@ class MonthPlanController extends Notifier<MonthPlan> {
 }
 
 /// Seçili ayın listesindeki kural ihlalleri; her değişiklikte yenilenir.
+/// Bir ay yalnız hemşire ise tekniker koltuğu kapatılmış ayarlar.
+RosterSettings effectiveSettings(
+  RosterSettings base, {
+  required bool nurseOnly,
+}) => nurseOnly ? base.copyWith(techsPerDay: 0) : base;
+
+/// Seçili ayın, (yalnız hemşire ise) teknikeri kapatılmış etkin ayarları.
+final effectiveSettingsProvider = Provider<RosterSettings>((ref) {
+  final nurseOnly = ref.watch(monthPlanProvider.select((p) => p.nurseOnly));
+  return effectiveSettings(
+    ref.watch(rosterSettingsProvider),
+    nurseOnly: nurseOnly,
+  );
+});
+
 final rosterViolationsProvider = Provider<List<RuleViolation>>((ref) {
   final plan = ref.watch(monthPlanProvider);
   if (!plan.hasRoster) return const [];
-  return RosterValidator(ref.watch(rosterSettingsProvider)).validate(
+  return RosterValidator(ref.watch(effectiveSettingsProvider)).validate(
     year: plan.year,
     month: plan.month,
     assignments: plan.assignments,

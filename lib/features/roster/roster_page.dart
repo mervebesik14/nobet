@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../../data/providers.dart';
 import '../../logic/roster_editor.dart';
 import '../../logic/roster_generator.dart';
 import '../../logic/roster_summary.dart';
@@ -59,7 +58,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
 
   List<RuleViolation> _validate(Map<int, DayAssignment> assignments) {
     final plan = _plan;
-    return RosterValidator(ref.read(rosterSettingsProvider)).validate(
+    return RosterValidator(ref.read(effectiveSettingsProvider)).validate(
       year: plan.year,
       month: plan.month,
       assignments: assignments,
@@ -112,7 +111,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     if (!_ensureUnlocked()) return;
 
     final plan = _plan;
-    final nursesPerDay = ref.read(rosterSettingsProvider).nursesPerDay;
+    final nursesPerDay = ref.read(effectiveSettingsProvider).nursesPerDay;
     final day = cell.day;
     final id = cell.personId;
     final current = plan.assignments[day] ?? DayAssignment(day: day);
@@ -194,7 +193,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     }
     if (!_ensureUnlocked()) return;
     final plan = _plan;
-    final settings = ref.read(rosterSettingsProvider);
+    final settings = ref.read(effectiveSettingsProvider);
     final current = plan.assignments[day] ?? DayAssignment(day: day);
     final before = _currentMessages();
 
@@ -264,7 +263,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         b: cell.personId,
         dayB: cell.day,
         role: role,
-        nursesPerDay: ref.read(rosterSettingsProvider).nursesPerDay,
+        nursesPerDay: ref.read(effectiveSettingsProvider).nursesPerDay,
       );
       setState(() => _swapFrom = null);
       await _apply(result);
@@ -336,7 +335,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   Widget build(BuildContext context) {
     final plan = ref.watch(monthPlanProvider);
     final people = ref.watch(peopleProvider);
-    final settings = ref.watch(rosterSettingsProvider);
+    // Yalnız hemşire ayında teknikeri kapatılmış etkin ayarlar kullanılır.
+    final settings = ref.watch(effectiveSettingsProvider);
     final violations = ref.watch(rosterViolationsProvider);
     final holidays = ref
         .watch(holidaysProvider)
@@ -352,6 +352,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       people: people,
       holidays: holidays,
       settings: settings,
+      onlyRoles: plan.nurseOnly ? const {Role.nurse} : null,
     );
     final missingByDay = <int, int>{};
     for (var d = 1; d <= plan.daysInMonth; d++) {

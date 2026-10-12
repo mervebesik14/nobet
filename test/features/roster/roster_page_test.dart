@@ -68,6 +68,8 @@ void main() {
 
     await tester.tap(find.text('Listeyi Oluştur'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
 
     expect(find.text('Ekim 2026 Nöbet Listesi'), findsOneWidget);
     final plan = saved();
@@ -141,6 +143,8 @@ void main() {
 
     await tester.tap(find.text('Listeyi Oluştur'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
     expect(find.text('Uygunluk sorunları var'), findsOneWidget);
     expect(
       find.descendant(
@@ -156,6 +160,8 @@ void main() {
     expect(saved().hasRoster, isFalse);
 
     await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Yine de dene'));
     await tester.pumpAndSettle();
@@ -189,6 +195,8 @@ void main() {
     await pumpMonthPage(tester);
     await tester.tap(find.text('Listeyi Oluştur'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
     final first = saved();
 
     await tester.tap(find.byTooltip('Kilitle'));
@@ -207,6 +215,8 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Yeniden oluştur'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
     expect(saved().seed, isNot(first.seed));
     expect(saved().isLocked, isTrue);
 
@@ -221,12 +231,49 @@ void main() {
     await pumpMonthPage(tester);
     await tester.tap(find.text('Listeyi Oluştur'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
     final firstSeed = saved().seed;
 
     await tester.tap(find.byTooltip('Yeniden oluştur'));
     await tester.pumpAndSettle();
     expect(find.text('Bu ay kilitli'), findsNothing);
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
     expect(saved().seed, isNot(firstSeed));
     expect(saved().assignments.length, 31);
+  });
+
+  testWidgets('yalnız hemşire: tekniker atanmaz ve listede görünmez', (
+    tester,
+  ) async {
+    await pumpMonthPage(tester);
+
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    expect(find.text('Liste kimler için?'), findsOneWidget);
+    await tester.tap(find.text('Yalnız hemşire'));
+    await tester.pumpAndSettle();
+
+    final plan = saved();
+    expect(plan.nurseOnly, isTrue);
+    expect(plan.assignments.length, 31);
+    for (final a in plan.assignments.values) {
+      expect(a.nurseIds.length, 2);
+      expect(a.techId, isNull); // tekniker atanmadı
+    }
+
+    final table = find.byType(RosterTable);
+    Finder inTable(String t) =>
+        find.descendant(of: table, matching: find.text(t));
+    // Hemşireler görünür, Radyoloji Teknikerleri grubu ve teknikerler yok.
+    expect(inTable('Hemşireler'), findsOneWidget);
+    expect(inTable('Radyoloji Teknikerleri'), findsNothing);
+    for (final name in ['Ali', 'Burak', 'Can', 'Deniz']) {
+      expect(inTable(name), findsNothing);
+    }
+    // Tekniker eksikliği ihlal/eksik olarak sayılmaz.
+    expect(find.text('Kural ihlali yok'), findsOneWidget);
+    expect(inTable('Eksik'), findsNothing);
   });
 }

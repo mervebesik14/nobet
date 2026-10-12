@@ -12,6 +12,7 @@ class MonthPlan {
     this.generatedAt,
     this.isLocked = false,
     this.seed,
+    this.nurseOnly = false,
   });
 
   final int year;
@@ -33,6 +34,9 @@ class MonthPlan {
 
   /// Listeyi üreten tohum; aynı girdilerle aynı liste yeniden üretilebilir.
   final int? seed;
+
+  /// Bu ay yalnız hemşire listesi olarak oluşturuldu (tekniker yok).
+  final bool nurseOnly;
 
   /// Nöbet listesi oluşturulmuş mu?
   bool get hasRoster => assignments.isNotEmpty;
@@ -61,6 +65,7 @@ class MonthPlan {
     DateTime? generatedAt,
     bool? isLocked,
     int? seed,
+    bool? nurseOnly,
   }) {
     return MonthPlan(
       year: year,
@@ -70,6 +75,7 @@ class MonthPlan {
       generatedAt: generatedAt ?? this.generatedAt,
       isLocked: isLocked ?? this.isLocked,
       seed: seed ?? this.seed,
+      nurseOnly: nurseOnly ?? this.nurseOnly,
     );
   }
 
@@ -84,6 +90,7 @@ class MonthPlan {
     'generatedAt': generatedAt?.toIso8601String(),
     'isLocked': isLocked,
     'seed': seed,
+    'nurseOnly': nurseOnly,
   };
 
   factory MonthPlan.fromJson(Map<String, dynamic> json) {
@@ -106,6 +113,7 @@ class MonthPlan {
       generatedAt: generatedAt == null ? null : DateTime.parse(generatedAt),
       isLocked: json['isLocked'] as bool? ?? false,
       seed: json['seed'] as int?,
+      nurseOnly: json['nurseOnly'] as bool? ?? false,
     );
   }
 
@@ -123,7 +131,8 @@ class MonthPlan {
       _assignmentsEquality.equals(other.assignments, assignments) &&
       other.generatedAt == generatedAt &&
       other.isLocked == isLocked &&
-      other.seed == seed;
+      other.seed == seed &&
+      other.nurseOnly == nurseOnly;
 
   @override
   int get hashCode => Object.hash(
@@ -134,6 +143,7 @@ class MonthPlan {
     generatedAt,
     isLocked,
     seed,
+    nurseOnly,
   );
 
   @override

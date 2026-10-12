@@ -118,4 +118,19 @@ void main() {
     expect(s.people.every((r) => r.shifts == 0), isTrue);
     expect(s.people.every((r) => r.missingHours == 147), isTrue);
   });
+
+  test('onlyRoles: yalnız verilen roller özette yer alır', () {
+    final s = RosterSummary.build(
+      year: 2026,
+      month: 10,
+      assignments: assignments(),
+      people: people,
+      holidays: holidays,
+      settings: settings,
+      onlyRoles: const {Role.nurse},
+    );
+    expect(s.people.every((r) => r.role == Role.nurse), isTrue);
+    expect(s.averages.containsKey(Role.radiologyTech), isFalse);
+    expect(s.people.map((r) => r.personId), isNot(contains('t')));
+  });
 }

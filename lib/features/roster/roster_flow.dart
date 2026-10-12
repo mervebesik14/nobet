@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/providers.dart';
+import '../../logic/feasibility_checker.dart';
+import '../people/people_controller.dart';
 import '../month/month_plan_controller.dart';
 
-/// "Listeyi Oluştur" / "Yeniden oluştur" akışı: kilit onayı, uygunluk
-/// uyarıları, ilerleme göstergesi ve eksik kalan günlerin raporu.
-/// Liste oluşturulduysa true döner.
+/// "Listeyi Oluştur" / "Yeniden oluştur" akışı: önce mod seçimi (hemşire +
+/// tekniker / yalnız hemşire), kilit onayı, uygunluk uyarıları, ilerleme
+/// göstergesi ve eksik kalan günlerin raporu. Liste oluşturulduysa true döner.
 Future<bool> generateRoster(BuildContext context, WidgetRef ref) async {
   final plan = ref.read(monthPlanProvider);
   final controller = ref.read(monthPlanProvider.notifier);
+  final hasTechs = ref.read(rosterSettingsProvider).techsPerDay > 0;
 
   if (plan.isLocked) {
     final ok = await _confirm(
@@ -22,7 +26,29 @@ Future<bool> generateRoster(BuildContext context, WidgetRef ref) async {
     if (!ok || !context.mounted) return false;
   }
 
-  final report = ref.read(monthFeasibilityProvider);
+  // Mod: yalnızca tekniker tanımlıysa sor; değilse zaten yalnız hemşire.
+  final bool nurseOnly;
+  if (hasTechs) {
+    final choice = await _chooseMode(context);
+    if (choice == null || !context.mounted) return false;
+    nurseOnly = choice;
+  } else {
+    nurseOnly = true;
+  }
+
+  // Uygunluk, seçilen moda göre (yalnız hemşirede tekniker aranmaz).
+  final report =
+      FeasibilityChecker(
+        effectiveSettings(
+          ref.read(rosterSettingsProvider),
+          nurseOnly: nurseOnly,
+        ),
+      ).check(
+        year: plan.year,
+        month: plan.month,
+        people: ref.read(peopleProvider),
+        unavailableDays: plan.unavailableDays,
+      );
   if (!report.isFeasible) {
     final ok = await _confirm(
       context,
@@ -53,7 +79,7 @@ Future<bool> generateRoster(BuildContext context, WidgetRef ref) async {
       ),
     ),
   );
-  final result = await controller.generate();
+  final result = await controller.generate(nurseOnly: nurseOnly);
   navigator.pop();
 
   if (!result.isComplete && context.mounted) {
@@ -74,6 +100,32 @@ Future<bool> generateRoster(BuildContext context, WidgetRef ref) async {
     );
   }
   return true;
+}
+
+/// Liste kimler için oluşturulsun? true = yalnız hemşire, false = hemşire +
+/// tekniker, null = vazgeçildi.
+Future<bool?> _chooseMode(BuildContext context) {
+  return showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Liste kimler için?'),
+      content: const Text('Nöbet listesini kimler için oluşturalım?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Vazgeç'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Yalnız hemşire'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Hemşire + Tekniker'),
+        ),
+      ],
+    ),
+  );
 }
 
 Future<bool> _confirm(

@@ -119,6 +119,8 @@ void main() {
 
     await tester.tap(find.text('Listeyi Oluştur'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
 
     final october = boxes.monthPlans.get('2026-10')!;
     expect(october.assignments.length, 31);
@@ -153,6 +155,8 @@ void main() {
     await boxes.monthPlans.put('2026-09', _september(locked: true));
     await pumpMonthPage(tester);
     await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
     await tester.pumpAndSettle();
     await tester.pageBack();
     await tester.pumpAndSettle();

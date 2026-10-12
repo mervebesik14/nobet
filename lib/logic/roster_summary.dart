@@ -91,6 +91,7 @@ class RosterSummary {
     required Iterable<Person> people,
     required Iterable<Holiday> holidays,
     required RosterSettings settings,
+    Set<Role>? onlyRoles,
   }) {
     final calc = WorkHoursCalculator(settings);
     final required = calc.requiredHours(year, month, holidays);
@@ -116,10 +117,14 @@ class RosterSummary {
 
     final byId = {for (final p in people) p.id: p};
     final rows = <PersonSummary>[];
+    bool roleAllowed(Role? role) =>
+        onlyRoles == null || onlyRoles.contains(role);
     final included = {
       for (final p in people)
-        if (p.isActive || worked.containsKey(p.id)) p.id,
-      ...worked.keys,
+        if ((p.isActive || worked.containsKey(p.id)) && roleAllowed(p.role))
+          p.id,
+      for (final id in worked.keys)
+        if (roleAllowed(byId[id]?.role ?? assignedRole[id])) id,
     };
     for (final id in included) {
       final person = byId[id];
