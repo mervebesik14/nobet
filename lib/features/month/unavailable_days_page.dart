@@ -247,7 +247,14 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
               ? 'Bu ay kilitli; ${type.label.toLowerCase()} değiştirilemez.'
               : 'Başlangıç ve bitiş gününü seçin, sonra "İzin ekle"ye dokunun. '
                     'İzin günlerinde nöbet verilmez ve gereken saatten düşülür. '
-                    'Kişi iznin bittiği günden sonraki ilk gün nöbete girebilir.',
+                    '${switch (type) {
+                      LeaveType.annual =>
+                        'Kişi iznin bittiği günden sonraki ilk iş günü nöbete '
+                            'girebilir (aradaki hafta sonu/tatile nöbet '
+                            'yazılmaz).',
+                      LeaveType.radiation =>
+                        'Kişi iznin bittiği günden sonra nöbete girebilir.',
+                    }}',
           style: theme.textTheme.bodyMedium,
         ),
         const SizedBox(height: 8),

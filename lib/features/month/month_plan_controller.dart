@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../logic/feasibility_checker.dart';
+import '../../logic/leave_rules.dart';
 import '../../logic/roster_generator.dart';
 import '../../logic/roster_validator.dart';
 import '../../logic/yearly_summary.dart';
@@ -217,7 +218,10 @@ class MonthPlanController extends Notifier<MonthPlan> {
       year: plan.year,
       month: plan.month,
       people: ref.read(peopleProvider),
-      unavailableDays: plan.blockedDays,
+      unavailableDays: computeEffectiveBlockedDays(
+        plan,
+        ref.read(holidaysProvider),
+      ),
       holidays: ref.read(holidaysProvider),
       settings: effectiveSettings(base, nurseOnly: onlyNurses),
       seed: seed ?? Random().nextInt(1 << 31),
@@ -299,7 +303,7 @@ final rosterViolationsProvider = Provider<List<RuleViolation>>((ref) {
     month: plan.month,
     assignments: plan.assignments,
     people: ref.watch(peopleProvider),
-    unavailableDays: plan.blockedDays,
+    unavailableDays: ref.watch(effectiveBlockedDaysProvider),
     previousMonthTail: ref.read(monthPlanProvider.notifier).previousMonthTail(),
     overtimeRequests: plan.overtimeRequests,
   );
@@ -319,6 +323,38 @@ final monthPlanProvider = NotifierProvider<MonthPlanController, MonthPlan>(
   MonthPlanController.new,
 );
 
+/// Nöbet dağıtımında kişi başı gerçekten engellenen günler: istenmeyen
+/// günler + tüm izinler + yıllık izin bitişinden sonraki ilk iş gününe kadar
+/// kalan günler.
+Map<String, List<int>> computeEffectiveBlockedDays(
+  MonthPlan plan,
+  Iterable<Holiday> holidays,
+) {
+  final base = plan.blockedDays;
+  final ids = {...base.keys, ...plan.annualLeave.keys};
+  final result = <String, List<int>>{};
+  for (final id in ids) {
+    final days = {...?base[id]};
+    days.addAll(
+      LeaveRules.postAnnualLeaveBlockedDays(
+        year: plan.year,
+        month: plan.month,
+        annualLeaveDays: plan.annualLeaveOf(id),
+        holidays: holidays,
+      ),
+    );
+    if (days.isNotEmpty) result[id] = days.toList()..sort();
+  }
+  return result;
+}
+
+/// Seçili ayın etkin bloklu günleri. Üretim, uygunluk ve doğrulama kullanır.
+final effectiveBlockedDaysProvider = Provider<Map<String, List<int>>>((ref) {
+  final plan = ref.watch(monthPlanProvider);
+  final holidays = ref.watch(holidaysProvider);
+  return computeEffectiveBlockedDays(plan, holidays);
+});
+
 /// Seçili ay için liste oluşturmadan önceki uygunluk kontrolü.
 final monthFeasibilityProvider = Provider<FeasibilityReport>((ref) {
   final plan = ref.watch(monthPlanProvider);
@@ -326,6 +362,6 @@ final monthFeasibilityProvider = Provider<FeasibilityReport>((ref) {
     year: plan.year,
     month: plan.month,
     people: ref.watch(peopleProvider),
-    unavailableDays: plan.blockedDays,
+    unavailableDays: ref.watch(effectiveBlockedDaysProvider),
   );
 });

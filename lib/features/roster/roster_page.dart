@@ -64,7 +64,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       month: plan.month,
       assignments: assignments,
       people: ref.read(peopleProvider),
-      unavailableDays: plan.blockedDays,
+      unavailableDays: ref.read(effectiveBlockedDaysProvider),
       previousMonthTail: ref
           .read(monthPlanProvider.notifier)
           .previousMonthTail(),

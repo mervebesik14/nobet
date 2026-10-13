@@ -282,6 +282,34 @@ void main() {
     expect(inTable('Ş.İ.'), findsNWidgets(2));
   });
 
+  testWidgets('yıllık izin Cuma bitince hafta sonu da nöbetsiz kalır', (
+    tester,
+  ) async {
+    // 9 Ekim Cuma. n1 yıllık izni 8–9; 10 Cmt ve 11 Paz da nöbete kapalı,
+    // ilk nöbet en erken 12 Pazartesi.
+    await boxes.monthPlans.put(
+      '2026-10',
+      const MonthPlan(
+        year: 2026,
+        month: 10,
+        annualLeave: {
+          'n1': [8, 9],
+        },
+      ),
+    );
+    await pumpMonthPage(tester);
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
+
+    final plan = saved();
+    // İzin günleri ve iznden sonraki hafta sonu n1'e kapalı.
+    for (final d in [8, 9, 10, 11]) {
+      expect(plan.assignments[d]!.includes('n1'), isFalse, reason: 'gün $d');
+    }
+  });
+
   testWidgets('Listeyi sıfırla: onaylayınca liste silinir, tercihler kalır', (
     tester,
   ) async {
