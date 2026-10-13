@@ -152,7 +152,8 @@ class RosterTable extends StatelessWidget {
         ),
       );
       final personDays = worked[row.id] ?? const <int>{};
-      final personLeave = plan.annualLeaveOf(row.id).toSet();
+      final annualLeave = plan.annualLeaveOf(row.id).toSet();
+      final radiationLeave = plan.radiationLeaveOf(row.id).toSet();
       right.add(
         Row(
           children: [
@@ -169,15 +170,16 @@ class RosterTable extends StatelessWidget {
                   context,
                   box: box,
                   cell: (personId: row.id, day: d),
-                  label: _labelFor(
-                    row.id,
-                    d,
-                    personDays.contains(d),
-                    personLeave.contains(d),
-                  ),
+                  // İzinli gün (o gün nöbeti yoksa) türüne göre gösterilir.
+                  leave: personDays.contains(d)
+                      ? null
+                      : annualLeave.contains(d)
+                      ? LeaveType.annual
+                      : radiationLeave.contains(d)
+                      ? LeaveType.radiation
+                      : null,
+                  label: _labelFor(row.id, d, personDays.contains(d)),
                   columnColor: columnColor(d),
-                  // İzinli gün (o gün nöbeti yoksa) ayrı renkte gösterilir.
-                  isLeave: personLeave.contains(d) && !personDays.contains(d),
                 ),
               ),
           ],
@@ -294,15 +296,13 @@ class RosterTable extends StatelessWidget {
     );
   }
 
-  /// Hücre yazısı: nöbet varsa 16B teknikeri ise "16B" yoksa "24"; nöbet
-  /// yoksa ve o gün yıllık izinliyse "Y.İ."; değilse boş.
-  String? _labelFor(String id, int day, bool works, bool onLeave) {
-    if (works) {
-      return (plan.assignments[day]?.isSecondaryTech(id) ?? false)
-          ? '16B'
-          : '$shiftHours';
-    }
-    return onLeave ? 'Y.İ.' : null;
+  /// Nöbet hücresi yazısı: 16B teknikeri ise "16B", yoksa "24". Nöbet
+  /// yoksa null (izin yazısı hücrede ayrıca eklenir).
+  String? _labelFor(String id, int day, bool works) {
+    if (!works) return null;
+    return (plan.assignments[day]?.isSecondaryTech(id) ?? false)
+        ? '16B'
+        : '$shiftHours';
   }
 
   Widget _personCell(
@@ -318,36 +318,44 @@ class RosterTable extends StatelessWidget {
     required RosterCell cell,
     required String? label,
     required Color? columnColor,
-    required bool isLeave,
+    required LeaveType? leave,
   }) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final selected = selectedCell == cell;
     final violated = violationCells.contains(cell);
+    // Nöbet yoksa ama izin varsa izin yazısı/rengi gösterilir.
+    final leaveTint = switch (leave) {
+      LeaveType.annual => scheme.leaveTint,
+      LeaveType.radiation => scheme.radiationTint,
+      null => null,
+    };
+    final leaveInk = switch (leave) {
+      LeaveType.annual => scheme.leaveColor,
+      LeaveType.radiation => scheme.radiationColor,
+      null => null,
+    };
+    final text = label ?? leave?.shortLabel;
     final color = selected
         ? scheme.primary
         : violated
         ? scheme.dangerTint
-        : isLeave
-        ? scheme.leaveTint
-        : columnColor;
+        : leaveTint ?? columnColor;
     final textColor = selected
         ? scheme.onPrimary
         : violated
         ? scheme.error
-        : isLeave
-        ? scheme.leaveColor
-        : scheme.primary;
+        : leaveInk ?? scheme.primary;
     return box(
       width: _cellWidth,
       height: _rowHeight,
       color: color,
-      child: label == null
+      child: text == null
           ? null
           : FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(
-                label,
+                text,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: textColor,

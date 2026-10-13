@@ -127,7 +127,7 @@ void main() {
       people: people,
       holidays: holidays,
       settings: settings,
-      annualLeave: const {
+      leaveDays: const {
         // 1,2 iş günü (2×7=14) + 28 arife (5) = 19 saat düşer; 3 hafta sonu
         // yok sayılır.
         'b': [1, 2, 3, 28],
@@ -150,7 +150,7 @@ void main() {
       people: people,
       holidays: holidays,
       settings: settings,
-      annualLeave: {
+      leaveDays: {
         // Ayın tüm günleri izin: gereken saat 0'a iner, negatife düşmez.
         'a': [for (var d = 1; d <= 31; d++) d],
       },

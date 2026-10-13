@@ -59,6 +59,9 @@ void main() {
         'n1': [8, 9, 10],
         't2': [15],
       },
+      radiationLeave: const {
+        't1': [22, 23],
+      },
     );
     expect(MonthPlan.fromJson(plan.toJson()), plan);
     expect(plan.key, '2026-10');
@@ -70,10 +73,13 @@ void main() {
     expect(plan.wantsOvertime('n9'), isFalse);
     expect(plan.annualLeaveOf('n1'), [8, 9, 10]);
     expect(plan.annualLeaveOf('yok'), isEmpty);
+    expect(plan.radiationLeaveOf('t1'), [22, 23]);
+    expect(plan.leaveOf('t1', LeaveType.radiation), [22, 23]);
+    expect(plan.leaveOf('n1', LeaveType.annual), [8, 9, 10]);
     expect(const MonthPlan(year: 2026, month: 1).hasRoster, isFalse);
   });
 
-  test('MonthPlan.blockedDays istenmeyen gün ve izinleri birleştirir', () {
+  test('MonthPlan.blockedDays istenmeyen gün ve tüm izinleri birleştirir', () {
     const plan = MonthPlan(
       year: 2026,
       month: 10,
@@ -85,12 +91,20 @@ void main() {
         'n1': [14, 20],
         't1': [2],
       },
+      radiationLeave: {
+        'n1': [21],
+        't2': [8],
+      },
     );
-    // n1: kesişen 14 tekilleşir, sıralı birleşim.
-    expect(plan.blockedDays['n1'], [3, 14, 20]);
+    // n1: kesişen 14 tekilleşir, istenmeyen + yıllık + şua sıralı birleşim.
+    expect(plan.blockedDays['n1'], [3, 14, 20, 21]);
     expect(plan.blockedDays['n2'], [5]);
     expect(plan.blockedDays['t1'], [2]);
-    expect(plan.references('t1'), isTrue);
+    expect(plan.blockedDays['t2'], [8]);
+    // leaveDays yalnızca izinleri (istenmeyen hariç) birleştirir.
+    expect(plan.leaveDaysOf('n1'), [14, 20, 21]);
+    expect(plan.leaveDays['t2'], [8]);
+    expect(plan.references('t2'), isTrue);
   });
 
   test('MonthPlan.references istenmeyen gün ve atamaları kontrol eder', () {

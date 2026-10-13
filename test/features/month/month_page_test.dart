@@ -167,7 +167,7 @@ void main() {
     expect(find.text('Temizle'), findsNothing);
   });
 
-  testWidgets('Yıllık izin sekmesinden gün eklenir ve satırda görünür', (
+  testWidgets('Yıllık izin aralık olarak eklenir ve satırda görünür', (
     tester,
   ) async {
     await seed(_team);
@@ -175,9 +175,10 @@ void main() {
 
     await tester.tap(find.text('Ali'));
     await tester.pumpAndSettle();
-    // İki sekme var.
+    // Üç sekme var.
     expect(find.text('İstenmeyen günler'), findsOneWidget);
     expect(find.text('Yıllık izin'), findsOneWidget);
+    expect(find.text('Şua izni'), findsOneWidget);
 
     await tester.tap(find.text('Yıllık izin'));
     await tester.pumpAndSettle();
@@ -185,20 +186,56 @@ void main() {
     // Fazla mesai anahtarı yıllık izin sekmesinde yok.
     expect(find.text('Fazla mesai istiyor'), findsNothing);
 
+    // 6–9 aralığı: başlangıç ve bitişe dokun, sonra "İzin ekle".
     await tester.tap(find.text('6'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('7'));
+    await tester.tap(find.text('9'));
     await tester.pumpAndSettle();
-    expect(boxes.monthPlans.get('2026-10')!.annualLeaveOf('t1'), [6, 7]);
+    await tester.tap(find.text('İzin ekle'));
+    await tester.pumpAndSettle();
+
+    expect(boxes.monthPlans.get('2026-10')!.annualLeaveOf('t1'), [6, 7, 8, 9]);
     // İzin günleri istenmeyen günlere karışmaz.
     expect(boxes.monthPlans.get('2026-10')!.unavailableDaysOf('t1'), isEmpty);
+    // Aralık özeti çipi görünür.
+    expect(find.text('6–9 Ekim'), findsOneWidget);
 
     await tester.pageBack();
     await tester.pumpAndSettle();
-    expect(find.text('2 gün yıllık izin'), findsOneWidget);
+    expect(find.text('4 gün yıllık izin'), findsOneWidget);
   });
 
-  testWidgets('Yıllık izin Temizle yalnız izinleri kaldırır', (tester) async {
+  testWidgets('Şua izni ayrı sekmede tutulur, yıllık izinden bağımsız', (
+    tester,
+  ) async {
+    await seed(_team);
+    await pumpPage(tester);
+
+    await tester.tap(find.text('Ali'));
+    await tester.pumpAndSettle();
+    // Kaydırılabilir sekme çubuğunda üçüncü sekmeyi görünür yap.
+    await tester.drag(find.byType(TabBar), const Offset(-300, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Şua izni'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('10'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('12'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('İzin ekle'));
+    await tester.pumpAndSettle();
+
+    final plan = boxes.monthPlans.get('2026-10')!;
+    expect(plan.radiationLeaveOf('t1'), [10, 11, 12]);
+    expect(plan.annualLeaveOf('t1'), isEmpty);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('3 gün şua izni'), findsOneWidget);
+  });
+
+  testWidgets('İzin çipi silinince o aralık kaldırılır', (tester) async {
     await seed(
       _team,
       const MonthPlan(
@@ -208,7 +245,7 @@ void main() {
           't1': [1],
         },
         annualLeave: {
-          't1': [5, 6],
+          't1': [5, 6, 7],
         },
       ),
     );
@@ -218,7 +255,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Yıllık izin'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Temizle'));
+    // Kayıtlı aralık çipi görünür; silgisine dokun.
+    expect(find.text('5–7 Ekim'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.cancel).first);
     await tester.pumpAndSettle();
 
     final plan = boxes.monthPlans.get('2026-10')!;

@@ -244,7 +244,7 @@ void main() {
     expect(saved().assignments.length, 31);
   });
 
-  testWidgets('yıllık izinli günler tabloda "Y.İ." olarak görünür', (
+  testWidgets('izinli günler tabloda "Y.İ." / "Ş.İ." olarak görünür', (
     tester,
   ) async {
     await boxes.monthPlans.put(
@@ -255,6 +255,9 @@ void main() {
         annualLeave: {
           'n1': [6, 7, 8],
         },
+        radiationLeave: {
+          'n2': [12, 13],
+        },
       ),
     );
     await pumpMonthPage(tester);
@@ -263,19 +266,20 @@ void main() {
     await tester.tap(find.text('Hemşire + Tekniker'));
     await tester.pumpAndSettle();
 
-    // İzinli kişi izin günlerinde nöbete atanmaz.
+    // İzinli kişiler izin günlerinde nöbete atanmaz (iznin bittiği günden
+    // sonra tekrar nöbete girebilir).
     final plan = saved();
     for (final d in [6, 7, 8]) {
       expect(plan.assignments[d]!.includes('n1'), isFalse);
     }
-    // Tabloda her izin günü için bir "Y.İ." hücresi.
-    expect(
-      find.descendant(
-        of: find.byType(RosterTable),
-        matching: find.text('Y.İ.'),
-      ),
-      findsNWidgets(3),
-    );
+    for (final d in [12, 13]) {
+      expect(plan.assignments[d]!.includes('n2'), isFalse);
+    }
+    // Tabloda her yıllık izin günü "Y.İ.", her şua izni günü "Ş.İ.".
+    Finder inTable(String t) =>
+        find.descendant(of: find.byType(RosterTable), matching: find.text(t));
+    expect(inTable('Y.İ.'), findsNWidgets(3));
+    expect(inTable('Ş.İ.'), findsNWidgets(2));
   });
 
   testWidgets('Listeyi sıfırla: onaylayınca liste silinir, tercihler kalır', (

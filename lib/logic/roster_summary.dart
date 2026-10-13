@@ -99,7 +99,7 @@ class RosterSummary {
     required Iterable<Holiday> holidays,
     required RosterSettings settings,
     Set<Role>? onlyRoles,
-    Map<String, List<int>> annualLeave = const {},
+    Map<String, List<int>> leaveDays = const {},
   }) {
     final calc = WorkHoursCalculator(settings);
     final required = calc.requiredHours(year, month, holidays);
@@ -146,8 +146,9 @@ class RosterSummary {
       final days = worked[id] ?? const <int>{};
       final light = secondary[id] ?? const <int>{};
       final full = days.length - light.length;
-      // Yıllık izin günleri kişinin gereken saatinden düşülür (altına inmez).
-      final leave = annualLeave[id] ?? const <int>[];
+      // İzin günleri (yıllık + şua) kişinin gereken saatinden düşülür
+      // (altına inmez).
+      final leave = leaveDays[id] ?? const <int>[];
       final personRequired = leave.isEmpty
           ? required
           : (required - calc.leaveDeduction(year, month, holidays, leave))

@@ -50,6 +50,8 @@ Future<Uint8List> buildRosterPdf({
         _legend(_holidayColor, 'Resmi tatil'),
         pw.SizedBox(width: 12),
         _legend(_leaveColor, 'Y.İ. = Yıllık izin'),
+        pw.SizedBox(width: 12),
+        _legend(_radiationColor, 'Ş.İ. = Şua izni'),
       ],
     ),
     pw.SizedBox(height: 14),
@@ -98,6 +100,7 @@ const _holidayColor = PdfColor.fromInt(0xFFF6E1C4);
 const _groupColor = PdfColor.fromInt(0xFFB9E9E1);
 const _missingColor = PdfColor.fromInt(0xFFF9D6D2);
 const _leaveColor = PdfColor.fromInt(0xFFCADEE2);
+const _radiationColor = PdfColor.fromInt(0xFFDDD2EE);
 
 pw.Widget _legend(PdfColor color, String label) => pw.Row(
   children: [
@@ -182,7 +185,8 @@ pw.Widget _rosterTable({
       );
     }
     final personDays = worked[row.id] ?? const <int>{};
-    final personLeave = plan.annualLeaveOf(row.id).toSet();
+    final annualLeave = plan.annualLeaveOf(row.id).toSet();
+    final radiationLeave = plan.radiationLeaveOf(row.id).toSet();
     tableRows.add(
       pw.TableRow(
         children: [
@@ -196,8 +200,10 @@ pw.Widget _rosterTable({
                 color: columnColor(d),
                 bold: true,
               )
-            else if (personLeave.contains(d))
+            else if (annualLeave.contains(d))
               cell('Y.İ.', color: _leaveColor, bold: true)
+            else if (radiationLeave.contains(d))
+              cell('Ş.İ.', color: _radiationColor, bold: true)
             else
               cell('', color: columnColor(d)),
         ],

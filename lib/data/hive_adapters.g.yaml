@@ -51,7 +51,7 @@ types:
         index: 3
   MonthPlan:
     typeId: 4
-    nextIndex: 10
+    nextIndex: 11
     fields:
       year:
         index: 0
@@ -73,6 +73,8 @@ types:
         index: 8
       annualLeave:
         index: 9
+      radiationLeave:
+        index: 10
   RosterSettings:
     typeId: 5
     nextIndex: 11

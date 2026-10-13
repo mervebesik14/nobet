@@ -32,4 +32,10 @@ extension AppTints on ColorScheme {
 
   /// Yıllık izin lejantı/zemini: serin tonun hafif hali.
   Color get leaveTint => _tint(leaveColor, 0.16);
+
+  /// Şua izni günleri: yıllık izinden ayrışan mor ton.
+  Color get radiationColor => const Color(0xFF7E57C2);
+
+  /// Şua izni lejantı/zemini: mor tonun hafif hali.
+  Color get radiationTint => _tint(radiationColor, 0.16);
 }

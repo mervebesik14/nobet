@@ -88,16 +88,50 @@ class MonthPlanController extends Notifier<MonthPlan> {
   /// Kişinin bu aydaki tüm istenmeyen günlerini kaldırır.
   Future<bool> clearUnavailable(String personId) => _setDays(personId, {});
 
-  /// Kişinin [day] gününü yıllık izin yapar ya da bundan çıkarır.
+  /// Kişinin [day] gününü verilen türde izin yapar ya da bundan çıkarır.
   /// Kilitli ayda değişiklik yapılmaz ve false döner.
-  Future<bool> toggleLeave(String personId, int day) {
-    final days = {...state.annualLeaveOf(personId)};
+  Future<bool> toggleLeave(String personId, LeaveType type, int day) {
+    final days = {...state.leaveOf(personId, type)};
     if (!days.remove(day)) days.add(day);
-    return _setLeaveDays(personId, days);
+    return _setLeaveDays(personId, type, days);
   }
 
-  /// Kişinin bu aydaki tüm yıllık izin günlerini kaldırır.
-  Future<bool> clearLeave(String personId) => _setLeaveDays(personId, {});
+  /// [start]–[end] (dahil) gün aralığını verilen türde izne ekler. Aralık
+  /// ayın günlerine kırpılır; ters verilirse sıraya sokulur.
+  Future<bool> addLeaveRange(
+    String personId,
+    LeaveType type,
+    int start,
+    int end,
+  ) {
+    final lo = start <= end ? start : end;
+    final hi = start <= end ? end : start;
+    final days = {...state.leaveOf(personId, type)};
+    for (var d = lo; d <= hi; d++) {
+      if (d >= 1 && d <= state.daysInMonth) days.add(d);
+    }
+    return _setLeaveDays(personId, type, days);
+  }
+
+  /// [start]–[end] (dahil) gün aralığını verilen türdeki izinlerden çıkarır.
+  Future<bool> removeLeaveRange(
+    String personId,
+    LeaveType type,
+    int start,
+    int end,
+  ) {
+    final lo = start <= end ? start : end;
+    final hi = start <= end ? end : start;
+    final days = {...state.leaveOf(personId, type)};
+    for (var d = lo; d <= hi; d++) {
+      days.remove(d);
+    }
+    return _setLeaveDays(personId, type, days);
+  }
+
+  /// Kişinin bu aydaki verilen türdeki tüm izin günlerini kaldırır.
+  Future<bool> clearLeave(String personId, LeaveType type) =>
+      _setLeaveDays(personId, type, {});
 
   /// Kişinin bu ay fazla mesai isteyip istemediğini değiştirir.
   /// Kilitli ayda değişmez ve false döner.
@@ -129,15 +163,27 @@ class MonthPlanController extends Notifier<MonthPlan> {
     return true;
   }
 
-  Future<bool> _setLeaveDays(String personId, Set<int> days) async {
+  Future<bool> _setLeaveDays(
+    String personId,
+    LeaveType type,
+    Set<int> days,
+  ) async {
     if (state.isLocked) return false;
-    final leave = {...state.annualLeave};
+    final map = {
+      ...switch (type) {
+        LeaveType.annual => state.annualLeave,
+        LeaveType.radiation => state.radiationLeave,
+      },
+    };
     if (days.isEmpty) {
-      leave.remove(personId);
+      map.remove(personId);
     } else {
-      leave[personId] = days.toList()..sort();
+      map[personId] = days.toList()..sort();
     }
-    state = state.copyWith(annualLeave: leave);
+    state = switch (type) {
+      LeaveType.annual => state.copyWith(annualLeave: map),
+      LeaveType.radiation => state.copyWith(radiationLeave: map),
+    };
     await ref.read(monthPlanRepositoryProvider).save(state);
     return true;
   }
@@ -152,6 +198,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       month: state.month,
       unavailableDays: state.unavailableDays,
       annualLeave: state.annualLeave,
+      radiationLeave: state.radiationLeave,
       overtimeRequests: state.overtimeRequests,
       nurseOnly: state.nurseOnly,
     );

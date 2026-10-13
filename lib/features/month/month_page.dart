@@ -112,7 +112,10 @@ class MonthPage extends ConsumerWidget {
                 _PersonRow(
                   person: person,
                   unavailableCount: plan.unavailableDaysOf(person.id).length,
-                  leaveCount: plan.annualLeaveOf(person.id).length,
+                  annualLeaveCount: plan.annualLeaveOf(person.id).length,
+                  radiationLeaveCount: plan
+                      .radiationLeaveOf(person.id)
+                      .length,
                   wantsOvertime: plan.wantsOvertime(person.id),
                 ),
             ],
@@ -127,13 +130,15 @@ class _PersonRow extends StatelessWidget {
   const _PersonRow({
     required this.person,
     required this.unavailableCount,
-    required this.leaveCount,
+    required this.annualLeaveCount,
+    required this.radiationLeaveCount,
     required this.wantsOvertime,
   });
 
   final Person person;
   final int unavailableCount;
-  final int leaveCount;
+  final int annualLeaveCount;
+  final int radiationLeaveCount;
   final bool wantsOvertime;
 
   @override
@@ -154,23 +159,15 @@ class _PersonRow extends StatelessWidget {
                   : theme.colorScheme.error,
             ),
           ),
-          if (leaveCount > 0)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.beach_access_outlined,
-                  size: 16,
-                  color: theme.colorScheme.leaveColor,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '$leaveCount gün yıllık izin',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.leaveColor,
-                  ),
-                ),
-              ],
+          if (annualLeaveCount > 0)
+            _LeaveLine(
+              icon: Icons.beach_access_outlined,
+              text: '$annualLeaveCount gün yıllık izin',
+            ),
+          if (radiationLeaveCount > 0)
+            _LeaveLine(
+              icon: Icons.radio_button_checked,
+              text: '$radiationLeaveCount gün şua izni',
             ),
           if (wantsOvertime)
             Row(
@@ -198,6 +195,31 @@ class _PersonRow extends StatelessWidget {
           builder: (_) => UnavailableDaysPage(person: person),
         ),
       ),
+    );
+  }
+}
+
+class _LeaveLine extends StatelessWidget {
+  const _LeaveLine({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.leaveColor;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: color),
+        ),
+      ],
     );
   }
 }

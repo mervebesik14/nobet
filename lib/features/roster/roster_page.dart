@@ -439,7 +439,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       holidays: holidays,
       settings: settings,
       onlyRoles: plan.nurseOnly ? const {Role.nurse} : null,
-      annualLeave: plan.annualLeave,
+      leaveDays: plan.leaveDays,
     );
     final missingByDay = <int, int>{};
     for (var d = 1; d <= plan.daysInMonth; d++) {

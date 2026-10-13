@@ -8,8 +8,8 @@ import '../holidays/holidays_controller.dart';
 import 'month_plan_controller.dart';
 import '../../shared/app_colors.dart';
 
-/// Bir kişinin seçili aydaki istenmeyen günlerini ve yıllık izinlerini
-/// takvimden seçme ekranı. İki sekme: istenmeyen günler ve yıllık izin.
+/// Bir kişinin seçili aydaki istenmeyen günlerini ve izinlerini düzenleme
+/// ekranı. Üç sekme: istenmeyen günler, yıllık izin, şua izni.
 class UnavailableDaysPage extends ConsumerStatefulWidget {
   const UnavailableDaysPage({super.key, required this.person});
 
@@ -22,7 +22,7 @@ class UnavailableDaysPage extends ConsumerStatefulWidget {
 
 class _UnavailableDaysPageState extends ConsumerState<UnavailableDaysPage>
     with SingleTickerProviderStateMixin {
-  late final TabController _tabs = TabController(length: 2, vsync: this)
+  late final TabController _tabs = TabController(length: 3, vsync: this)
     ..addListener(() => setState(() {}));
 
   Person get person => widget.person;
@@ -37,72 +37,67 @@ class _UnavailableDaysPageState extends ConsumerState<UnavailableDaysPage>
   Widget build(BuildContext context) {
     final plan = ref.watch(monthPlanProvider);
     final controller = ref.read(monthPlanProvider.notifier);
-    final unavailable = plan.unavailableDaysOf(person.id).toSet();
-    final leave = plan.annualLeaveOf(person.id).toSet();
-    final onLeaveTab = _tabs.index == 1;
-    final current = onLeaveTab ? leave : unavailable;
+
+    // Aktif sekmedeki verinin varlığı ve "Temizle" eylemi.
+    final (hasData, onClear) = switch (_tabs.index) {
+      1 => (
+        plan.annualLeaveOf(person.id).isNotEmpty,
+        () => controller.clearLeave(person.id, LeaveType.annual),
+      ),
+      2 => (
+        plan.radiationLeaveOf(person.id).isNotEmpty,
+        () => controller.clearLeave(person.id, LeaveType.radiation),
+      ),
+      _ => (
+        plan.unavailableDaysOf(person.id).isNotEmpty,
+        () => controller.clearUnavailable(person.id),
+      ),
+    };
 
     return Scaffold(
       appBar: AppBar(
         title: Text(person.name),
         actions: [
-          if (current.isNotEmpty && !plan.isLocked)
+          if (hasData && !plan.isLocked)
             TextButton(
-              onPressed: () => onLeaveTab
-                  ? controller.clearLeave(person.id)
-                  : controller.clearUnavailable(person.id),
+              onPressed: onClear,
               child: const Text('Temizle'),
             ),
         ],
         bottom: TabBar(
           controller: _tabs,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           tabs: const [
             Tab(text: 'İstenmeyen günler'),
             Tab(text: 'Yıllık izin'),
+            Tab(text: 'Şua izni'),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabs,
         children: [
-          _CalendarEditor(
-            person: person,
-            mode: _EditorMode.unavailable,
-            selected: unavailable,
-            showOvertime: true,
-          ),
-          _CalendarEditor(
-            person: person,
-            mode: _EditorMode.leave,
-            selected: leave,
-            showOvertime: false,
-          ),
+          _CalendarEditor(person: person),
+          _LeaveEditor(person: person, type: LeaveType.annual),
+          _LeaveEditor(person: person, type: LeaveType.radiation),
         ],
       ),
     );
   }
 }
 
-enum _EditorMode { unavailable, leave }
-
-/// İki sekmede ortak kullanılan takvim düzenleyici.
+/// İstenmeyen günler sekmesi: takvimden tek tek gün seçme + fazla mesai.
 class _CalendarEditor extends ConsumerWidget {
-  const _CalendarEditor({
-    required this.person,
-    required this.mode,
-    required this.selected,
-    required this.showOvertime,
-  });
+  const _CalendarEditor({required this.person});
 
   final Person person;
-  final _EditorMode mode;
-  final Set<int> selected;
-  final bool showOvertime;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final plan = ref.watch(monthPlanProvider);
     final controller = ref.read(monthPlanProvider.notifier);
+    final selected = plan.unavailableDaysOf(person.id).toSet();
     final holidays = {
       for (final h in ref.watch(holidaysProvider))
         if (h.date.year == plan.year && h.date.month == plan.month)
@@ -111,16 +106,6 @@ class _CalendarEditor extends ConsumerWidget {
     final firstDay = DateTime(plan.year, plan.month);
     final lastDay = DateTime(plan.year, plan.month, plan.daysInMonth);
     final theme = Theme.of(context);
-    final isLeave = mode == _EditorMode.leave;
-
-    void toggle(int day) {
-      if (plan.isLocked) return;
-      if (isLeave) {
-        controller.toggleLeave(person.id, day);
-      } else {
-        controller.toggleUnavailable(person.id, day);
-      }
-    }
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -132,15 +117,8 @@ class _CalendarEditor extends ConsumerWidget {
         const SizedBox(height: 4),
         Text(
           plan.isLocked
-              ? (isLeave
-                    ? 'Bu ay kilitli; yıllık izinler değiştirilemez.'
-                    : 'Bu ay kilitli; istenmeyen günler değiştirilemez.')
-              : (isLeave
-                    ? 'Yıllık izin günlerine dokunun. İzin günü nöbet '
-                          'verilmez ve gereken saatten düşülür. '
-                          'Seçili: ${selected.length} gün'
-                    : 'Nöbet istemediği günlere dokunun. '
-                          'Seçili: ${selected.length} gün'),
+              ? 'Bu ay kilitli; istenmeyen günler değiştirilemez.'
+              : 'Nöbet istemediği günlere dokunun. Seçili: ${selected.length} gün',
           style: theme.textTheme.bodyMedium,
         ),
         const SizedBox(height: 8),
@@ -154,12 +132,20 @@ class _CalendarEditor extends ConsumerWidget {
           headerVisible: false,
           calendarStyle: const CalendarStyle(outsideDaysVisible: false),
           selectedDayPredicate: (day) => selected.contains(day.day),
-          onDaySelected: (day, _) => toggle(day.day),
+          onDaySelected: (day, _) {
+            if (!plan.isLocked) {
+              controller.toggleUnavailable(person.id, day.day);
+            }
+          },
           calendarBuilders: CalendarBuilders(
             prioritizedBuilder: (context, day, _) => _DayCell(
               day: day.day,
-              isSelected: selected.contains(day.day),
-              isLeave: isLeave,
+              background: selected.contains(day.day)
+                  ? theme.colorScheme.error
+                  : null,
+              foreground: selected.contains(day.day)
+                  ? theme.colorScheme.onError
+                  : null,
               holiday: holidays[day.day],
               isWeekend:
                   day.weekday == DateTime.saturday ||
@@ -168,99 +154,272 @@ class _CalendarEditor extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 16),
-        _Legend(isLeave: isLeave),
-        if (showOvertime) ...[
-          const Divider(height: 32),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            secondary: const Icon(Icons.more_time),
-            title: const Text('Fazla mesai istiyor'),
-            subtitle: const Text(
-              'Nöbet sayısı diğerlerinden birkaç fazla olabilir.',
-            ),
-            value: plan.wantsOvertime(person.id),
-            onChanged: plan.isLocked
-                ? null
-                : (v) => controller.setOvertime(person.id, v),
+        _Legend(items: [(theme.colorScheme.error, 'İstemiyor')]),
+        const Divider(height: 32),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          secondary: const Icon(Icons.more_time),
+          title: const Text('Fazla mesai istiyor'),
+          subtitle: const Text(
+            'Nöbet sayısı diğerlerinden birkaç fazla olabilir.',
           ),
-        ],
-        if (holidays.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          for (final h in holidays.values)
-            Text(
-              '${h.date.day} ${DateFormat.MMMM('tr_TR').format(h.date)}: '
-              '${h.name}${h.isHalfDay ? ' (yarım gün)' : ''}',
-              style: theme.textTheme.bodySmall,
-            ),
-        ],
+          value: plan.wantsOvertime(person.id),
+          onChanged: plan.isLocked
+              ? null
+              : (v) => controller.setOvertime(person.id, v),
+        ),
+        _HolidayList(holidays: holidays.values),
       ],
     );
   }
 }
 
-/// Gün hücresi renkleri: seçili > tatil > hafta sonu > normal.
-({Color background, Color foreground})? _cellColors(
-  ColorScheme scheme, {
-  required bool isSelected,
-  required bool isLeave,
-  required bool isHoliday,
-  required bool isWeekend,
-}) {
-  if (isSelected) {
-    return isLeave
-        ? (background: scheme.leaveColor, foreground: Colors.white)
-        : (background: scheme.error, foreground: scheme.onError);
+/// İzin sekmesi (yıllık / şua): başlangıç–bitiş tarih aralığı ile izin girme.
+class _LeaveEditor extends ConsumerStatefulWidget {
+  const _LeaveEditor({required this.person, required this.type});
+
+  final Person person;
+  final LeaveType type;
+
+  @override
+  ConsumerState<_LeaveEditor> createState() => _LeaveEditorState();
+}
+
+class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
+  DateTime? _rangeStart;
+  DateTime? _rangeEnd;
+
+  Person get person => widget.person;
+  LeaveType get type => widget.type;
+
+  /// Sıralı gün listesini bitişik aralıklara ayırır: [1,2,3,7] → [(1,3),(7,7)].
+  List<(int, int)> _ranges(List<int> days) {
+    if (days.isEmpty) return const [];
+    final sorted = [...days]..sort();
+    final out = <(int, int)>[];
+    var start = sorted.first;
+    var prev = sorted.first;
+    for (final d in sorted.skip(1)) {
+      if (d == prev + 1) {
+        prev = d;
+      } else {
+        out.add((start, prev));
+        start = d;
+        prev = d;
+      }
+    }
+    out.add((start, prev));
+    return out;
   }
-  if (isHoliday) {
-    return (background: scheme.holidayTint, foreground: scheme.onSurface);
+
+  @override
+  Widget build(BuildContext context) {
+    final plan = ref.watch(monthPlanProvider);
+    final controller = ref.read(monthPlanProvider.notifier);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final days = plan.leaveOf(person.id, type).toSet();
+    final holidays = {
+      for (final h in ref.watch(holidaysProvider))
+        if (h.date.year == plan.year && h.date.month == plan.month)
+          h.date.day: h,
+    };
+    final firstDay = DateTime(plan.year, plan.month);
+    final lastDay = DateTime(plan.year, plan.month, plan.daysInMonth);
+    final monthName = DateFormat.MMMM('tr_TR').format(firstDay);
+    final locked = plan.isLocked;
+    final start = _rangeStart;
+    final canAdd = !locked && start != null;
+
+    String rangeText(int a, int b) =>
+        a == b ? '$a $monthName' : '$a–$b $monthName';
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          '${DateFormat.yMMMM('tr_TR').format(firstDay)} · ${person.role.label}',
+          style: theme.textTheme.titleMedium,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          locked
+              ? 'Bu ay kilitli; ${type.label.toLowerCase()} değiştirilemez.'
+              : 'Başlangıç ve bitiş gününü seçin, sonra "İzin ekle"ye dokunun. '
+                    'İzin günlerinde nöbet verilmez ve gereken saatten düşülür. '
+                    'Kişi iznin bittiği günden sonraki ilk gün nöbete girebilir.',
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 8),
+        TableCalendar<void>(
+          locale: 'tr_TR',
+          firstDay: firstDay,
+          lastDay: lastDay,
+          focusedDay: start ?? firstDay,
+          startingDayOfWeek: StartingDayOfWeek.monday,
+          availableGestures: AvailableGestures.none,
+          headerVisible: false,
+          rangeSelectionMode: RangeSelectionMode.toggledOn,
+          rangeStartDay: _rangeStart,
+          rangeEndDay: _rangeEnd,
+          calendarStyle: CalendarStyle(
+            outsideDaysVisible: false,
+            rangeHighlightColor: scheme.leaveTint,
+            withinRangeTextStyle: TextStyle(color: scheme.onSurface),
+            rangeStartDecoration: BoxDecoration(
+              color: scheme.leaveColor,
+              shape: BoxShape.circle,
+            ),
+            rangeEndDecoration: BoxDecoration(
+              color: scheme.leaveColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          onRangeSelected: locked
+              ? null
+              : (s, e, _) => setState(() {
+                  _rangeStart = s;
+                  _rangeEnd = e;
+                }),
+          calendarBuilders: CalendarBuilders(
+            // Kayıtlı izin günleri her zaman izin renginde; seçim aralığı
+            // yalnızca henüz kaydedilmemiş günlerde görünür.
+            prioritizedBuilder: (context, day, _) => days.contains(day.day)
+                ? _DayCell(
+                    day: day.day,
+                    background: scheme.leaveColor,
+                    foreground: Colors.white,
+                    holiday: holidays[day.day],
+                    isWeekend:
+                        day.weekday == DateTime.saturday ||
+                        day.weekday == DateTime.sunday,
+                  )
+                : null,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                start == null
+                    ? 'Aralık seçilmedi'
+                    : 'Seçilen: ${rangeText(start.day, (_rangeEnd ?? start).day)}',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+            FilledButton.icon(
+              onPressed: canAdd
+                  ? () {
+                      final s = start.day;
+                      final e = (_rangeEnd ?? start).day;
+                      controller.addLeaveRange(person.id, type, s, e);
+                      setState(() {
+                        _rangeStart = null;
+                        _rangeEnd = null;
+                      });
+                    }
+                  : null,
+              icon: const Icon(Icons.add),
+              label: const Text('İzin ekle'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        _Legend(items: [(scheme.leaveColor, type.label)]),
+        if (days.isNotEmpty) ...[
+          const Divider(height: 32),
+          Text(
+            '${type.label} günleri (${days.length} gün)',
+            style: theme.textTheme.titleSmall,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              for (final (a, b) in _ranges(days.toList()))
+                Chip(
+                  label: Text(rangeText(a, b)),
+                  onDeleted: locked
+                      ? null
+                      : () =>
+                            controller.removeLeaveRange(person.id, type, a, b),
+                ),
+            ],
+          ),
+        ],
+        _HolidayList(holidays: holidays.values),
+      ],
+    );
   }
-  if (isWeekend) {
-    return (background: scheme.weekendTint, foreground: scheme.onSurface);
+}
+
+class _HolidayList extends StatelessWidget {
+  const _HolidayList({required this.holidays});
+
+  final Iterable<Holiday> holidays;
+
+  @override
+  Widget build(BuildContext context) {
+    if (holidays.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        for (final h in holidays)
+          Text(
+            '${h.date.day} ${DateFormat.MMMM('tr_TR').format(h.date)}: '
+            '${h.name}${h.isHalfDay ? ' (yarım gün)' : ''}',
+            style: theme.textTheme.bodySmall,
+          ),
+      ],
+    );
   }
-  return null;
 }
 
 class _DayCell extends StatelessWidget {
   const _DayCell({
     required this.day,
-    required this.isSelected,
-    required this.isLeave,
+    required this.background,
+    required this.foreground,
     required this.holiday,
     required this.isWeekend,
   });
 
   final int day;
-  final bool isSelected;
-  final bool isLeave;
+  final Color? background;
+  final Color? foreground;
   final Holiday? holiday;
   final bool isWeekend;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final colors = _cellColors(
-      scheme,
-      isSelected: isSelected,
-      isLeave: isLeave,
-      isHoliday: holiday != null,
-      isWeekend: isWeekend,
-    );
+    final selected = background != null;
+    final bg = background ??
+        (holiday != null
+            ? scheme.holidayTint
+            : isWeekend
+            ? scheme.weekendTint
+            : null);
     return Container(
       margin: const EdgeInsets.all(4),
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: colors?.background,
+        color: bg,
         borderRadius: BorderRadius.circular(8),
         // Tatil olan seçili gün de tatil olduğu anlaşılsın.
-        border: holiday != null && isSelected
+        border: holiday != null && selected
             ? Border.all(color: const Color(0xFFE0A030), width: 2)
             : null,
       ),
       child: Text(
         '$day',
         style: TextStyle(
-          color: colors?.foreground,
-          fontWeight: isSelected ? FontWeight.bold : null,
+          color: foreground ?? (selected ? Colors.white : null),
+          fontWeight: selected ? FontWeight.bold : null,
         ),
       ),
     );
@@ -268,9 +427,10 @@ class _DayCell extends StatelessWidget {
 }
 
 class _Legend extends StatelessWidget {
-  const _Legend({required this.isLeave});
+  const _Legend({required this.items});
 
-  final bool isLeave;
+  /// Ekrana özel ilk öğeler; sonrasına tatil ve hafta sonu eklenir.
+  final List<(Color, String)> items;
 
   @override
   Widget build(BuildContext context) {
@@ -294,9 +454,7 @@ class _Legend extends StatelessWidget {
       spacing: 16,
       runSpacing: 8,
       children: [
-        isLeave
-            ? item(scheme.leaveColor, 'Yıllık izin')
-            : item(scheme.error, 'İstemiyor'),
+        for (final (color, label) in items) item(color, label),
         item(scheme.holidayTint, 'Resmi tatil'),
         item(scheme.weekendTint, 'Hafta sonu'),
       ],

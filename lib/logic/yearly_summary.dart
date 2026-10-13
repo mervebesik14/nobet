@@ -71,7 +71,7 @@ class YearlySummary {
           (h) => h.date.year == plan.year && h.date.month == plan.month,
         ),
         settings: settings,
-        annualLeave: plan.annualLeave,
+        leaveDays: plan.leaveDays,
       );
       for (final r in summary.people) {
         info[r.personId] = (r.name, r.role);
