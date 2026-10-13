@@ -244,6 +244,40 @@ void main() {
     expect(saved().assignments.length, 31);
   });
 
+  testWidgets('yıllık izinli günler tabloda "Y.İ." olarak görünür', (
+    tester,
+  ) async {
+    await boxes.monthPlans.put(
+      '2026-10',
+      const MonthPlan(
+        year: 2026,
+        month: 10,
+        annualLeave: {
+          'n1': [6, 7, 8],
+        },
+      ),
+    );
+    await pumpMonthPage(tester);
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
+
+    // İzinli kişi izin günlerinde nöbete atanmaz.
+    final plan = saved();
+    for (final d in [6, 7, 8]) {
+      expect(plan.assignments[d]!.includes('n1'), isFalse);
+    }
+    // Tabloda her izin günü için bir "Y.İ." hücresi.
+    expect(
+      find.descendant(
+        of: find.byType(RosterTable),
+        matching: find.text('Y.İ.'),
+      ),
+      findsNWidgets(3),
+    );
+  });
+
   testWidgets('Listeyi sıfırla: onaylayınca liste silinir, tercihler kalır', (
     tester,
   ) async {

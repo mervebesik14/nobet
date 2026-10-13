@@ -48,6 +48,8 @@ Future<Uint8List> buildRosterPdf({
         _legend(_weekendColor, 'Hafta sonu'),
         pw.SizedBox(width: 12),
         _legend(_holidayColor, 'Resmi tatil'),
+        pw.SizedBox(width: 12),
+        _legend(_leaveColor, 'Y.İ. = Yıllık izin'),
       ],
     ),
     pw.SizedBox(height: 14),
@@ -95,6 +97,7 @@ const _weekendColor = PdfColor.fromInt(0xFFE3ECEB);
 const _holidayColor = PdfColor.fromInt(0xFFF6E1C4);
 const _groupColor = PdfColor.fromInt(0xFFB9E9E1);
 const _missingColor = PdfColor.fromInt(0xFFF9D6D2);
+const _leaveColor = PdfColor.fromInt(0xFFCADEE2);
 
 pw.Widget _legend(PdfColor color, String label) => pw.Row(
   children: [
@@ -179,20 +182,24 @@ pw.Widget _rosterTable({
       );
     }
     final personDays = worked[row.id] ?? const <int>{};
+    final personLeave = plan.annualLeaveOf(row.id).toSet();
     tableRows.add(
       pw.TableRow(
         children: [
           nameCell(row.name),
           for (final d in days)
-            cell(
-              !personDays.contains(d)
-                  ? ''
-                  : (plan.assignments[d]?.isSecondaryTech(row.id) ?? false)
-                  ? '16B'
-                  : '$shiftHours',
-              color: columnColor(d),
-              bold: true,
-            ),
+            if (personDays.contains(d))
+              cell(
+                (plan.assignments[d]?.isSecondaryTech(row.id) ?? false)
+                    ? '16B'
+                    : '$shiftHours',
+                color: columnColor(d),
+                bold: true,
+              )
+            else if (personLeave.contains(d))
+              cell('Y.İ.', color: _leaveColor, bold: true)
+            else
+              cell('', color: columnColor(d)),
         ],
       ),
     );

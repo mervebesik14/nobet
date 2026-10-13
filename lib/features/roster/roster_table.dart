@@ -152,6 +152,7 @@ class RosterTable extends StatelessWidget {
         ),
       );
       final personDays = worked[row.id] ?? const <int>{};
+      final personLeave = plan.annualLeaveOf(row.id).toSet();
       right.add(
         Row(
           children: [
@@ -168,8 +169,15 @@ class RosterTable extends StatelessWidget {
                   context,
                   box: box,
                   cell: (personId: row.id, day: d),
-                  label: _labelFor(row.id, d, personDays.contains(d)),
+                  label: _labelFor(
+                    row.id,
+                    d,
+                    personDays.contains(d),
+                    personLeave.contains(d),
+                  ),
                   columnColor: columnColor(d),
+                  // İzinli gün (o gün nöbeti yoksa) ayrı renkte gösterilir.
+                  isLeave: personLeave.contains(d) && !personDays.contains(d),
                 ),
               ),
           ],
@@ -286,12 +294,15 @@ class RosterTable extends StatelessWidget {
     );
   }
 
-  /// Hücre yazısı: nöbet yoksa null, 16B teknikeri ise "16B", yoksa "24".
-  String? _labelFor(String id, int day, bool works) {
-    if (!works) return null;
-    return (plan.assignments[day]?.isSecondaryTech(id) ?? false)
-        ? '16B'
-        : '$shiftHours';
+  /// Hücre yazısı: nöbet varsa 16B teknikeri ise "16B" yoksa "24"; nöbet
+  /// yoksa ve o gün yıllık izinliyse "Y.İ."; değilse boş.
+  String? _labelFor(String id, int day, bool works, bool onLeave) {
+    if (works) {
+      return (plan.assignments[day]?.isSecondaryTech(id) ?? false)
+          ? '16B'
+          : '$shiftHours';
+    }
+    return onLeave ? 'Y.İ.' : null;
   }
 
   Widget _personCell(
@@ -307,6 +318,7 @@ class RosterTable extends StatelessWidget {
     required RosterCell cell,
     required String? label,
     required Color? columnColor,
+    required bool isLeave,
   }) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -316,11 +328,15 @@ class RosterTable extends StatelessWidget {
         ? scheme.primary
         : violated
         ? scheme.dangerTint
+        : isLeave
+        ? scheme.leaveTint
         : columnColor;
     final textColor = selected
         ? scheme.onPrimary
         : violated
         ? scheme.error
+        : isLeave
+        ? scheme.leaveColor
         : scheme.primary;
     return box(
       width: _cellWidth,
