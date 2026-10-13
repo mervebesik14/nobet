@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../logic/roster_summary.dart';
+import '../../shared/app_colors.dart';
 
 /// Liste sonundaki kişi başı özet tablo ve rol grubu ortalamaları.
 class SummaryTable extends StatelessWidget {
@@ -55,9 +56,7 @@ class SummaryTable extends StatelessWidget {
             ),
           for (final a in summary.averages.values)
             DataRow(
-              color: WidgetStatePropertyAll(
-                theme.colorScheme.surfaceContainerHighest,
-              ),
+              color: WidgetStatePropertyAll(theme.colorScheme.headerTint),
               cells: [
                 DataCell(Text('Ortalama', style: averageStyle)),
                 DataCell(Text(a.role.pluralLabel, style: averageStyle)),

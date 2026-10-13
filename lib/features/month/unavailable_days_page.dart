@@ -6,6 +6,7 @@ import 'package:table_calendar/table_calendar.dart';
 import '../../models/models.dart';
 import '../holidays/holidays_controller.dart';
 import 'month_plan_controller.dart';
+import '../../shared/app_colors.dart';
 
 /// Bir kişinin seçili aydaki istenmeyen günlerini takvimden seçme ekranı.
 class UnavailableDaysPage extends ConsumerWidget {
@@ -122,16 +123,10 @@ class UnavailableDaysPage extends ConsumerWidget {
     return (background: scheme.error, foreground: scheme.onError);
   }
   if (isHoliday) {
-    return (
-      background: scheme.tertiaryContainer,
-      foreground: scheme.onTertiaryContainer,
-    );
+    return (background: scheme.holidayTint, foreground: scheme.onSurface);
   }
   if (isWeekend) {
-    return (
-      background: scheme.secondaryContainer,
-      foreground: scheme.onSecondaryContainer,
-    );
+    return (background: scheme.weekendTint, foreground: scheme.onSurface);
   }
   return null;
 }
@@ -166,7 +161,7 @@ class _DayCell extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
         // Tatil olan istenmeyen gün de tatil olduğu anlaşılsın.
         border: holiday != null && isUnavailable
-            ? Border.all(color: scheme.tertiary, width: 2)
+            ? Border.all(color: const Color(0xFFE0A030), width: 2)
             : null,
       ),
       child: Text(
@@ -206,8 +201,8 @@ class _Legend extends StatelessWidget {
       runSpacing: 8,
       children: [
         item(scheme.error, 'İstemiyor'),
-        item(scheme.tertiaryContainer, 'Resmi tatil'),
-        item(scheme.secondaryContainer, 'Hafta sonu'),
+        item(scheme.holidayTint, 'Resmi tatil'),
+        item(scheme.weekendTint, 'Hafta sonu'),
       ],
     );
   }

@@ -9,6 +9,7 @@ import '../../models/models.dart';
 import '../../shared/widgets/month_selector.dart';
 import 'holiday_form_dialog.dart';
 import 'holidays_controller.dart';
+import '../../shared/app_colors.dart';
 
 /// Tatiller sekmesi: ay seçici, ayın gereken çalışma saati ve tatil listesi.
 class HolidaysPage extends ConsumerWidget {
@@ -103,20 +104,11 @@ class _RequiredHoursCard extends ConsumerWidget {
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      color: theme.colorScheme.primaryContainer,
+      color: theme.colorScheme.infoTint,
       child: ListTile(
-        leading: Icon(
-          Icons.schedule,
-          color: theme.colorScheme.onPrimaryContainer,
-        ),
-        title: Text(
-          'Bu ay çalışılması gereken: ${_formatHours(r.hours)} saat',
-          style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
-        ),
-        subtitle: Text(
-          details,
-          style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
-        ),
+        leading: Icon(Icons.schedule, color: theme.colorScheme.primary),
+        title: Text('Bu ay çalışılması gereken: ${_formatHours(r.hours)} saat'),
+        subtitle: Text(details),
       ),
     );
   }
@@ -132,16 +124,12 @@ class _MissingReligiousNotice extends StatelessWidget {
     final theme = Theme.of(context);
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      color: theme.colorScheme.tertiaryContainer,
+      color: theme.colorScheme.holidayTint,
       child: ListTile(
-        leading: Icon(
-          Icons.info_outline,
-          color: theme.colorScheme.onTertiaryContainer,
-        ),
+        leading: Icon(Icons.info_outline, color: theme.colorScheme.onSurface),
         title: Text(
           '$year için Ramazan ve Kurban Bayramı tarihleri tanımlı değil. '
           'Diyanet takvimine göre + ile elle ekleyin.',
-          style: TextStyle(color: theme.colorScheme.onTertiaryContainer),
         ),
       ),
     );

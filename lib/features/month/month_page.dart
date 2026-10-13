@@ -11,6 +11,7 @@ import '../roster/roster_page.dart';
 import '../roster/yearly_summary_page.dart';
 import 'month_plan_controller.dart';
 import 'unavailable_days_page.dart';
+import '../../shared/app_colors.dart';
 
 /// Ay Planı sekmesi: ay seçici, aktif kişiler ve istenmeyen gün sayıları,
 /// liste oluşturmadan önceki uygunluk uyarıları.
@@ -89,7 +90,7 @@ class MonthPage extends ConsumerWidget {
                       ref.read(monthPlanProvider.notifier).setLocked(false),
                   child: const Text('Kilidi aç'),
                 ),
-                tileColor: theme.colorScheme.surfaceContainerHighest,
+                tileColor: theme.colorScheme.headerTint,
               ),
             ),
           if (active.isEmpty)
@@ -191,8 +192,8 @@ class _FeasibilitySection extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.fromLTRB(16, 24, 16, 0),
       color: report.isFeasible
-          ? theme.colorScheme.surfaceContainerHighest
-          : theme.colorScheme.errorContainer,
+          ? theme.colorScheme.headerTint
+          : theme.colorScheme.dangerTint,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(

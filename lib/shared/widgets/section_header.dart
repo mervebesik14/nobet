@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../app_colors.dart';
+
 /// Liste bölüm başlığı: başlık ve yanında sayı rozeti.
 class SectionHeader extends StatelessWidget {
   const SectionHeader({super.key, required this.title, required this.count});
@@ -23,8 +25,8 @@ class SectionHeader extends StatelessWidget {
           const SizedBox(width: 8),
           Badge(
             label: Text('$count'),
-            backgroundColor: theme.colorScheme.secondaryContainer,
-            textColor: theme.colorScheme.onSecondaryContainer,
+            backgroundColor: theme.colorScheme.infoTint,
+            textColor: theme.colorScheme.primary,
           ),
         ],
       ),

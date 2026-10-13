@@ -20,6 +20,7 @@ import 'roster_pdf.dart';
 import 'roster_flow.dart';
 import 'roster_table.dart';
 import 'summary_table.dart';
+import '../../shared/app_colors.dart';
 
 /// Seçili ayın nöbet listesi, elle düzenleme, kural uyarıları ve özet.
 ///
@@ -502,7 +503,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
               subtitle: const Text(
                 'Düzenleme kapalı; yeniden oluşturmak onay ister.',
               ),
-              tileColor: theme.colorScheme.surfaceContainerHighest,
+              tileColor: theme.colorScheme.headerTint,
             )
           else if (_swapFrom case final from?)
             MaterialBanner(
@@ -586,10 +587,10 @@ class _ViolationList extends StatelessWidget {
         title: const Text('Kural ihlali yok'),
       );
     }
-    final onColor = theme.colorScheme.onErrorContainer;
+    final onColor = theme.colorScheme.error;
     return Card(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      color: theme.colorScheme.errorContainer,
+      color: theme.colorScheme.dangerTint,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(

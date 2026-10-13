@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/models.dart';
+import '../../shared/app_colors.dart';
 
 /// Tablodaki bir kişi satırı.
 typedef RosterRow = ({String id, String name, Role role});
@@ -74,8 +75,8 @@ class RosterTable extends StatelessWidget {
     }
 
     Color? columnColor(int day) {
-      if (holidayDays.contains(day)) return scheme.tertiaryContainer;
-      if (weekendDays.contains(day)) return scheme.secondaryContainer;
+      if (holidayDays.contains(day)) return scheme.holidayTint;
+      if (weekendDays.contains(day)) return scheme.weekendTint;
       return null;
     }
 
@@ -108,12 +109,18 @@ class RosterTable extends StatelessWidget {
           box(
             width: _labelWidth,
             height: _groupHeight,
-            color: scheme.primaryContainer,
+            color: scheme.groupTint,
             alignment: Alignment.centerLeft,
-            child: Text(
-              row.role.pluralLabel,
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: scheme.onPrimaryContainer,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                row.role.pluralLabel,
+                maxLines: 1,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: scheme.primary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
@@ -125,7 +132,7 @@ class RosterTable extends StatelessWidget {
                 box(
                   width: _cellWidth,
                   height: _groupHeight,
-                  color: scheme.primaryContainer,
+                  color: scheme.groupTint,
                 ),
             ],
           ),
@@ -175,12 +182,9 @@ class RosterTable extends StatelessWidget {
         box(
           width: _labelWidth,
           height: _rowHeight,
-          color: scheme.errorContainer,
+          color: scheme.dangerTint,
           alignment: Alignment.centerLeft,
-          child: Text(
-            'Eksik',
-            style: TextStyle(color: scheme.onErrorContainer),
-          ),
+          child: Text('Eksik', style: TextStyle(color: scheme.error)),
         ),
       );
       right.add(
@@ -196,12 +200,12 @@ class RosterTable extends StatelessWidget {
                   width: _cellWidth,
                   height: _rowHeight,
                   color: missingByDay.containsKey(d)
-                      ? scheme.errorContainer
+                      ? scheme.dangerTint
                       : columnColor(d),
                   child: missingByDay.containsKey(d)
                       ? Text(
                           '${missingByDay[d]}',
-                          style: TextStyle(color: scheme.onErrorContainer),
+                          style: TextStyle(color: scheme.error),
                         )
                       : null,
                 ),
@@ -219,7 +223,7 @@ class RosterTable extends StatelessWidget {
             box(
               width: _labelWidth,
               height: _headerHeight,
-              color: scheme.surfaceContainerHighest,
+              color: scheme.headerTint,
               alignment: Alignment.centerLeft,
               child: const Text('Ad Soyad'),
             ),
@@ -237,7 +241,7 @@ class RosterTable extends StatelessWidget {
                       box(
                         width: _cellWidth,
                         height: _headerHeight,
-                        color: columnColor(d) ?? scheme.surfaceContainerHighest,
+                        color: columnColor(d) ?? scheme.headerTint,
                         child: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Column(
@@ -311,12 +315,12 @@ class RosterTable extends StatelessWidget {
     final color = selected
         ? scheme.primary
         : violated
-        ? scheme.errorContainer
+        ? scheme.dangerTint
         : columnColor;
     final textColor = selected
         ? scheme.onPrimary
         : violated
-        ? scheme.onErrorContainer
+        ? scheme.error
         : scheme.primary;
     return box(
       width: _cellWidth,
