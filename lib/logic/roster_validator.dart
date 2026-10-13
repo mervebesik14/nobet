@@ -69,6 +69,8 @@ class RosterValidator {
     required Iterable<Person> people,
     Map<String, List<int>> unavailableDays = const {},
     List<Set<String>> previousMonthTail = const [],
+    Set<String> overtimeRequests = const {},
+    int overtimeAllowance = 2,
   }) {
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final byId = {for (final p in people) p.id: p};
@@ -242,9 +244,12 @@ class RosterValidator {
             : settings.techsPerDay;
         final members = byId.values.where((p) => p.isActive && p.role == role);
         if (members.isEmpty || perDay == 0) continue;
-        final cap = (daysInMonth * perDay / members.length).ceil() + extra;
+        final baseCap = (daysInMonth * perDay / members.length).ceil() + extra;
         for (final id in ids) {
           if (seatRole[id] != role) continue;
+          // Fazla mesai isteyene ek pay tanınır.
+          final cap =
+              baseCap + (overtimeRequests.contains(id) ? overtimeAllowance : 0);
           final inMonth = worked[id]!.where((d) => d >= 1).toList()..sort();
           if (inMonth.length <= cap) continue;
           violations.add(

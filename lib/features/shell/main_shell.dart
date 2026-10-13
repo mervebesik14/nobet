@@ -14,8 +14,9 @@ class SelectedTabNotifier extends Notifier<int> {
   void select(int index) => state = index;
 }
 
-final selectedTabProvider =
-    NotifierProvider<SelectedTabNotifier, int>(SelectedTabNotifier.new);
+final selectedTabProvider = NotifierProvider<SelectedTabNotifier, int>(
+  SelectedTabNotifier.new,
+);
 
 /// Dört sekmeli ana iskelet: Kişiler, Ay Planı, Tatiller, Ayarlar.
 class MainShell extends ConsumerWidget {

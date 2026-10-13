@@ -2,11 +2,7 @@ import 'package:flutter/material.dart';
 
 /// Henüz yapılmamış sekmeler için ortak boş görünüm.
 class PlaceholderView extends StatelessWidget {
-  const PlaceholderView({
-    super.key,
-    required this.icon,
-    required this.message,
-  });
+  const PlaceholderView({super.key, required this.icon, required this.message});
 
   final IconData icon;
   final String message;

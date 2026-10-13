@@ -88,6 +88,8 @@ class RosterGenerator {
     this.seed = 0,
     this.previousMonthTail = const [],
     this.yearToDate = const {},
+    this.overtimeRequests = const {},
+    this.overtimeAllowance = 2,
     this.attempts = 400,
   }) : people = people.where((p) => p.isActive).toList()
          ..sort((a, b) => a.id.compareTo(b.id));
@@ -114,6 +116,20 @@ class RosterGenerator {
   /// düşük olanlara gider; hafta sonu ve gün aşırı çift için de aynısı.
   /// Ay içi denge (fark ≤ 1) yine önceliklidir.
   final Map<String, PersonTotals> yearToDate;
+
+  /// Bu ay fazla mesai isteyen kişiler; nöbet sayıları [overtimeAllowance]
+  /// kadar diğerlerinin üstüne çıkabilir.
+  final Set<String> overtimeRequests;
+
+  /// Fazla mesai isteyene tanınan ek nöbet payı.
+  final int overtimeAllowance;
+
+  /// Kişi → fazla mesai payı (fazla mesai isteyene [overtimeAllowance], yoksa
+  /// 0). Adalet puanında ve açgözlü seçimde kişinin sayısından düşülür.
+  Map<String, int> _allowanceFor(List<Person> members) => {
+    for (final p in members)
+      p.id: overtimeRequests.contains(p.id) ? overtimeAllowance : 0,
+  };
 
   /// Rol başına açgözlü deneme sayısı.
   final int attempts;
@@ -172,6 +188,7 @@ class RosterGenerator {
       weekend: weekend,
       tail: _tailFor(nurseMembers),
       yearToDate: yearToDate,
+      allowance: _allowanceFor(nurseMembers),
       settings: settings,
     ).solve(rng, attempts, _polishCount);
 
@@ -194,6 +211,7 @@ class RosterGenerator {
         weekend: weekend,
         tail: techTail,
         yearToDate: yearToDate,
+        allowance: _allowanceFor(techMembers),
         settings: settings,
       ).solve(rng, attempts, _polishCount);
       techScore = tech.score;
@@ -216,6 +234,7 @@ class RosterGenerator {
         weekend: weekend,
         tail: techTail,
         yearToDate: yearToDate,
+        allowance: _allowanceFor(techMembers),
         settings: settings,
       ).solve(rng, attempts, _polishCount);
       techScore = techs.score;
@@ -284,6 +303,7 @@ class _RoleSolver {
     required this.weekend,
     required this.tail,
     required Map<String, PersonTotals> yearToDate,
+    this.allowance = const {},
     required RosterSettings settings,
   }) : ytdShifts = _relative(members, yearToDate, (t) => t.shifts),
        ytdWeekend = _relative(members, yearToDate, (t) => t.weekendShifts),
@@ -307,6 +327,12 @@ class _RoleSolver {
   final bool forbidConsecutive;
   final int maxChain;
   final int? cap;
+
+  /// Kişi → fazla mesai payı (fazla mesai isteyene > 0). Nöbet sayısı
+  /// dengelenirken bu kadar fazlası hoş görülür.
+  final Map<String, int> allowance;
+
+  int _allow(String id) => allowance[id] ?? 0;
 
   /// Kişinin yıl içi toplamının grup ortalamasından farkı, ±[_ytdClamp]
   /// ile sınırlı. Pozitif: yıl içinde diğerlerinden fazla tutmuş.
@@ -391,7 +417,9 @@ class _RoleSolver {
       return _Block.consecutive;
     }
     if (_breaksChain(id, d)) return _Block.chain;
-    if (cap != null && _worked[id]!.length >= cap!) return _Block.cap;
+    if (cap != null && _worked[id]!.length >= cap! + _allow(id)) {
+      return _Block.cap;
+    }
     return null;
   }
 
@@ -418,7 +446,9 @@ class _RoleSolver {
   double _score() {
     if (ids.isEmpty) return _emptySlots() * RosterGenerator.emptySlotPenalty;
     final n = ids.length;
-    final counts = [for (final id in ids) _worked[id]!.length];
+    // Fazla mesai isteyenin payı sayısından düşülür: böylece birkaç fazla
+    // nöbet dengesizlik sayılmaz ve o kişi fazlayı üstlenir.
+    final counts = [for (final id in ids) _worked[id]!.length - _allow(id)];
     final weekends = [for (final id in ids) _weekendCount(id)];
     final pairs = [for (final id in ids) _pairs(id)];
 
@@ -515,7 +545,8 @@ class _RoleSolver {
   /// Açgözlü adımda [id] kişisini [d] gününe atamanın ceza puanı.
   double _cost(String id, int d) {
     final n = ids.length;
-    var cost = (_worked[id]!.length + 1 - _totalSlots / n) * 10;
+    // Fazla mesai payı sayıdan düşülünce o kişi fazla nöbet için öne geçer.
+    var cost = (_worked[id]!.length - _allow(id) + 1 - _totalSlots / n) * 10;
     cost += ytdShifts[id]! * _ytdGreedyWeight;
     if (weekend.contains(d)) {
       cost += (_weekendCount(id) + 1 - weekend.length * perDay / n) * 10;
@@ -697,6 +728,7 @@ class _TechSolver {
     required this.weekend,
     required this.tail,
     required Map<String, PersonTotals> yearToDate,
+    this.allowance = const {},
     required RosterSettings settings,
   }) : ids = [for (final p in members) p.id],
        maxChain = max(1, settings.maxEveryOtherDayChain),
@@ -711,6 +743,11 @@ class _TechSolver {
   final int days;
   final Map<String, Set<int>> available;
   final Set<int> weekend;
+
+  /// Kişi → fazla mesai payı; 24 sayısı dengesinde bu kadarı hoş görülür.
+  final Map<String, int> allowance;
+
+  int _allow(String id) => allowance[id] ?? 0;
 
   /// Kişi → önceki aya ait çalıştığı günler (offset ≤ 0). Hepsi 24 (bloklayan)
   /// kabul edilir.
@@ -801,7 +838,7 @@ class _TechSolver {
   }
 
   bool _overCap(String id) =>
-      cap != null && _w24[id]!.length + _w16[id]!.length >= cap!;
+      cap != null && _w24[id]!.length + _w16[id]!.length >= cap! + _allow(id);
 
   bool _canPlace24(String id, int d) =>
       available[id]!.contains(d) &&
@@ -849,7 +886,7 @@ class _TechSolver {
     final totalPairs = ids.fold(0, (a, id) => a + _pairs24(id));
     const balance = 3.0;
     return balance *
-            (sq((id) => _w24[id]!.length) +
+            (sq((id) => _w24[id]!.length - _allow(id)) +
                 sq((id) => _w16[id]!.length) +
                 sq(_weekendCount) +
                 sq(_pairs24)) +
@@ -923,7 +960,8 @@ class _TechSolver {
   double _cost(String id, int d, {required bool is16b}) {
     final n = ids.length;
     final mean = days / n; // her gün 1 adet 24 ve 1 adet 16B
-    final own = is16b ? _w16[id]!.length : _w24[id]!.length;
+    // Fazla mesai payı yalnız 24 (ağır) vardiyaya uygulanır.
+    final own = is16b ? _w16[id]!.length : _w24[id]!.length - _allow(id);
     var cost = (own + 1 - mean) * 10 + ytd[id]! * 1.5;
     if (weekend.contains(d)) {
       cost += (_weekendCount(id) + 1 - weekend.length * 2 / n) * 10;

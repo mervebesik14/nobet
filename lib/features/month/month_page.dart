@@ -111,6 +111,7 @@ class MonthPage extends ConsumerWidget {
                 _PersonRow(
                   person: person,
                   unavailableCount: plan.unavailableDaysOf(person.id).length,
+                  wantsOvertime: plan.wantsOvertime(person.id),
                 ),
             ],
           _FeasibilitySection(report: report),
@@ -121,18 +122,23 @@ class MonthPage extends ConsumerWidget {
 }
 
 class _PersonRow extends StatelessWidget {
-  const _PersonRow({required this.person, required this.unavailableCount});
+  const _PersonRow({
+    required this.person,
+    required this.unavailableCount,
+    required this.wantsOvertime,
+  });
 
   final Person person;
   final int unavailableCount;
+  final bool wantsOvertime;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return ListTile(
       title: Text(person.name),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             unavailableCount == 0
@@ -144,9 +150,27 @@ class _PersonRow extends StatelessWidget {
                   : theme.colorScheme.error,
             ),
           ),
-          const Icon(Icons.chevron_right),
+          if (wantsOvertime)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.more_time,
+                  size: 16,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Fazla mesai istiyor',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
         ],
       ),
+      trailing: const Icon(Icons.chevron_right),
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => UnavailableDaysPage(person: person),

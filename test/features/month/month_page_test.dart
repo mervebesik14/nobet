@@ -47,7 +47,7 @@ void main() {
   }
 
   Future<void> pumpPage(WidgetTester tester) async {
-    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.physicalSize = const Size(1200, 5200);
     tester.view.devicePixelRatio = 2.5;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
@@ -91,6 +91,31 @@ void main() {
     expect(find.text('2 gün istemiyor'), findsOneWidget);
     expect(find.text('İstenmeyen gün yok'), findsNWidgets(10));
     expect(find.text('Uygunluk kontrolü: sorun görünmüyor'), findsOneWidget);
+  });
+
+  testWidgets('fazla mesai anahtarı kaydedilir ve satırda görünür', (
+    tester,
+  ) async {
+    await seed(_team);
+    await pumpPage(tester);
+
+    await tester.tap(find.text('Ali'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fazla mesai istiyor'));
+    await tester.pumpAndSettle();
+    expect(boxes.monthPlans.get('2026-10')!.wantsOvertime('t1'), isTrue);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    // Ay Planı satırında işaret görünür.
+    expect(find.text('Fazla mesai istiyor'), findsOneWidget);
+
+    // Kapatınca kalkar.
+    await tester.tap(find.text('Ali'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Fazla mesai istiyor'));
+    await tester.pumpAndSettle();
+    expect(boxes.monthPlans.get('2026-10')!.wantsOvertime('t1'), isFalse);
   });
 
   testWidgets('takvimden gün seçilir/kaldırılır ve kaydedilir', (tester) async {

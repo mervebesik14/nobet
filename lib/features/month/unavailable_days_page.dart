@@ -83,6 +83,19 @@ class UnavailableDaysPage extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           const _Legend(),
+          const Divider(height: 32),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            secondary: const Icon(Icons.more_time),
+            title: const Text('Fazla mesai istiyor'),
+            subtitle: const Text(
+              'Nöbet sayısı diğerlerinden birkaç fazla olabilir.',
+            ),
+            value: plan.wantsOvertime(person.id),
+            onChanged: plan.isLocked
+                ? null
+                : (v) => controller.setOvertime(person.id, v),
+          ),
           if (holidays.isNotEmpty) ...[
             const SizedBox(height: 16),
             for (final h in holidays.values)

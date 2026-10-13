@@ -13,6 +13,7 @@ class MonthPlan {
     this.isLocked = false,
     this.seed,
     this.nurseOnly = false,
+    this.overtimeRequests = const {},
   });
 
   final int year;
@@ -37,6 +38,13 @@ class MonthPlan {
 
   /// Bu ay yalnız hemşire listesi olarak oluşturuldu (tekniker yok).
   final bool nurseOnly;
+
+  /// Bu ay fazla mesai isteyen kişiler; nöbet sayıları diğerlerinden birkaç
+  /// fazla olabilir.
+  final Set<String> overtimeRequests;
+
+  /// Kişi bu ay fazla mesai istiyor mu?
+  bool wantsOvertime(String personId) => overtimeRequests.contains(personId);
 
   /// Nöbet listesi oluşturulmuş mu?
   bool get hasRoster => assignments.isNotEmpty;
@@ -66,6 +74,7 @@ class MonthPlan {
     bool? isLocked,
     int? seed,
     bool? nurseOnly,
+    Set<String>? overtimeRequests,
   }) {
     return MonthPlan(
       year: year,
@@ -76,6 +85,7 @@ class MonthPlan {
       isLocked: isLocked ?? this.isLocked,
       seed: seed ?? this.seed,
       nurseOnly: nurseOnly ?? this.nurseOnly,
+      overtimeRequests: overtimeRequests ?? this.overtimeRequests,
     );
   }
 
@@ -91,6 +101,7 @@ class MonthPlan {
     'isLocked': isLocked,
     'seed': seed,
     'nurseOnly': nurseOnly,
+    'overtimeRequests': overtimeRequests.toList(),
   };
 
   factory MonthPlan.fromJson(Map<String, dynamic> json) {
@@ -114,6 +125,9 @@ class MonthPlan {
       isLocked: json['isLocked'] as bool? ?? false,
       seed: json['seed'] as int?,
       nurseOnly: json['nurseOnly'] as bool? ?? false,
+      overtimeRequests: {
+        ...?(json['overtimeRequests'] as List?)?.cast<String>(),
+      },
     );
   }
 
@@ -132,7 +146,11 @@ class MonthPlan {
       other.generatedAt == generatedAt &&
       other.isLocked == isLocked &&
       other.seed == seed &&
-      other.nurseOnly == nurseOnly;
+      other.nurseOnly == nurseOnly &&
+      const SetEquality<String>().equals(
+        other.overtimeRequests,
+        overtimeRequests,
+      );
 
   @override
   int get hashCode => Object.hash(
@@ -144,6 +162,7 @@ class MonthPlan {
     isLocked,
     seed,
     nurseOnly,
+    const SetEquality<String>().hash(overtimeRequests),
   );
 
   @override

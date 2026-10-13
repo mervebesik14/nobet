@@ -88,6 +88,21 @@ class MonthPlanController extends Notifier<MonthPlan> {
   /// Kişinin bu aydaki tüm istenmeyen günlerini kaldırır.
   Future<bool> clearUnavailable(String personId) => _setDays(personId, {});
 
+  /// Kişinin bu ay fazla mesai isteyip istemediğini değiştirir.
+  /// Kilitli ayda değişmez ve false döner.
+  Future<bool> setOvertime(String personId, bool wants) async {
+    if (state.isLocked) return false;
+    final set = {...state.overtimeRequests};
+    if (wants) {
+      set.add(personId);
+    } else {
+      set.remove(personId);
+    }
+    state = state.copyWith(overtimeRequests: set);
+    await ref.read(monthPlanRepositoryProvider).save(state);
+    return true;
+  }
+
   Future<bool> _setDays(String personId, Set<int> days) async {
     if (state.isLocked) return false;
     final unavailable = {...state.unavailableDays};
@@ -119,6 +134,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       settings: effectiveSettings(base, nurseOnly: onlyNurses),
       seed: seed ?? Random().nextInt(1 << 31),
       previousMonthTail: previousMonthTail(),
+      overtimeRequests: plan.overtimeRequests,
       yearToDate: YearlySummary.build(
         year: plan.year,
         plans: ref.read(monthPlanRepositoryProvider).getAll(),
@@ -197,6 +213,7 @@ final rosterViolationsProvider = Provider<List<RuleViolation>>((ref) {
     people: ref.watch(peopleProvider),
     unavailableDays: plan.unavailableDays,
     previousMonthTail: ref.read(monthPlanProvider.notifier).previousMonthTail(),
+    overtimeRequests: plan.overtimeRequests,
   );
 });
 

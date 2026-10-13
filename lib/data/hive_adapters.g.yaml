@@ -51,7 +51,7 @@ types:
         index: 3
   MonthPlan:
     typeId: 4
-    nextIndex: 8
+    nextIndex: 9
     fields:
       year:
         index: 0
@@ -69,6 +69,8 @@ types:
         index: 6
       nurseOnly:
         index: 7
+      overtimeRequests:
+        index: 8
   RosterSettings:
     typeId: 5
     nextIndex: 11

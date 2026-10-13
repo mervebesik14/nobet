@@ -461,4 +461,89 @@ void main() {
       }
     });
   });
+
+  group('fazla mesai', () {
+    final people = team(7, 4);
+    final weekend = RosterGenerator.weekendDays(2026, 10, holidays, settings);
+
+    test('isteyen kişi diğerlerinden fazla nöbet alır, diğerleri dengede', () {
+      for (final seed in [1, 2, 3, 4]) {
+        final r = generator(seed: seed).generate();
+        final rOt = RosterGenerator(
+          year: 2026,
+          month: 10,
+          people: people,
+          holidays: holidays,
+          settings: settings,
+          seed: seed,
+          overtimeRequests: const {'n1'},
+          attempts: 150,
+        ).generate();
+        expectHardRules(rOt, people, const {}, settings);
+
+        final w = workedDays(rOt);
+        final n1 = w['n1']!.length;
+        final others = [
+          for (var i = 2; i <= 7; i++) (w['n$i'] ?? <int>{}).length,
+        ];
+        // n1 en çok tutanlardan ve diğerlerinin en azından 1 üstünde.
+        expect(n1, greaterThan(others.reduce((a, b) => a < b ? a : b)));
+        expect(
+          n1 - others.reduce((a, b) => a > b ? a : b),
+          lessThanOrEqualTo(2),
+        );
+        // Fazla mesai istemeyenler kendi aralarında dengede (fark ≤ 1).
+        expect(spread(others), lessThanOrEqualTo(1));
+      }
+    });
+
+    test('iki kişi isterse ikisi de fazla alır', () {
+      final r = RosterGenerator(
+        year: 2026,
+        month: 10,
+        people: people,
+        holidays: holidays,
+        settings: settings,
+        seed: 2,
+        overtimeRequests: const {'n1', 'n2'},
+        attempts: 150,
+      ).generate();
+      final w = workedDays(r);
+      final base = [
+        for (var i = 3; i <= 7; i++) (w['n$i'] ?? <int>{}).length,
+      ].reduce((a, b) => a > b ? a : b);
+      expect(w['n1']!.length, greaterThan(base));
+      expect(w['n2']!.length, greaterThan(base));
+      // Hafta sonu yine herkes arasında dengeli.
+      expect(
+        spread([
+          for (var i = 1; i <= 7; i++)
+            (w['n$i'] ?? <int>{}).where(weekend.contains).length,
+        ]),
+        lessThanOrEqualTo(1),
+      );
+    });
+
+    test('2 teknikerde fazla mesai 24 sayısını artırır', () {
+      const s = RosterSettings(techsPerDay: 2);
+      final r = RosterGenerator(
+        year: 2026,
+        month: 10,
+        people: people,
+        holidays: holidays,
+        settings: s,
+        seed: 3,
+        overtimeRequests: const {'t1'},
+        attempts: 150,
+      ).generate();
+      final c24 = <String, int>{};
+      for (final a in r.assignments.values) {
+        if (a.techId != null) c24[a.techId!] = (c24[a.techId!] ?? 0) + 1;
+      }
+      final base = [
+        for (var i = 2; i <= 4; i++) c24['t$i'] ?? 0,
+      ].reduce((a, b) => a > b ? a : b);
+      expect(c24['t1']!, greaterThan(base));
+    });
+  });
 }

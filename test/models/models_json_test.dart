@@ -54,6 +54,7 @@ void main() {
       generatedAt: DateTime(2026, 9, 30, 21, 15),
       isLocked: true,
       seed: 12345,
+      overtimeRequests: const {'n1', 't1'},
     );
     expect(MonthPlan.fromJson(plan.toJson()), plan);
     expect(plan.key, '2026-10');
@@ -61,6 +62,8 @@ void main() {
     expect(plan.unavailableDaysOf('n1'), [3, 14]);
     expect(plan.unavailableDaysOf('yok'), isEmpty);
     expect(plan.hasRoster, isTrue);
+    expect(plan.wantsOvertime('n1'), isTrue);
+    expect(plan.wantsOvertime('n9'), isFalse);
     expect(const MonthPlan(year: 2026, month: 1).hasRoster, isFalse);
   });
 

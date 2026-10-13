@@ -203,13 +203,16 @@ class MonthPlanAdapter extends TypeAdapter<MonthPlan> {
       isLocked: fields[5] == null ? false : fields[5] as bool,
       seed: (fields[6] as num?)?.toInt(),
       nurseOnly: fields[7] == null ? false : fields[7] as bool,
+      overtimeRequests: fields[8] == null
+          ? const {}
+          : (fields[8] as Set).cast<String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, MonthPlan obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.year)
       ..writeByte(1)
@@ -225,7 +228,9 @@ class MonthPlanAdapter extends TypeAdapter<MonthPlan> {
       ..writeByte(6)
       ..write(obj.seed)
       ..writeByte(7)
-      ..write(obj.nurseOnly);
+      ..write(obj.nurseOnly)
+      ..writeByte(8)
+      ..write(obj.overtimeRequests);
   }
 
   @override
