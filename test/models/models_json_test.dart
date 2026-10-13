@@ -55,6 +55,10 @@ void main() {
       isLocked: true,
       seed: 12345,
       overtimeRequests: const {'n1', 't1'},
+      annualLeave: const {
+        'n1': [8, 9, 10],
+        't2': [15],
+      },
     );
     expect(MonthPlan.fromJson(plan.toJson()), plan);
     expect(plan.key, '2026-10');
@@ -64,7 +68,29 @@ void main() {
     expect(plan.hasRoster, isTrue);
     expect(plan.wantsOvertime('n1'), isTrue);
     expect(plan.wantsOvertime('n9'), isFalse);
+    expect(plan.annualLeaveOf('n1'), [8, 9, 10]);
+    expect(plan.annualLeaveOf('yok'), isEmpty);
     expect(const MonthPlan(year: 2026, month: 1).hasRoster, isFalse);
+  });
+
+  test('MonthPlan.blockedDays istenmeyen gün ve izinleri birleştirir', () {
+    const plan = MonthPlan(
+      year: 2026,
+      month: 10,
+      unavailableDays: {
+        'n1': [3, 14],
+        'n2': [5],
+      },
+      annualLeave: {
+        'n1': [14, 20],
+        't1': [2],
+      },
+    );
+    // n1: kesişen 14 tekilleşir, sıralı birleşim.
+    expect(plan.blockedDays['n1'], [3, 14, 20]);
+    expect(plan.blockedDays['n2'], [5]);
+    expect(plan.blockedDays['t1'], [2]);
+    expect(plan.references('t1'), isTrue);
   });
 
   test('MonthPlan.references istenmeyen gün ve atamaları kontrol eder', () {

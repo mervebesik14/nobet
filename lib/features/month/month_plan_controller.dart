@@ -88,6 +88,17 @@ class MonthPlanController extends Notifier<MonthPlan> {
   /// Kişinin bu aydaki tüm istenmeyen günlerini kaldırır.
   Future<bool> clearUnavailable(String personId) => _setDays(personId, {});
 
+  /// Kişinin [day] gününü yıllık izin yapar ya da bundan çıkarır.
+  /// Kilitli ayda değişiklik yapılmaz ve false döner.
+  Future<bool> toggleLeave(String personId, int day) {
+    final days = {...state.annualLeaveOf(personId)};
+    if (!days.remove(day)) days.add(day);
+    return _setLeaveDays(personId, days);
+  }
+
+  /// Kişinin bu aydaki tüm yıllık izin günlerini kaldırır.
+  Future<bool> clearLeave(String personId) => _setLeaveDays(personId, {});
+
   /// Kişinin bu ay fazla mesai isteyip istemediğini değiştirir.
   /// Kilitli ayda değişmez ve false döner.
   Future<bool> setOvertime(String personId, bool wants) async {
@@ -118,6 +129,36 @@ class MonthPlanController extends Notifier<MonthPlan> {
     return true;
   }
 
+  Future<bool> _setLeaveDays(String personId, Set<int> days) async {
+    if (state.isLocked) return false;
+    final leave = {...state.annualLeave};
+    if (days.isEmpty) {
+      leave.remove(personId);
+    } else {
+      leave[personId] = days.toList()..sort();
+    }
+    state = state.copyWith(annualLeave: leave);
+    await ref.read(monthPlanRepositoryProvider).save(state);
+    return true;
+  }
+
+  /// Oluşturulmuş nöbet listesini sıfırlar (atamalar, tohum, oluşturma anı
+  /// silinir). İstenmeyen günler, yıllık izinler ve fazla mesai istekleri
+  /// korunur. Kilitli ayda sıfırlanmaz ve false döner.
+  Future<bool> resetRoster() async {
+    if (state.isLocked) return false;
+    state = MonthPlan(
+      year: state.year,
+      month: state.month,
+      unavailableDays: state.unavailableDays,
+      annualLeave: state.annualLeave,
+      overtimeRequests: state.overtimeRequests,
+      nurseOnly: state.nurseOnly,
+    );
+    await ref.read(monthPlanRepositoryProvider).save(state);
+    return true;
+  }
+
   /// Nöbet listesini oluşturur ve plana kaydeder. [seed] verilmezse yeni
   /// rastgele tohum kullanılır (her "Yeniden oluştur" farklı liste verir).
   /// Kilit burada kontrol edilmez; onayı ekran ister.
@@ -129,7 +170,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       year: plan.year,
       month: plan.month,
       people: ref.read(peopleProvider),
-      unavailableDays: plan.unavailableDays,
+      unavailableDays: plan.blockedDays,
       holidays: ref.read(holidaysProvider),
       settings: effectiveSettings(base, nurseOnly: onlyNurses),
       seed: seed ?? Random().nextInt(1 << 31),
@@ -211,7 +252,7 @@ final rosterViolationsProvider = Provider<List<RuleViolation>>((ref) {
     month: plan.month,
     assignments: plan.assignments,
     people: ref.watch(peopleProvider),
-    unavailableDays: plan.unavailableDays,
+    unavailableDays: plan.blockedDays,
     previousMonthTail: ref.read(monthPlanProvider.notifier).previousMonthTail(),
     overtimeRequests: plan.overtimeRequests,
   );
@@ -238,6 +279,6 @@ final monthFeasibilityProvider = Provider<FeasibilityReport>((ref) {
     year: plan.year,
     month: plan.month,
     people: ref.watch(peopleProvider),
-    unavailableDays: plan.unavailableDays,
+    unavailableDays: plan.blockedDays,
   );
 });

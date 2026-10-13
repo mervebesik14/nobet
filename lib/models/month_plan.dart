@@ -14,6 +14,7 @@ class MonthPlan {
     this.seed,
     this.nurseOnly = false,
     this.overtimeRequests = const {},
+    this.annualLeave = const {},
   });
 
   final int year;
@@ -46,6 +47,23 @@ class MonthPlan {
   /// Kişi bu ay fazla mesai istiyor mu?
   bool wantsOvertime(String personId) => overtimeRequests.contains(personId);
 
+  /// Kişi kimliği → o kişinin yıllık izinli olduğu günler. İzin günü hem
+  /// nöbet verilmesini engeller hem de kişinin gereken saatinden düşülür.
+  final Map<String, List<int>> annualLeave;
+
+  /// Kişinin yıllık izin günleri.
+  List<int> annualLeaveOf(String personId) =>
+      annualLeave[personId] ?? const [];
+
+  /// Nöbet dağıtımında engellenen günler: istenmeyen günler + yıllık izin.
+  Map<String, List<int>> get blockedDays {
+    final ids = {...unavailableDays.keys, ...annualLeave.keys};
+    return {
+      for (final id in ids)
+        id: {...unavailableDaysOf(id), ...annualLeaveOf(id)}.toList()..sort(),
+    };
+  }
+
   /// Nöbet listesi oluşturulmuş mu?
   bool get hasRoster => assignments.isNotEmpty;
 
@@ -65,6 +83,7 @@ class MonthPlan {
   /// Kişi bu ayın listesinde ya da istenmeyen günlerinde geçiyor mu?
   bool references(String personId) =>
       unavailableDays.containsKey(personId) ||
+      annualLeave.containsKey(personId) ||
       assignments.values.any((a) => a.includes(personId));
 
   MonthPlan copyWith({
@@ -75,6 +94,7 @@ class MonthPlan {
     int? seed,
     bool? nurseOnly,
     Set<String>? overtimeRequests,
+    Map<String, List<int>>? annualLeave,
   }) {
     return MonthPlan(
       year: year,
@@ -86,6 +106,7 @@ class MonthPlan {
       seed: seed ?? this.seed,
       nurseOnly: nurseOnly ?? this.nurseOnly,
       overtimeRequests: overtimeRequests ?? this.overtimeRequests,
+      annualLeave: annualLeave ?? this.annualLeave,
     );
   }
 
@@ -102,6 +123,7 @@ class MonthPlan {
     'seed': seed,
     'nurseOnly': nurseOnly,
     'overtimeRequests': overtimeRequests.toList(),
+    'annualLeave': annualLeave,
   };
 
   factory MonthPlan.fromJson(Map<String, dynamic> json) {
@@ -128,6 +150,10 @@ class MonthPlan {
       overtimeRequests: {
         ...?(json['overtimeRequests'] as List?)?.cast<String>(),
       },
+      annualLeave: {
+        for (final e in (json['annualLeave'] as Map? ?? const {}).entries)
+          e.key as String: (e.value as List).cast<int>(),
+      },
     );
   }
 
@@ -150,7 +176,8 @@ class MonthPlan {
       const SetEquality<String>().equals(
         other.overtimeRequests,
         overtimeRequests,
-      );
+      ) &&
+      _unavailableEquality.equals(other.annualLeave, annualLeave);
 
   @override
   int get hashCode => Object.hash(
@@ -163,6 +190,7 @@ class MonthPlan {
     seed,
     nurseOnly,
     const SetEquality<String>().hash(overtimeRequests),
+    _unavailableEquality.hash(annualLeave),
   );
 
   @override

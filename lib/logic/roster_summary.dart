@@ -99,6 +99,7 @@ class RosterSummary {
     required Iterable<Holiday> holidays,
     required RosterSettings settings,
     Set<Role>? onlyRoles,
+    Map<String, List<int>> annualLeave = const {},
   }) {
     final calc = WorkHoursCalculator(settings);
     final required = calc.requiredHours(year, month, holidays);
@@ -145,6 +146,12 @@ class RosterSummary {
       final days = worked[id] ?? const <int>{};
       final light = secondary[id] ?? const <int>{};
       final full = days.length - light.length;
+      // Yıllık izin günleri kişinin gereken saatinden düşülür (altına inmez).
+      final leave = annualLeave[id] ?? const <int>[];
+      final personRequired = leave.isEmpty
+          ? required
+          : (required - calc.leaveDeduction(year, month, holidays, leave))
+                .clamp(0.0, required);
       rows.add(
         PersonSummary(
           personId: id,
@@ -158,7 +165,7 @@ class RosterSummary {
           workedHours:
               calc.workedHours(full) +
               light.length * settings.secondaryTechShiftHours,
-          requiredHours: required,
+          requiredHours: personRequired,
         ),
       );
     }

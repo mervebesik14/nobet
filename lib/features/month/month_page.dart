@@ -112,6 +112,7 @@ class MonthPage extends ConsumerWidget {
                 _PersonRow(
                   person: person,
                   unavailableCount: plan.unavailableDaysOf(person.id).length,
+                  leaveCount: plan.annualLeaveOf(person.id).length,
                   wantsOvertime: plan.wantsOvertime(person.id),
                 ),
             ],
@@ -126,11 +127,13 @@ class _PersonRow extends StatelessWidget {
   const _PersonRow({
     required this.person,
     required this.unavailableCount,
+    required this.leaveCount,
     required this.wantsOvertime,
   });
 
   final Person person;
   final int unavailableCount;
+  final int leaveCount;
   final bool wantsOvertime;
 
   @override
@@ -151,6 +154,24 @@ class _PersonRow extends StatelessWidget {
                   : theme.colorScheme.error,
             ),
           ),
+          if (leaveCount > 0)
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.beach_access_outlined,
+                  size: 16,
+                  color: theme.colorScheme.leaveColor,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '$leaveCount gün yıllık izin',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.leaveColor,
+                  ),
+                ),
+              ],
+            ),
           if (wantsOvertime)
             Row(
               mainAxisSize: MainAxisSize.min,

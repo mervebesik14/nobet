@@ -64,12 +64,45 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       month: plan.month,
       assignments: assignments,
       people: ref.read(peopleProvider),
-      unavailableDays: plan.unavailableDays,
+      unavailableDays: plan.blockedDays,
       previousMonthTail: ref
           .read(monthPlanProvider.notifier)
           .previousMonthTail(),
       overtimeRequests: plan.overtimeRequests,
     );
+  }
+
+  /// Oluşturulmuş listeyi onayla sıfırlar; istenmeyen günler ve izinler
+  /// korunur. Sıfırlanınca liste boş kaldığı için Ay Planı'na dönülür.
+  Future<void> _confirmReset() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Listeyi sıfırla'),
+        content: const Text(
+          'Oluşturulan nöbet listesi silinecek. İstenmeyen günler, yıllık '
+          'izinler ve fazla mesai istekleri korunur. Devam edilsin mi?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Sıfırla'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final done = await ref.read(monthPlanProvider.notifier).resetRoster();
+    if (!mounted) return;
+    if (done) {
+      Navigator.of(context).pop();
+    } else {
+      _notify('Kilitli ay sıfırlanamaz.');
+    }
   }
 
   /// [after] uygulanırsa [personId] için yeni çıkan ihlaller.
@@ -406,6 +439,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       holidays: holidays,
       settings: settings,
       onlyRoles: plan.nurseOnly ? const {Role.nurse} : null,
+      annualLeave: plan.annualLeave,
     );
     final missingByDay = <int, int>{};
     for (var d = 1; d <= plan.daysInMonth; d++) {
@@ -487,6 +521,23 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 child: ListTile(
                   leading: Icon(Icons.print_outlined),
                   title: Text('Yazdır'),
+                ),
+              ),
+            ],
+          ),
+          PopupMenuButton<String>(
+            tooltip: 'Diğer',
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'reset') _confirmReset();
+            },
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                value: 'reset',
+                enabled: !plan.isLocked,
+                child: const ListTile(
+                  leading: Icon(Icons.delete_sweep_outlined),
+                  title: Text('Listeyi sıfırla'),
                 ),
               ),
             ],

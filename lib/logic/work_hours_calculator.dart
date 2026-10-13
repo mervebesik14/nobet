@@ -80,6 +80,39 @@ class WorkHoursCalculator {
   double requiredHours(int year, int month, Iterable<Holiday> holidays) =>
       requiredHoursBreakdown(year, month, holidays).hours;
 
+  /// [leaveDays] (ayın günleri) yıllık izinler için gereken saatten
+  /// düşülecek toplam saat. Yalnızca gereken saate giren günler düşülür:
+  /// tatil olmayan hafta içi günler tam, (ayar açıksa) hafta içi yarım gün
+  /// arifeler yarım. Hafta sonu ve tam gün tatiller gereken saate zaten
+  /// girmediği için düşülmez. Ay dışındaki günler yok sayılır.
+  double leaveDeduction(
+    int year,
+    int month,
+    Iterable<Holiday> holidays,
+    Iterable<int> leaveDays,
+  ) {
+    final byDay = <int, Holiday>{
+      for (final h in holidays)
+        if (h.date.year == year && h.date.month == month) h.date.day: h,
+    };
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+    var hours = 0.0;
+    for (final day in leaveDays) {
+      if (day < 1 || day > daysInMonth) continue;
+      final weekday = DateTime(year, month, day).weekday;
+      if (weekday == DateTime.saturday || weekday == DateTime.sunday) continue;
+      final holiday = byDay[day];
+      if (holiday == null) {
+        hours += settings.dailyRequiredHours;
+      } else if (holiday.isHalfDay) {
+        hours += settings.halfDayHolidayIsHalfWorkday
+            ? settings.halfDayRequiredHours
+            : settings.dailyRequiredHours;
+      }
+    }
+    return hours;
+  }
+
   /// [shiftCount] nöbetin karşılığı çalışılan saat.
   int workedHours(int shiftCount) => shiftCount * settings.shiftHours;
 

@@ -119,6 +119,47 @@ void main() {
     expect(s.people.every((r) => r.missingHours == 147), isTrue);
   });
 
+  test('yıllık izin kişinin gereken saatini düşürür', () {
+    final s = RosterSummary.build(
+      year: 2026,
+      month: 10,
+      assignments: assignments(),
+      people: people,
+      holidays: holidays,
+      settings: settings,
+      annualLeave: const {
+        // 1,2 iş günü (2×7=14) + 28 arife (5) = 19 saat düşer; 3 hafta sonu
+        // yok sayılır.
+        'b': [1, 2, 3, 28],
+      },
+    );
+    // Özetin ortak gereken saati değişmez.
+    expect(s.requiredHours, 145);
+    final ayse = s.people.firstWhere((r) => r.personId == 'b');
+    expect(ayse.requiredHours, 145 - 19);
+    // İzni olmayan kişi tam gereken saatte kalır.
+    final zeynep = s.people.firstWhere((r) => r.personId == 'a');
+    expect(zeynep.requiredHours, 145);
+  });
+
+  test('izin gereken saatin altına indiremez (0\'da durur)', () {
+    final s = RosterSummary.build(
+      year: 2026,
+      month: 10,
+      assignments: assignments(),
+      people: people,
+      holidays: holidays,
+      settings: settings,
+      annualLeave: {
+        // Ayın tüm günleri izin: gereken saat 0'a iner, negatife düşmez.
+        'a': [for (var d = 1; d <= 31; d++) d],
+      },
+    );
+    final zeynep = s.people.firstWhere((r) => r.personId == 'a');
+    expect(zeynep.requiredHours, 0);
+    expect(zeynep.missingHours, 0);
+  });
+
   test('onlyRoles: yalnız verilen roller özette yer alır', () {
     final s = RosterSummary.build(
       year: 2026,

@@ -110,4 +110,32 @@ void main() {
       expect(calc.workedHours(0), 0);
     });
   });
+
+  group('yıllık izin gereken saatten düşülür', () {
+    test('hafta içi iş günleri tam saat düşer', () {
+      // Ekim 2026: 1 (Per), 2 (Cum) iş günü -> 2×7 = 14 saat.
+      expect(calc.leaveDeduction(2026, 10, holidays2026, [1, 2]), 14);
+    });
+
+    test('hafta sonu ve tam gün tatil düşmez', () {
+      // 3 Ekim Cmt, 4 Ekim Paz hafta sonu; 29 Ekim tam tatil (Cumhuriyet).
+      expect(calc.leaveDeduction(2026, 10, holidays2026, [3, 4, 29]), 0);
+    });
+
+    test('arife (yarım gün) arife saati kadar düşer', () {
+      // 28 Ekim arife -> 5 saat.
+      expect(calc.leaveDeduction(2026, 10, holidays2026, [28]), 5);
+    });
+
+    test('ay dışı ve geçersiz günler yok sayılır', () {
+      expect(calc.leaveDeduction(2026, 10, holidays2026, [0, 40, 1]), 7);
+    });
+
+    test('ayar kapalıysa arife tam gün düşer', () {
+      const c = WorkHoursCalculator(
+        RosterSettings(halfDayHolidayIsHalfWorkday: false),
+      );
+      expect(c.leaveDeduction(2026, 10, holidays2026, [28]), 7);
+    });
+  });
 }

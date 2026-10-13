@@ -167,6 +167,66 @@ void main() {
     expect(find.text('Temizle'), findsNothing);
   });
 
+  testWidgets('Yıllık izin sekmesinden gün eklenir ve satırda görünür', (
+    tester,
+  ) async {
+    await seed(_team);
+    await pumpPage(tester);
+
+    await tester.tap(find.text('Ali'));
+    await tester.pumpAndSettle();
+    // İki sekme var.
+    expect(find.text('İstenmeyen günler'), findsOneWidget);
+    expect(find.text('Yıllık izin'), findsOneWidget);
+
+    await tester.tap(find.text('Yıllık izin'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('gereken saatten düşülür'), findsOneWidget);
+    // Fazla mesai anahtarı yıllık izin sekmesinde yok.
+    expect(find.text('Fazla mesai istiyor'), findsNothing);
+
+    await tester.tap(find.text('6'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('7'));
+    await tester.pumpAndSettle();
+    expect(boxes.monthPlans.get('2026-10')!.annualLeaveOf('t1'), [6, 7]);
+    // İzin günleri istenmeyen günlere karışmaz.
+    expect(boxes.monthPlans.get('2026-10')!.unavailableDaysOf('t1'), isEmpty);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('2 gün yıllık izin'), findsOneWidget);
+  });
+
+  testWidgets('Yıllık izin Temizle yalnız izinleri kaldırır', (tester) async {
+    await seed(
+      _team,
+      const MonthPlan(
+        year: 2026,
+        month: 10,
+        unavailableDays: {
+          't1': [1],
+        },
+        annualLeave: {
+          't1': [5, 6],
+        },
+      ),
+    );
+    await pumpPage(tester);
+
+    await tester.tap(find.text('Ali'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Yıllık izin'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Temizle'));
+    await tester.pumpAndSettle();
+
+    final plan = boxes.monthPlans.get('2026-10')!;
+    expect(plan.annualLeave.containsKey('t1'), isFalse);
+    // İstenmeyen gün korunur.
+    expect(plan.unavailableDaysOf('t1'), [1]);
+  });
+
   testWidgets('uygun tekniker kalmayan gün uyarı olarak görünür', (
     tester,
   ) async {

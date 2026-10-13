@@ -26,4 +26,10 @@ extension AppTints on ColorScheme {
 
   /// Uyarı/eksik/ihlal zemini: hafif kırmızı ton.
   Color get dangerTint => _tint(error, 0.10);
+
+  /// Yıllık izin günleri: istenmeyen günlerden (kırmızı) ayrışan serin ton.
+  Color get leaveColor => const Color(0xFF2E7D8A);
+
+  /// Yıllık izin lejantı/zemini: serin tonun hafif hali.
+  Color get leaveTint => _tint(leaveColor, 0.16);
 }

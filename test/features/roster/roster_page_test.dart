@@ -244,6 +244,58 @@ void main() {
     expect(saved().assignments.length, 31);
   });
 
+  testWidgets('Listeyi sıfırla: onaylayınca liste silinir, tercihler kalır', (
+    tester,
+  ) async {
+    await boxes.monthPlans.put(
+      '2026-10',
+      const MonthPlan(
+        year: 2026,
+        month: 10,
+        unavailableDays: {
+          'n1': [5],
+        },
+        annualLeave: {
+          'n2': [8],
+        },
+        overtimeRequests: {'t1'},
+      ),
+    );
+    await pumpMonthPage(tester);
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
+    expect(saved().hasRoster, isTrue);
+
+    await tester.tap(find.byTooltip('Diğer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Listeyi sıfırla'));
+    await tester.pumpAndSettle();
+    // Önce vazgeç: değişmez.
+    await tester.tap(find.text('Vazgeç'));
+    await tester.pumpAndSettle();
+    expect(saved().hasRoster, isTrue);
+
+    await tester.tap(find.byTooltip('Diğer'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Listeyi sıfırla'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Sıfırla'));
+    await tester.pumpAndSettle();
+
+    // Liste silinir ama istenmeyen gün, izin ve fazla mesai korunur.
+    final plan = saved();
+    expect(plan.hasRoster, isFalse);
+    expect(plan.generatedAt, isNull);
+    expect(plan.seed, isNull);
+    expect(plan.unavailableDaysOf('n1'), [5]);
+    expect(plan.annualLeaveOf('n2'), [8]);
+    expect(plan.wantsOvertime('t1'), isTrue);
+    // Ay Planı'na dönülür.
+    expect(find.text('Listeyi Oluştur'), findsOneWidget);
+  });
+
   testWidgets('yalnız hemşire: tekniker atanmaz ve listede görünmez', (
     tester,
   ) async {

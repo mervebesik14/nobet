@@ -468,7 +468,6 @@ void main() {
 
     test('isteyen kişi diğerlerinden fazla nöbet alır, diğerleri dengede', () {
       for (final seed in [1, 2, 3, 4]) {
-        final r = generator(seed: seed).generate();
         final rOt = RosterGenerator(
           year: 2026,
           month: 10,
