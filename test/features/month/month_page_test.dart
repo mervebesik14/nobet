@@ -266,6 +266,57 @@ void main() {
     expect(plan.unavailableDaysOf('t1'), [1]);
   });
 
+  testWidgets('Nöbet günleri sekmesi yalnızca sorumlu hemşirede', (
+    tester,
+  ) async {
+    await seed([
+      ..._team,
+      const Person(
+        id: 'c',
+        name: 'Sorumlu',
+        role: Role.nurse,
+        isChargeNurse: true,
+      ),
+    ]);
+    await pumpPage(tester);
+
+    // Sıradan hemşirede sekme yok.
+    await tester.tap(find.text('Ayşe'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nöbet günleri'), findsNothing);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Sorumlu'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Nöbet günleri'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('bu günlere nöbet yazılır'), findsOneWidget);
+    expect(find.text('Fazla mesai istiyor'), findsNothing);
+
+    await tester.tap(find.text('5'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('12'));
+    await tester.pumpAndSettle();
+    expect(boxes.monthPlans.get('2026-10')!.requestedShiftsOf('c'), [5, 12]);
+
+    // Aynı gün istenmeyen yapılınca nöbet günlerinden çıkar. (Sekme çubuğu
+    // kaydı; ilk sekme görünsün diye geri kaydırılır.)
+    await tester.drag(find.byType(TabBar), const Offset(300, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('İstenmeyen günler'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('5'));
+    await tester.pumpAndSettle();
+    final plan = boxes.monthPlans.get('2026-10')!;
+    expect(plan.unavailableDaysOf('c'), [5]);
+    expect(plan.requestedShiftsOf('c'), [12]);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('1 gün nöbet seçildi'), findsOneWidget);
+  });
+
   testWidgets('uygun tekniker kalmayan gün uyarı olarak görünür', (
     tester,
   ) async {

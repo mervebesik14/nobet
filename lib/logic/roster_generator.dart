@@ -90,6 +90,7 @@ class RosterGenerator {
     this.yearToDate = const {},
     this.overtimeRequests = const {},
     this.overtimeAllowance = 2,
+    this.requestedShifts = const {},
     this.attempts = 400,
   }) : people = people.where((p) => p.isActive).toList()
          ..sort((a, b) => a.id.compareTo(b.id));
@@ -123,6 +124,11 @@ class RosterGenerator {
 
   /// Fazla mesai isteyene tanınan ek nöbet payı.
   final int overtimeAllowance;
+
+  /// Kişi → mutlaka nöbet tutacağı günler (sorumlu hemşire için seçilir).
+  /// Bu günlere sabit yazılır; kalan koltuklar diğerleriyle dolar. Kişinin
+  /// o gün uygun olmadığı (istemediği / izinli) günler yok sayılır.
+  final Map<String, List<int>> requestedShifts;
 
   /// Kişi → fazla mesai payı (fazla mesai isteyene [overtimeAllowance], yoksa
   /// 0). Adalet puanında ve açgözlü seçimde kişinin sayısından düşülür.
@@ -192,6 +198,17 @@ class RosterGenerator {
       reserve: {
         for (final p in nurseMembers)
           if (p.isChargeNurse) p.id,
+      },
+      fixed: {
+        for (final p in nurseMembers)
+          if (requestedShifts[p.id]?.isNotEmpty ?? false)
+            p.id: {
+              for (final d in requestedShifts[p.id]!)
+                if (d >= 1 &&
+                    d <= daysInMonth &&
+                    !(unavailableDays[p.id] ?? const []).contains(d))
+                  d,
+            },
       },
       settings: settings,
     ).solve(rng, attempts, _polishCount);
@@ -309,6 +326,7 @@ class _RoleSolver {
     required Map<String, PersonTotals> yearToDate,
     this.allowance = const {},
     this.reserve = const {},
+    this.fixed = const {},
     required RosterSettings settings,
   }) : ytdShifts = _relative(
          _fair(members, reserve),
@@ -354,6 +372,23 @@ class _RoleSolver {
   /// Yedek kişiler (sorumlu hemşire): nöbet dengesine girmez, yalnızca
   /// başka uygun kişi yoksa nöbete yazılır.
   final Set<String> reserve;
+
+  /// Kişi → sabit nöbet günleri: her denemede önce yazılır, yerel
+  /// iyileştirmede yerinden oynatılmaz.
+  final Map<String, Set<int>> fixed;
+
+  bool _isFixed(String id, int d) => fixed[id]?.contains(d) ?? false;
+
+  void _prefill() {
+    for (final MapEntry(key: id, value: days) in fixed.entries) {
+      if (!_worked.containsKey(id)) continue;
+      for (final d in days) {
+        if (_slots[d].length < perDay && !_worked[id]!.contains(d)) {
+          _add(id, d);
+        }
+      }
+    }
+  }
 
   /// Yedek kişinin her nöbetinin cezası: boş koltuktan ucuz, dengeyi
   /// bozan her hamleden pahalı.
@@ -575,8 +610,9 @@ class _RoleSolver {
       });
     }
 
+    _prefill();
     for (final d in order) {
-      for (var slot = 0; slot < perDay; slot++) {
+      while (_slots[d].length < perDay) {
         String? bestId;
         var bestCost = double.infinity;
         for (final id in ids) {
@@ -638,6 +674,7 @@ class _RoleSolver {
       // Değiştirme: d günündeki a yerine b.
       for (var d = 1; d <= days; d++) {
         for (final a in [..._slots[d]]) {
+          if (_isFixed(a, d)) continue;
           for (final b in ids) {
             if (_slots[d].contains(b)) continue;
             _remove(a, d);
@@ -666,6 +703,7 @@ class _RoleSolver {
           final (d1, a) = shifts[i];
           final (d2, b) = shifts[j];
           if (a == b || d1 == d2) continue;
+          if (_isFixed(a, d1) || _isFixed(b, d2)) continue;
           if (!_slots[d1].contains(a) || !_slots[d2].contains(b)) continue;
           if (_slots[d1].contains(b) || _slots[d2].contains(a)) continue;
           if (_trySwap(a, d1, b, d2, current)) {

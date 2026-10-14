@@ -570,6 +570,50 @@ void main() {
       }
     });
 
+    test('seçilen nöbet günlerine sabit yazılır, başka gün almaz', () {
+      for (final seed in [1, 2, 3]) {
+        final r = RosterGenerator(
+          year: 2026,
+          month: 10,
+          people: people,
+          holidays: holidays,
+          settings: settings,
+          seed: seed,
+          attempts: 150,
+          requestedShifts: const {
+            'c': [5, 12, 20],
+          },
+        ).generate();
+        expectHardRules(r, people, const {}, settings);
+        final w = workedDays(r);
+        expect(w['c'], {5, 12, 20}, reason: 'seed $seed');
+        // Kalan koltuklarda diğer hemşireler dengede.
+        expect(
+          spread([for (var i = 1; i <= 7; i++) (w['n$i'] ?? {}).length]),
+          lessThanOrEqualTo(1),
+        );
+      }
+    });
+
+    test('uygun olmadığı seçilmiş gün yok sayılır', () {
+      final r = RosterGenerator(
+        year: 2026,
+        month: 10,
+        people: people,
+        unavailableDays: const {
+          'c': [12],
+        },
+        holidays: holidays,
+        settings: settings,
+        seed: 1,
+        attempts: 150,
+        requestedShifts: const {
+          'c': [5, 12],
+        },
+      ).generate();
+      expect(workedDays(r)['c'], {5});
+    });
+
     test('başka uygun hemşire kalmayan günde nöbete yazılır', () {
       // 14 Ekim'de n2–n7 istemiyor: tek uygun n1 + sorumlu hemşire.
       final unavailable = {

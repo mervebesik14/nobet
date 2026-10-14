@@ -382,6 +382,47 @@ void main() {
     expect(find.text('7A\ngün'), findsOneWidget);
   });
 
+  testWidgets('sorumlu hemşire seçilen nöbet günlerine yazılır', (
+    tester,
+  ) async {
+    await boxes.people.put(
+      'c',
+      const Person(
+        id: 'c',
+        name: 'Sorumlu Hemşire',
+        role: Role.nurse,
+        isChargeNurse: true,
+      ),
+    );
+    await boxes.monthPlans.put(
+      '2026-10',
+      const MonthPlan(
+        year: 2026,
+        month: 10,
+        requestedShifts: {
+          'c': [7, 21],
+        },
+      ),
+    );
+    await pumpMonthPage(tester);
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
+
+    final days = {
+      for (final a in saved().assignments.values)
+        if (a.includes('c')) a.day,
+    };
+    expect(days, {7, 21});
+    // Seçilen nöbet günleri sıfırlamada korunur.
+    await tester.tap(find.byTooltip('Listeyi sıfırla'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Sıfırla'));
+    await tester.pumpAndSettle();
+    expect(saved().requestedShiftsOf('c'), [7, 21]);
+  });
+
   testWidgets('Listeyi sıfırla: onaylayınca liste silinir, tercihler kalır', (
     tester,
   ) async {

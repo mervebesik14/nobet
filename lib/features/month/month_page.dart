@@ -129,6 +129,7 @@ class MonthPage extends ConsumerWidget {
                       .radiationLeaveOf(person.id)
                       .length,
                   wantsOvertime: plan.wantsOvertime(person.id),
+                  requestedCount: plan.requestedShiftsOf(person.id).length,
                 ),
             ],
           _FeasibilitySection(report: report),
@@ -145,6 +146,7 @@ class _PersonRow extends StatelessWidget {
     required this.annualLeaveCount,
     required this.radiationLeaveCount,
     required this.wantsOvertime,
+    this.requestedCount = 0,
   });
 
   final Person person;
@@ -152,6 +154,7 @@ class _PersonRow extends StatelessWidget {
   final int annualLeaveCount;
   final int radiationLeaveCount;
   final bool wantsOvertime;
+  final int requestedCount;
 
   @override
   Widget build(BuildContext context) {
@@ -171,6 +174,13 @@ class _PersonRow extends StatelessWidget {
                   : theme.colorScheme.error,
             ),
           ),
+          if (requestedCount > 0)
+            Text(
+              '$requestedCount gün nöbet seçildi',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.primary,
+              ),
+            ),
           if (annualLeaveCount > 0)
             _LeaveLine(
               icon: Icons.beach_access_outlined,

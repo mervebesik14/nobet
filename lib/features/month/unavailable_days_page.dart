@@ -9,7 +9,8 @@ import 'month_plan_controller.dart';
 import '../../shared/app_colors.dart';
 
 /// Bir kişinin seçili aydaki istenmeyen günlerini ve izinlerini düzenleme
-/// ekranı. Üç sekme: istenmeyen günler, yıllık izin, şua izni.
+/// ekranı. Sekmeler: istenmeyen günler, (sorumlu hemşirede) nöbet günleri,
+/// yıllık izin, şua izni.
 class UnavailableDaysPage extends ConsumerStatefulWidget {
   const UnavailableDaysPage({super.key, required this.person});
 
@@ -20,12 +21,24 @@ class UnavailableDaysPage extends ConsumerStatefulWidget {
       _UnavailableDaysPageState();
 }
 
+enum _Tab { unavailable, requested, annual, radiation }
+
 class _UnavailableDaysPageState extends ConsumerState<UnavailableDaysPage>
     with SingleTickerProviderStateMixin {
-  late final TabController _tabs = TabController(length: 3, vsync: this)
-    ..addListener(() => setState(() {}));
-
   Person get person => widget.person;
+
+  /// Nöbet günleri sekmesi yalnızca sorumlu hemşirede görünür.
+  late final List<_Tab> _tabList = [
+    _Tab.unavailable,
+    if (person.isChargeNurse && person.role == Role.nurse) _Tab.requested,
+    _Tab.annual,
+    _Tab.radiation,
+  ];
+
+  late final TabController _tabs = TabController(
+    length: _tabList.length,
+    vsync: this,
+  )..addListener(() => setState(() {}));
 
   @override
   void dispose() {
@@ -39,18 +52,22 @@ class _UnavailableDaysPageState extends ConsumerState<UnavailableDaysPage>
     final controller = ref.read(monthPlanProvider.notifier);
 
     // Aktif sekmedeki verinin varlığı ve "Temizle" eylemi.
-    final (hasData, onClear) = switch (_tabs.index) {
-      1 => (
+    final (hasData, onClear) = switch (_tabList[_tabs.index]) {
+      _Tab.unavailable => (
+        plan.unavailableDaysOf(person.id).isNotEmpty,
+        () => controller.clearUnavailable(person.id),
+      ),
+      _Tab.requested => (
+        plan.requestedShiftsOf(person.id).isNotEmpty,
+        () => controller.clearRequestedShifts(person.id),
+      ),
+      _Tab.annual => (
         plan.annualLeaveOf(person.id).isNotEmpty,
         () => controller.clearLeave(person.id, LeaveType.annual),
       ),
-      2 => (
+      _Tab.radiation => (
         plan.radiationLeaveOf(person.id).isNotEmpty,
         () => controller.clearLeave(person.id, LeaveType.radiation),
-      ),
-      _ => (
-        plan.unavailableDaysOf(person.id).isNotEmpty,
-        () => controller.clearUnavailable(person.id),
       ),
     };
 
@@ -65,36 +82,61 @@ class _UnavailableDaysPageState extends ConsumerState<UnavailableDaysPage>
           controller: _tabs,
           isScrollable: true,
           tabAlignment: TabAlignment.start,
-          tabs: const [
-            Tab(text: 'İstenmeyen günler'),
-            Tab(text: 'Yıllık izin'),
-            Tab(text: 'Şua izni'),
+          tabs: [
+            for (final tab in _tabList)
+              Tab(
+                text: switch (tab) {
+                  _Tab.unavailable => 'İstenmeyen günler',
+                  _Tab.requested => 'Nöbet günleri',
+                  _Tab.annual => 'Yıllık izin',
+                  _Tab.radiation => 'Şua izni',
+                },
+              ),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabs,
         children: [
-          _CalendarEditor(person: person),
-          _LeaveEditor(person: person, type: LeaveType.annual),
-          _LeaveEditor(person: person, type: LeaveType.radiation),
+          for (final tab in _tabList)
+            switch (tab) {
+              _Tab.unavailable => _CalendarEditor(person: person),
+              _Tab.requested => _CalendarEditor(
+                person: person,
+                requested: true,
+              ),
+              _Tab.annual => _LeaveEditor(
+                person: person,
+                type: LeaveType.annual,
+              ),
+              _Tab.radiation => _LeaveEditor(
+                person: person,
+                type: LeaveType.radiation,
+              ),
+            },
         ],
       ),
     );
   }
 }
 
-/// İstenmeyen günler sekmesi: takvimden tek tek gün seçme + fazla mesai.
+/// Takvimden tek tek gün seçme sekmesi. [requested] ise sorumlu hemşirenin
+/// nöbet tutacağı günler; değilse istenmeyen günler (+ fazla mesai).
 class _CalendarEditor extends ConsumerWidget {
-  const _CalendarEditor({required this.person});
+  const _CalendarEditor({required this.person, this.requested = false});
 
   final Person person;
+  final bool requested;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final plan = ref.watch(monthPlanProvider);
     final controller = ref.read(monthPlanProvider.notifier);
-    final selected = plan.unavailableDaysOf(person.id).toSet();
+    final selected =
+        (requested
+                ? plan.requestedShiftsOf(person.id)
+                : plan.unavailableDaysOf(person.id))
+            .toSet();
     final holidays = {
       for (final h in ref.watch(holidaysProvider))
         if (h.date.year == plan.year && h.date.month == plan.month)
@@ -103,6 +145,9 @@ class _CalendarEditor extends ConsumerWidget {
     final firstDay = DateTime(plan.year, plan.month);
     final lastDay = DateTime(plan.year, plan.month, plan.daysInMonth);
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final mark = requested ? scheme.primary : scheme.error;
+    final onMark = requested ? scheme.onPrimary : scheme.onError;
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -114,7 +159,13 @@ class _CalendarEditor extends ConsumerWidget {
         const SizedBox(height: 4),
         Text(
           plan.isLocked
-              ? 'Bu ay kilitli; istenmeyen günler değiştirilemez.'
+              ? 'Bu ay kilitli; ${requested ? 'nöbet günleri' : 'istenmeyen günler'} '
+                    'değiştirilemez.'
+              : requested
+              ? 'Nöbet tutacağı günlere dokunun; liste oluşturulurken bu '
+                    'günlere nöbet yazılır. Diğer günlerde yalnızca başka '
+                    'uygun hemşire yoksa nöbete yazılır. '
+                    'Seçili: ${selected.length} gün'
               : 'Nöbet istemediği günlere dokunun. Seçili: ${selected.length} gün',
           style: theme.textTheme.bodyMedium,
         ),
@@ -130,19 +181,18 @@ class _CalendarEditor extends ConsumerWidget {
           calendarStyle: const CalendarStyle(outsideDaysVisible: false),
           selectedDayPredicate: (day) => selected.contains(day.day),
           onDaySelected: (day, _) {
-            if (!plan.isLocked) {
+            if (plan.isLocked) return;
+            if (requested) {
+              controller.toggleRequestedShift(person.id, day.day);
+            } else {
               controller.toggleUnavailable(person.id, day.day);
             }
           },
           calendarBuilders: CalendarBuilders(
             prioritizedBuilder: (context, day, _) => _DayCell(
               day: day.day,
-              background: selected.contains(day.day)
-                  ? theme.colorScheme.error
-                  : null,
-              foreground: selected.contains(day.day)
-                  ? theme.colorScheme.onError
-                  : null,
+              background: selected.contains(day.day) ? mark : null,
+              foreground: selected.contains(day.day) ? onMark : null,
               holiday: holidays[day.day],
               isWeekend:
                   day.weekday == DateTime.saturday ||
@@ -151,20 +201,22 @@ class _CalendarEditor extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 16),
-        _Legend(items: [(theme.colorScheme.error, 'İstemiyor')]),
-        const Divider(height: 32),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          secondary: const Icon(Icons.more_time),
-          title: const Text('Fazla mesai istiyor'),
-          subtitle: const Text(
-            'Nöbet sayısı diğerlerinden birkaç fazla olabilir.',
+        _Legend(items: [(mark, requested ? 'Nöbet tutacak' : 'İstemiyor')]),
+        if (!requested) ...[
+          const Divider(height: 32),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            secondary: const Icon(Icons.more_time),
+            title: const Text('Fazla mesai istiyor'),
+            subtitle: const Text(
+              'Nöbet sayısı diğerlerinden birkaç fazla olabilir.',
+            ),
+            value: plan.wantsOvertime(person.id),
+            onChanged: plan.isLocked
+                ? null
+                : (v) => controller.setOvertime(person.id, v),
           ),
-          value: plan.wantsOvertime(person.id),
-          onChanged: plan.isLocked
-              ? null
-              : (v) => controller.setOvertime(person.id, v),
-        ),
+        ],
         _HolidayList(holidays: holidays.values),
       ],
     );

@@ -71,8 +71,13 @@ void main() {
       radiationLeave: const {
         't1': [22, 23],
       },
+      requestedShifts: const {
+        'n2': [4, 18],
+      },
     );
     expect(MonthPlan.fromJson(plan.toJson()), plan);
+    expect(plan.requestedShiftsOf('n2'), [4, 18]);
+    expect(plan.references('n2'), isTrue);
     expect(plan.key, '2026-10');
     expect(plan.daysInMonth, 31);
     expect(plan.unavailableDaysOf('n1'), [3, 14]);

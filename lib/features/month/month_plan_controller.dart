@@ -86,8 +86,26 @@ class MonthPlanController extends Notifier<MonthPlan> {
   Future<bool> toggleUnavailable(String personId, int day) {
     final days = {...state.unavailableDaysOf(personId)};
     if (!days.remove(day)) days.add(day);
-    return _setDays(personId, days);
+    // Bir gün hem istenmeyen hem seçilmiş nöbet günü olamaz.
+    final requested = {...state.requestedShiftsOf(personId)}..removeAll(days);
+    return _setDays(personId, days, requested: requested);
   }
+
+  /// Kişinin [day] gününü nöbet tutacağı gün yapar ya da bundan çıkarır.
+  /// İstenmeyen günlerdeyse oradan çıkar. Kilitli ayda false döner.
+  Future<bool> toggleRequestedShift(String personId, int day) {
+    final requested = {...state.requestedShiftsOf(personId)};
+    if (!requested.remove(day)) requested.add(day);
+    final days = {...state.unavailableDaysOf(personId)}..removeAll(requested);
+    return _setDays(personId, days, requested: requested);
+  }
+
+  /// Kişinin bu aydaki seçilmiş nöbet günlerini kaldırır.
+  Future<bool> clearRequestedShifts(String personId) => _setDays(
+    personId,
+    {...state.unavailableDaysOf(personId)},
+    requested: const {},
+  );
 
   /// Kişinin bu aydaki tüm istenmeyen günlerini kaldırır.
   Future<bool> clearUnavailable(String personId) => _setDays(personId, {});
@@ -152,17 +170,31 @@ class MonthPlanController extends Notifier<MonthPlan> {
     return true;
   }
 
-  Future<bool> _setDays(String personId, Set<int> days) async {
+  /// İstenmeyen günleri (ve verilirse seçilmiş nöbet günlerini) yazar.
+  Future<bool> _setDays(
+    String personId,
+    Set<int> days, {
+    Set<int>? requested,
+  }) async {
     if (state.isLocked) return false;
-    final unavailable = {...state.unavailableDays};
-    if (days.isEmpty) {
-      // Boş kayıt bırakılmaz: kişi yalnızca gerçekten istenmeyen günü varsa
-      // bu planda "geçiyor" sayılır.
-      unavailable.remove(personId);
-    } else {
-      unavailable[personId] = days.toList()..sort();
+    // Boş kayıt bırakılmaz: kişi yalnızca gerçekten günü varsa bu planda
+    // "geçiyor" sayılır.
+    Map<String, List<int>> put(Map<String, List<int>> map, Set<int> value) {
+      final copy = {...map};
+      if (value.isEmpty) {
+        copy.remove(personId);
+      } else {
+        copy[personId] = value.toList()..sort();
+      }
+      return copy;
     }
-    state = state.copyWith(unavailableDays: unavailable);
+
+    state = state.copyWith(
+      unavailableDays: put(state.unavailableDays, days),
+      requestedShifts: requested == null
+          ? null
+          : put(state.requestedShifts, requested),
+    );
     await ref.read(monthPlanRepositoryProvider).save(state);
     return true;
   }
@@ -203,6 +235,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       unavailableDays: state.unavailableDays,
       annualLeave: state.annualLeave,
       radiationLeave: state.radiationLeave,
+      requestedShifts: state.requestedShifts,
       overtimeRequests: state.overtimeRequests,
       nurseOnly: state.nurseOnly,
     );
@@ -231,6 +264,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       seed: seed ?? Random().nextInt(1 << 31),
       previousMonthTail: previousMonthTail(),
       overtimeRequests: plan.overtimeRequests,
+      requestedShifts: plan.requestedShifts,
       yearToDate: YearlySummary.build(
         year: plan.year,
         plans: ref.read(monthPlanRepositoryProvider).getAll(),

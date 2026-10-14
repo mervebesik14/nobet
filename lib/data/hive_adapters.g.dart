@@ -221,13 +221,19 @@ class MonthPlanAdapter extends TypeAdapter<MonthPlan> {
               (dynamic k, dynamic v) =>
                   MapEntry(k as String, (v as List).cast<int>()),
             ),
+      requestedShifts: fields[11] == null
+          ? const {}
+          : (fields[11] as Map).map(
+              (dynamic k, dynamic v) =>
+                  MapEntry(k as String, (v as List).cast<int>()),
+            ),
     );
   }
 
   @override
   void write(BinaryWriter writer, MonthPlan obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(12)
       ..writeByte(0)
       ..write(obj.year)
       ..writeByte(1)
@@ -249,7 +255,9 @@ class MonthPlanAdapter extends TypeAdapter<MonthPlan> {
       ..writeByte(9)
       ..write(obj.annualLeave)
       ..writeByte(10)
-      ..write(obj.radiationLeave);
+      ..write(obj.radiationLeave)
+      ..writeByte(11)
+      ..write(obj.requestedShifts);
   }
 
   @override
