@@ -16,6 +16,7 @@ class PersonSummary {
     required this.role,
     required this.shifts,
     required this.weekendShifts,
+    this.holidayShifts = 0,
     required this.everyOtherDayPairs,
     required this.workedHours,
     required this.requiredHours,
@@ -29,6 +30,9 @@ class PersonSummary {
   final Role role;
   final int shifts;
   final int weekendShifts;
+
+  /// Tam gün resmi tatil (bayram vb.) nöbetleri.
+  final int holidayShifts;
   final int everyOtherDayPairs;
 
   /// 24/16B nöbet saatleri + 7A saatleri.
@@ -63,6 +67,7 @@ class RoleAverage {
     required this.people,
     required this.shifts,
     required this.weekendShifts,
+    this.holidayShifts = 0,
     required this.everyOtherDayPairs,
     required this.workedHours,
     required this.overtimeHours,
@@ -74,6 +79,7 @@ class RoleAverage {
   final int people;
   final double shifts;
   final double weekendShifts;
+  final double holidayShifts;
   final double everyOtherDayPairs;
   final double workedHours;
   final double overtimeHours;
@@ -115,6 +121,7 @@ class RosterSummary {
   }) {
     final calc = WorkHoursCalculator(settings);
     final required = calc.requiredHours(year, month, holidays);
+    final holidayDays = RosterGenerator.holidayDays(year, month, holidays);
     final weekend = RosterGenerator.weekendDays(
       year,
       month,
@@ -182,6 +189,7 @@ class RosterSummary {
           shifts: days.length,
           secondaryShifts: light.length,
           weekendShifts: days.where(weekend.contains).length,
+          holidayShifts: days.where(holidayDays.contains).length,
           everyOtherDayPairs: RosterGenerator.everyOtherDayPairs(days),
           // 24 vardiyaları tam saat, 16B vardiyaları kısa saat sayılır.
           // 7A günleri o günün mesai saati kadar eklenir.
@@ -215,6 +223,7 @@ class RosterSummary {
         people: group.length,
         shifts: mean(group.map((r) => r.shifts)),
         weekendShifts: mean(group.map((r) => r.weekendShifts)),
+        holidayShifts: mean(group.map((r) => r.holidayShifts)),
         everyOtherDayPairs: mean(group.map((r) => r.everyOtherDayPairs)),
         workedHours: mean(group.map((r) => r.workedHours)),
         overtimeHours: mean(group.map((r) => r.overtimeHours)),

@@ -177,7 +177,10 @@ void main() {
         .length;
     expect(cell(n1, 2), '2'); // ay sayısı
     expect(cell(n1, 3), '${15 + n1October}'); // toplam nöbet
-    expect(cell(n1, 6), '${(15 + n1October) * 24}'); // çalışılan saat
+    // Tatil nöbeti: Eylül'de tam gün tatil yok, Ekim'de yalnız 29 Ekim.
+    final n1Holiday = october.assignments[29]!.nurseIds.contains('n1') ? 1 : 0;
+    expect(cell(n1, 5), '$n1Holiday'); // tatil nöbeti
+    expect(cell(n1, 7), '${(15 + n1October) * 24}'); // çalışılan saat
 
     await tester.tap(find.byTooltip('Önceki yıl'));
     await tester.pumpAndSettle();

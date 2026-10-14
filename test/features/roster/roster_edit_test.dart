@@ -378,6 +378,6 @@ void main() {
       (r) => (r.cells.first.child as Text).data == 'Hale',
     );
     expect((hale.cells[2].child as Text).data, '1'); // toplam nöbet
-    expect((hale.cells[5].child as Text).data, '24'); // çalışılan saat
+    expect((hale.cells[6].child as Text).data, '24'); // çalışılan saat
   });
 }

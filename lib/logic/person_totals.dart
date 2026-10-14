@@ -3,6 +3,7 @@ class PersonTotals {
   const PersonTotals({
     this.shifts = 0,
     this.weekendShifts = 0,
+    this.holidayShifts = 0,
     this.everyOtherDayPairs = 0,
     this.workedHours = 0,
     this.requiredHours = 0,
@@ -12,6 +13,9 @@ class PersonTotals {
 
   final int shifts;
   final int weekendShifts;
+
+  /// Tam gün resmi tatil (bayram vb.) nöbetleri.
+  final int holidayShifts;
   final int everyOtherDayPairs;
   final double workedHours;
   final double requiredHours;
@@ -25,6 +29,7 @@ class PersonTotals {
   PersonTotals operator +(PersonTotals o) => PersonTotals(
     shifts: shifts + o.shifts,
     weekendShifts: weekendShifts + o.weekendShifts,
+    holidayShifts: holidayShifts + o.holidayShifts,
     everyOtherDayPairs: everyOtherDayPairs + o.everyOtherDayPairs,
     workedHours: workedHours + o.workedHours,
     requiredHours: requiredHours + o.requiredHours,

@@ -26,6 +26,7 @@ class SummaryTable extends StatelessWidget {
         DataCell(Text(fmt(value), style: style));
 
     final has7A = summary.people.any((r) => r.dayShifts > 0);
+    final hasHoliday = summary.people.any((r) => r.holidayShifts > 0);
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
@@ -37,6 +38,8 @@ class SummaryTable extends StatelessWidget {
           const DataColumn(label: Text('Görev')),
           const DataColumn(label: Text('Toplam\nnöbet'), numeric: true),
           const DataColumn(label: Text('Hafta sonu\nnöbet'), numeric: true),
+          if (hasHoliday)
+            const DataColumn(label: Text('Tatil\nnöbeti'), numeric: true),
           const DataColumn(label: Text('Gün aşırı\nçift'), numeric: true),
           if (has7A) const DataColumn(label: Text('7A\ngün'), numeric: true),
           const DataColumn(label: Text('Çalışılan\nsaat'), numeric: true),
@@ -53,6 +56,7 @@ class SummaryTable extends StatelessWidget {
                 ),
                 number(r.shifts),
                 number(r.weekendShifts),
+                if (hasHoliday) number(r.holidayShifts),
                 number(r.everyOtherDayPairs),
                 if (has7A) number(r.dayShifts),
                 number(r.workedHours),
@@ -68,6 +72,7 @@ class SummaryTable extends StatelessWidget {
                 DataCell(Text(a.role.pluralLabel, style: averageStyle)),
                 number(a.shifts, style: averageStyle),
                 number(a.weekendShifts, style: averageStyle),
+                if (hasHoliday) number(a.holidayShifts, style: averageStyle),
                 number(a.everyOtherDayPairs, style: averageStyle),
                 if (has7A) const DataCell(Text('')),
                 number(a.workedHours, style: averageStyle),

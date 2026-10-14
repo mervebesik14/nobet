@@ -42,6 +42,7 @@ void main() {
     expect(ayse.name, 'Ayşe');
     expect(ayse.shifts, 4);
     expect(ayse.weekendShifts, 3); // 3, 10, 29
+    expect(ayse.holidayShifts, 1); // 29 Ekim (tam gün tatil)
     expect(ayse.everyOtherDayPairs, 1); // 1-3
     expect(ayse.workedHours, 96);
     expect(ayse.requiredHours, 145);

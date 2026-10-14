@@ -629,4 +629,58 @@ void main() {
       ]);
     });
   });
+
+  group('resmi tatil nöbeti dengesi', () {
+    test('Mayıs 2026: tatil nöbetleri rol içinde fark ≤ 1', () {
+      final holidayDays = RosterGenerator.holidayDays(2026, 5, holidays);
+      expect(holidayDays, {1, 19, 27, 28, 29, 30});
+      final people = team(7, 4);
+      for (final seed in [1, 2, 3]) {
+        final r = generator(month: 5, seed: seed).generate();
+        expectHardRules(r, people, const {}, settings);
+        final w = workedDays(r);
+        int count(String id) =>
+            (w[id] ?? const <int>{}).where(holidayDays.contains).length;
+        expect(
+          spread([for (var i = 1; i <= 7; i++) count('n$i')]),
+          lessThanOrEqualTo(1),
+          reason: 'hemşire, seed $seed',
+        );
+        expect(
+          spread([for (var i = 1; i <= 4; i++) count('t$i')]),
+          lessThanOrEqualTo(1),
+          reason: 'tekniker, seed $seed',
+        );
+      }
+    });
+
+    test('yıl içinde tatil nöbeti az olanlara öncelik', () {
+      // 29 Ekim tek tam gün tatil. n1–n5 bu yıl 2'şer tatil nöbeti tuttu;
+      // n6 ve n7 hiç tutmadı → 29 Ekim öncelikle onlara düşer (sert
+      // kurallar ve ay içi denge izin verdiği ölçüde).
+      final ytd = {
+        for (var i = 1; i <= 5; i++)
+          'n$i': const PersonTotals(holidayShifts: 2),
+      };
+      var fresh = 0;
+      for (final seed in [1, 2, 3, 4, 5]) {
+        final r = RosterGenerator(
+          year: 2026,
+          month: 10,
+          people: team(7, 4),
+          holidays: holidays,
+          settings: settings,
+          seed: seed,
+          attempts: 150,
+          yearToDate: ytd,
+        ).generate();
+        final nurses = r.assignments[29]!.nurseIds.toSet();
+        final f = nurses.intersection({'n6', 'n7'}).length;
+        expect(f, greaterThanOrEqualTo(1), reason: 'seed $seed: $nurses');
+        fresh += f;
+      }
+      // 10 koltuğun çoğu az tatil tutmuş ikiliye gider.
+      expect(fresh, greaterThan(5));
+    });
+  });
 }
