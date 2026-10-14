@@ -13,104 +13,111 @@ import '../models/holiday.dart';
 /// resmi tatil günlerine nöbet yazılmaz. Örneğin izin Cuma bitiyorsa
 /// Cumartesi–Pazar nöbet yazılmaz; ilk nöbet Pazartesi olur.
 ///
-/// Şua izni için bu kurallar uygulanmaz.
+/// Kurallar tarih üzerinden çalışır, ay sınırını aşar: 2 Kasım Pazartesi
+/// başlayan izin Ekim'in son günlerini, 30 Ekim Cuma biten izin Kasım'ın ilk
+/// günlerini kapatabilir. Şua izni için bu kurallar uygulanmaz.
 ///
 /// İş günü = hafta içi (Pazartesi–Cuma) ve tam gün resmi tatil olmayan gün.
-/// Arife (yarım gün tatil) iş günü sayılır. Kurallar yalnızca planın ayı
-/// içinde uygulanır.
+/// Arife (yarım gün tatil) iş günü sayılır.
 class LeaveRules {
   const LeaveRules._();
 
-  /// İzin öncesi ve sonrası kurallarının birlikte kapattığı günler.
-  /// İzin günlerinin kendisi bu kümeye dahil değildir.
+  /// [annualLeave] yıllık izin tarihlerine (her aydan olabilir) göre,
+  /// [year]/[month] ayında izin öncesi ve sonrası kurallarının kapattığı
+  /// günler. İzin günlerinin kendisi dahil değildir.
+  static Set<int> blockedDaysInMonth({
+    required int year,
+    required int month,
+    required Iterable<DateTime> annualLeave,
+    required Iterable<Holiday> holidays,
+    bool before = true,
+    bool after = true,
+  }) {
+    final leave = {for (final d in annualLeave) _day(d)};
+    if (leave.isEmpty) return const {};
+    final fullHolidays = {
+      for (final h in holidays)
+        if (!h.isHalfDay) _day(h.date),
+    };
+    bool isWorkday(DateTime d) =>
+        d.weekday != DateTime.saturday &&
+        d.weekday != DateTime.sunday &&
+        !fullHolidays.contains(d);
+
+    final blocked = <DateTime>{};
+    for (final day in leave) {
+      // İzin aralığının başlangıcından geriye: son iş günü dahil.
+      if (before && !leave.contains(_shift(day, -1))) {
+        var d = _shift(day, -1);
+        for (var i = 0; i < _maxGap; i++) {
+          blocked.add(d);
+          if (isWorkday(d)) break;
+          d = _shift(d, -1);
+        }
+      }
+      // İzin aralığının bitişinden ileriye: ilk iş günü hariç.
+      if (after && !leave.contains(_shift(day, 1))) {
+        var d = _shift(day, 1);
+        for (var i = 0; i < _maxGap && !isWorkday(d); i++) {
+          blocked.add(d);
+          d = _shift(d, 1);
+        }
+      }
+    }
+    return {
+      for (final d in blocked.difference(leave))
+        if (d.year == year && d.month == month) d.day,
+    };
+  }
+
+  /// Yalnız [year]/[month] ayının izin günleri ([annualLeaveDays], ayın
+  /// günleri) için izin öncesi ve sonrası kurallarının kapattığı günler.
   static Set<int> annualLeaveBlockedDays({
     required int year,
     required int month,
     required Iterable<int> annualLeaveDays,
     required Iterable<Holiday> holidays,
-  }) => {
-    ...preAnnualLeaveBlockedDays(
-      year: year,
-      month: month,
-      annualLeaveDays: annualLeaveDays,
-      holidays: holidays,
-    ),
-    ...postAnnualLeaveBlockedDays(
-      year: year,
-      month: month,
-      annualLeaveDays: annualLeaveDays,
-      holidays: holidays,
-    ),
-  };
+  }) => blockedDaysInMonth(
+    year: year,
+    month: month,
+    annualLeave: [for (final d in annualLeaveDays) DateTime(year, month, d)],
+    holidays: holidays,
+  );
 
-  /// Her izin aralığının başlangıcından geriye doğru, izinden önceki son iş
-  /// gününe kadar (o gün dahil) kalan günler.
+  /// Yalnız izin öncesi kuralı (ayın günleriyle).
   static Set<int> preAnnualLeaveBlockedDays({
     required int year,
     required int month,
     required Iterable<int> annualLeaveDays,
     required Iterable<Holiday> holidays,
-  }) {
-    final leave = annualLeaveDays.toSet();
-    if (leave.isEmpty) return const {};
-    final isWorkday = _workdayTest(year, month, holidays);
+  }) => blockedDaysInMonth(
+    year: year,
+    month: month,
+    annualLeave: [for (final d in annualLeaveDays) DateTime(year, month, d)],
+    holidays: holidays,
+    after: false,
+  );
 
-    final blocked = <int>{};
-    for (final start in leave) {
-      // Yalnızca aralık başlangıçlarından geriye git.
-      if (leave.contains(start - 1)) continue;
-      var day = start - 1;
-      while (day >= 1) {
-        blocked.add(day);
-        if (isWorkday(day)) break;
-        day--;
-      }
-    }
-    return blocked.difference(leave);
-  }
-
-  /// Her izin aralığının bitişinden sonraki ilk iş gününe kadar kalan (iş günü
-  /// olmayan) günler.
+  /// Yalnız izin sonrası kuralı (ayın günleriyle).
   static Set<int> postAnnualLeaveBlockedDays({
     required int year,
     required int month,
     required Iterable<int> annualLeaveDays,
     required Iterable<Holiday> holidays,
-  }) {
-    final leave = annualLeaveDays.toSet();
-    if (leave.isEmpty) return const {};
-    final daysInMonth = DateTime(year, month + 1, 0).day;
-    final isWorkday = _workdayTest(year, month, holidays);
+  }) => blockedDaysInMonth(
+    year: year,
+    month: month,
+    annualLeave: [for (final d in annualLeaveDays) DateTime(year, month, d)],
+    holidays: holidays,
+    before: false,
+  );
 
-    final blocked = <int>{};
-    for (final end in leave) {
-      // Yalnızca aralık bitişlerinden ileri git.
-      if (leave.contains(end + 1)) continue;
-      var day = end + 1;
-      while (day <= daysInMonth && !isWorkday(day)) {
-        blocked.add(day);
-        day++;
-      }
-    }
-    return blocked.difference(leave);
-  }
+  /// Bayram + hafta sonu gibi uzun ardışık tatillerde bile yeter.
+  static const _maxGap = 14;
 
-  static bool Function(int day) _workdayTest(
-    int year,
-    int month,
-    Iterable<Holiday> holidays,
-  ) {
-    final fullHolidays = <int>{
-      for (final h in holidays)
-        if (h.date.year == year && h.date.month == month && !h.isHalfDay)
-          h.date.day,
-    };
-    return (day) {
-      final weekday = DateTime(year, month, day).weekday;
-      if (weekday == DateTime.saturday || weekday == DateTime.sunday) {
-        return false;
-      }
-      return !fullHolidays.contains(day);
-    };
-  }
+  /// Saat dilimi / yaz saati kaymasından etkilenmeyen gün anahtarı.
+  static DateTime _day(DateTime d) => DateTime.utc(d.year, d.month, d.day);
+
+  static DateTime _shift(DateTime d, int days) =>
+      DateTime.utc(d.year, d.month, d.day + days);
 }

@@ -3,7 +3,9 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/month_plan_repository.dart';
 import '../../data/providers.dart';
+import '../../data/turkish_holidays.dart';
 import '../../logic/feasibility_checker.dart';
 import '../../logic/leave_rules.dart';
 import '../../logic/roster_generator.dart';
@@ -221,6 +223,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       unavailableDays: computeEffectiveBlockedDays(
         plan,
         ref.read(holidaysProvider),
+        repository: ref.read(monthPlanRepositoryProvider),
       ),
       holidays: ref.read(holidaysProvider),
       settings: effectiveSettings(base, nurseOnly: onlyNurses),
@@ -325,22 +328,44 @@ final monthPlanProvider = NotifierProvider<MonthPlanController, MonthPlan>(
 
 /// Nöbet dağıtımında kişi başı gerçekten engellenen günler: istenmeyen
 /// günler + tüm izinler + yıllık izin öncesi son iş günü ve sonrası ilk iş
-/// gününe kadar kalan günler (bkz. [LeaveRules]).
+/// gününe kadar kalan günler (bkz. [LeaveRules]). Ay sınırında önceki ve
+/// sonraki ayın yıllık izinleri de [repository] üzerinden hesaba katılır.
 Map<String, List<int>> computeEffectiveBlockedDays(
   MonthPlan plan,
-  Iterable<Holiday> holidays,
-) {
+  Iterable<Holiday> holidays, {
+  MonthPlanRepository? repository,
+}) {
+  final prevMonth = DateTime(plan.year, plan.month - 1);
+  final nextMonth = DateTime(plan.year, plan.month + 1);
+  final neighbours = [
+    ?repository?.get(prevMonth.year, prevMonth.month),
+    ?repository?.get(nextMonth.year, nextMonth.month),
+  ];
+  final plans = [plan, ...neighbours];
+
+  // Komşu ay başka yıldaysa ve o yılın tatilleri henüz yüklenmediyse
+  // hazır Türkiye tatilleri kullanılır.
+  final allHolidays = [...holidays];
+  for (final year in {prevMonth.year, nextMonth.year}) {
+    if (!allHolidays.any((h) => h.date.year == year)) {
+      allHolidays.addAll(TurkishHolidays.forYear(year));
+    }
+  }
+
   final base = plan.blockedDays;
-  final ids = {...base.keys, ...plan.annualLeave.keys};
+  final ids = {...base.keys, for (final p in plans) ...p.annualLeave.keys};
   final result = <String, List<int>>{};
   for (final id in ids) {
     final days = {...?base[id]};
     days.addAll(
-      LeaveRules.annualLeaveBlockedDays(
+      LeaveRules.blockedDaysInMonth(
         year: plan.year,
         month: plan.month,
-        annualLeaveDays: plan.annualLeaveOf(id),
-        holidays: holidays,
+        annualLeave: [
+          for (final p in plans)
+            for (final d in p.annualLeaveOf(id)) DateTime(p.year, p.month, d),
+        ],
+        holidays: allHolidays,
       ),
     );
     if (days.isNotEmpty) result[id] = days.toList()..sort();
@@ -352,7 +377,11 @@ Map<String, List<int>> computeEffectiveBlockedDays(
 final effectiveBlockedDaysProvider = Provider<Map<String, List<int>>>((ref) {
   final plan = ref.watch(monthPlanProvider);
   final holidays = ref.watch(holidaysProvider);
-  return computeEffectiveBlockedDays(plan, holidays);
+  return computeEffectiveBlockedDays(
+    plan,
+    holidays,
+    repository: ref.read(monthPlanRepositoryProvider),
+  );
 });
 
 /// Seçili ay için liste oluşturmadan önceki uygunluk kontrolü.

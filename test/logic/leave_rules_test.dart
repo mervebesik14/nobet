@@ -98,4 +98,43 @@ void main() {
     // Önce 9–11, sonra 17–18 (16 Cum biter, ilk nöbet 19 Pzt).
     expect(all, {9, 10, 11, 17, 18});
   });
+
+  group('ay ve yıl sınırı', () {
+    final allHolidays = [...holidays, ...TurkishHolidays.forYear(2027)];
+    Set<int> inMonth(int year, int month, List<DateTime> leave) =>
+        LeaveRules.blockedDaysInMonth(
+          year: year,
+          month: month,
+          annualLeave: leave,
+          holidays: allHolidays,
+        );
+    List<DateTime> range(DateTime from, int days) => [
+      for (var i = 0; i < days; i++)
+        DateTime(from.year, from.month, from.day + i),
+    ];
+
+    test('2 Kasım Pazartesi başlayan izin Ekim sonunu kapatır', () {
+      final leave = range(DateTime(2026, 11, 2), 5); // 2–6 Kasım
+      // Ekim: 30 Cum, 31 Cmt kapalı; son nöbet 29 Ekim.
+      expect(inMonth(2026, 10, leave), {30, 31});
+      // Kasım: öncesinden 1 Paz, sonrasından 7 Cmt, 8 Paz kapalı.
+      expect(inMonth(2026, 11, leave), {1, 7, 8});
+    });
+
+    test('30 Ekim Cuma biten izin Kasım başını kapatır', () {
+      final leave = range(DateTime(2026, 10, 26), 5); // 26–30 Ekim
+      // Ekim: öncesinden 23 Cum, 24 Cmt, 25 Paz; sonrasından 31 Cmt.
+      expect(inMonth(2026, 10, leave), {23, 24, 25, 31});
+      // Kasım: 1 Paz kapalı; ilk nöbet 2 Kasım Pazartesi.
+      expect(inMonth(2026, 11, leave), {1});
+    });
+
+    test('yıl sınırı: 4 Ocak 2027 izni Yılbaşı tatilini atlayıp 31 Aralığı '
+        'kapatır', () {
+      final leave = range(DateTime(2027, 1, 4), 5);
+      // 3 Paz, 2 Cmt, 1 Ocak Cum (Yılbaşı) kapalı; 31 Aralık Per son iş günü.
+      expect(inMonth(2026, 12, leave), {31});
+      expect(inMonth(2027, 1, leave), {1, 2, 3, 9, 10});
+    });
+  });
 }
