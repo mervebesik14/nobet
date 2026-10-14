@@ -3,6 +3,7 @@ import '../models/month_plan.dart';
 import '../models/person.dart';
 import '../models/role.dart';
 import '../models/roster_settings.dart';
+import 'day_shift_planner.dart';
 import 'person_totals.dart';
 import 'roster_summary.dart';
 import 'turkish_collation.dart';
@@ -59,9 +60,28 @@ class YearlySummary {
             .toList()
           ..sort((a, b) => a.month.compareTo(b.month));
 
+    final byKey = {for (final p in plans) p.key: p};
     final totals = <String, PersonTotals>{};
     final info = <String, (String, Role)>{};
     for (final plan in selected) {
+      final monthHolidays = holidays.where(
+        (h) => h.date.year == plan.year && h.date.month == plan.month,
+      );
+      final prev = DateTime(plan.year, plan.month - 1);
+      final previous = byKey[MonthPlan.keyFor(prev.year, prev.month)];
+      final dayShifts = DayShiftPlanner.plan(
+        year: plan.year,
+        month: plan.month,
+        assignments: plan.assignments,
+        people: people,
+        holidays: monthHolidays,
+        settings: settings,
+        leaveDays: plan.leaveDays,
+        unavailableDays: plan.unavailableDays,
+        previousMonthLastDay: {
+          ...?previous?.assignments[previous.daysInMonth]?.personIds,
+        },
+      );
       final summary = RosterSummary.build(
         year: plan.year,
         month: plan.month,
@@ -72,6 +92,7 @@ class YearlySummary {
         ),
         settings: settings,
         leaveDays: plan.leaveDays,
+        dayShifts: dayShifts,
       );
       for (final r in summary.people) {
         info[r.personId] = (r.name, r.role);

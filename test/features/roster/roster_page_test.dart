@@ -311,6 +311,38 @@ void main() {
     }
   });
 
+  testWidgets('sorumlu hemşire: mesai günlerinde tabloda 7A görünür', (
+    tester,
+  ) async {
+    await boxes.people.put(
+      'c',
+      const Person(
+        id: 'c',
+        name: 'Sorumlu Hemşire',
+        role: Role.nurse,
+        isChargeNurse: true,
+      ),
+    );
+    await pumpMonthPage(tester);
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
+
+    // Yeterli hemşire var: sorumlu hemşire nöbet almaz.
+    final plan = saved();
+    expect(plan.assignments.values.any((a) => a.includes('c')), isFalse);
+
+    // Ekim 2026'da 21 mesai günü (29 Ekim tatil hariç, 28 arife dahil):
+    // her birinde tabloda bir "7A"; nöbeti olmadığı için hepsi sorumluda.
+    Finder inTable(String t) =>
+        find.descendant(of: find.byType(RosterTable), matching: find.text(t));
+    expect(inTable('7A'), findsNWidgets(21));
+    // Özette görevi ve 7A sütunu.
+    expect(find.text('Sorumlu hemşire'), findsOneWidget);
+    expect(find.text('7A\ngün'), findsOneWidget);
+  });
+
   testWidgets('Listeyi sıfırla: onaylayınca liste silinir, tercihler kalır', (
     tester,
   ) async {

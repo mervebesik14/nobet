@@ -148,7 +148,11 @@ class _PersonTile extends ConsumerWidget {
         child: Text(initial),
       ),
       title: Text(person.name),
-      subtitle: person.isActive ? null : Text('${person.role.label} · pasif'),
+      subtitle: !person.isActive
+          ? Text('${person.role.label} · pasif')
+          : person.isChargeNurse
+          ? const Text('Sorumlu hemşire · 7A')
+          : null,
       onTap: onTap,
     );
 

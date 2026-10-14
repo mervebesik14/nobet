@@ -19,10 +19,19 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
   late final TextEditingController _name;
   late Role _role;
   late bool _isActive;
+  late bool _isChargeNurse;
   late final bool _roleLocked;
   bool _saving = false;
 
   bool get _isEditing => widget.person != null;
+
+  /// Bu kişi dışında işaretli sorumlu hemşire.
+  Person? get _otherChargeNurse {
+    for (final p in ref.read(peopleProvider)) {
+      if (p.isChargeNurse && p.id != widget.person?.id) return p;
+    }
+    return null;
+  }
 
   @override
   void initState() {
@@ -31,6 +40,7 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
     _name = TextEditingController(text: person?.name ?? '');
     _role = person?.role ?? Role.nurse;
     _isActive = person?.isActive ?? true;
+    _isChargeNurse = person?.isChargeNurse ?? false;
     // Geçmiş listelerde geçen kişinin görevi değişirse o listeler bozulur.
     _roleLocked =
         person != null &&
@@ -59,11 +69,22 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
     setState(() => _saving = true);
     final controller = ref.read(peopleProvider.notifier);
     final person = widget.person;
+    final chargeNurse = _role == Role.nurse && _isChargeNurse;
     if (person == null) {
-      await controller.add(name: _name.text, role: _role, isActive: _isActive);
+      await controller.add(
+        name: _name.text,
+        role: _role,
+        isActive: _isActive,
+        isChargeNurse: chargeNurse,
+      );
     } else {
       await controller.update(
-        person.copyWith(name: _name.text, role: _role, isActive: _isActive),
+        person.copyWith(
+          name: _name.text,
+          role: _role,
+          isActive: _isActive,
+          isChargeNurse: chargeNurse,
+        ),
       );
     }
     if (mounted) Navigator.of(context).pop();
@@ -112,6 +133,19 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
                 ),
               ),
             const SizedBox(height: 16),
+            if (_role == Role.nurse)
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                secondary: const Icon(Icons.badge_outlined),
+                title: const Text('Sorumlu hemşire'),
+                subtitle: Text(
+                  'Nöbet tutmadığı mesai günlerinde 7A çalışır; nöbete '
+                  'yalnızca gerektiğinde yazılır.'
+                  '${_otherChargeNurse == null ? '' : ' Şu an sorumlu hemşire: ${_otherChargeNurse!.name}; bu kişi seçilirse onunki kalkar.'}',
+                ),
+                value: _isChargeNurse,
+                onChanged: (value) => setState(() => _isChargeNurse = value),
+              ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Aktif'),

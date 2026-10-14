@@ -242,11 +242,15 @@ class RosterValidator {
         final perDay = role == Role.nurse
             ? settings.nursesPerDay
             : settings.techsPerDay;
-        final members = byId.values.where((p) => p.isActive && p.role == role);
+        // Sorumlu hemşire nöbet dengesine girmez.
+        final members = byId.values.where(
+          (p) => p.isActive && p.role == role && !p.isChargeNurse,
+        );
         if (members.isEmpty || perDay == 0) continue;
         final baseCap = (daysInMonth * perDay / members.length).ceil() + extra;
         for (final id in ids) {
           if (seatRole[id] != role) continue;
+          if (byId[id]?.isChargeNurse ?? false) continue;
           // Fazla mesai isteyene ek pay tanınır.
           final cap =
               baseCap + (overtimeRequests.contains(id) ? overtimeAllowance : 0);

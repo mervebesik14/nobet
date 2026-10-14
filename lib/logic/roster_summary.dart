@@ -1,4 +1,5 @@
 import '../models/day_assignment.dart';
+import 'day_shift_planner.dart';
 import '../models/holiday.dart';
 import '../models/person.dart';
 import '../models/role.dart';
@@ -19,6 +20,8 @@ class PersonSummary {
     required this.workedHours,
     required this.requiredHours,
     this.secondaryShifts = 0,
+    this.dayShifts = 0,
+    this.isChargeNurse = false,
   });
 
   final String personId;
@@ -27,8 +30,16 @@ class PersonSummary {
   final int shifts;
   final int weekendShifts;
   final int everyOtherDayPairs;
-  final int workedHours;
+
+  /// 24/16B nöbet saatleri + 7A saatleri.
+  final double workedHours;
   final double requiredHours;
+
+  /// 7A (gündüz mesaisi) gün sayısı.
+  final int dayShifts;
+
+  /// Sorumlu hemşire: rol ortalamasına girmez.
+  final bool isChargeNurse;
 
   /// Bunların kaçı 16B (hafif) vardiyası; teknikerler için anlamlıdır.
   final int secondaryShifts;
@@ -100,6 +111,7 @@ class RosterSummary {
     required RosterSettings settings,
     Set<Role>? onlyRoles,
     Map<String, List<int>> leaveDays = const {},
+    Map<int, DayShift> dayShifts = const {},
   }) {
     final calc = WorkHoursCalculator(settings);
     final required = calc.requiredHours(year, month, holidays);
@@ -128,6 +140,14 @@ class RosterSummary {
         assignedRole[id] = Role.radiologyTech;
         (secondary[id] ??= {}).add(a.day);
       }
+    }
+
+    // Kişi → 7A gün sayısı ve saati.
+    final dayCount = <String, int>{};
+    final dayHours = <String, double>{};
+    for (final s in dayShifts.values) {
+      dayCount[s.personId] = (dayCount[s.personId] ?? 0) + 1;
+      dayHours[s.personId] = (dayHours[s.personId] ?? 0) + s.hours;
     }
 
     final byId = {for (final p in people) p.id: p};
@@ -163,10 +183,14 @@ class RosterSummary {
           weekendShifts: days.where(weekend.contains).length,
           everyOtherDayPairs: RosterGenerator.everyOtherDayPairs(days),
           // 24 vardiyaları tam saat, 16B vardiyaları kısa saat sayılır.
+          // 7A günleri o günün mesai saati kadar eklenir.
           workedHours:
               calc.workedHours(full) +
-              light.length * settings.secondaryTechShiftHours,
+              light.length * settings.secondaryTechShiftHours +
+              (dayHours[id] ?? 0),
           requiredHours: personRequired,
+          dayShifts: dayCount[id] ?? 0,
+          isChargeNurse: person?.isChargeNurse ?? false,
         ),
       );
     }
@@ -180,7 +204,10 @@ class RosterSummary {
 
     final averages = <Role, RoleAverage>{};
     for (final role in Role.values) {
-      final group = rows.where((r) => r.role == role).toList();
+      // Sorumlu hemşire nöbet dengesine girmediği için ortalamaya da girmez.
+      final group = rows
+          .where((r) => r.role == role && !r.isChargeNurse)
+          .toList();
       if (group.isEmpty) continue;
       averages[role] = RoleAverage(
         role: role,

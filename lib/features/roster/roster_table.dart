@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../../logic/day_shift_planner.dart';
 import '../../models/models.dart';
 import '../../shared/app_colors.dart';
 
@@ -24,6 +25,7 @@ class RosterTable extends StatelessWidget {
     required this.holidayDays,
     required this.shiftHours,
     this.missingByDay = const {},
+    this.dayShifts = const {},
     this.violationCells = const {},
     this.selectedCell,
     this.onCellTap,
@@ -41,6 +43,9 @@ class RosterTable extends StatelessWidget {
 
   /// Gün → boş kalan koltuk sayısı; doluysa en altta "Eksik" satırı çıkar.
   final Map<int, int> missingByDay;
+
+  /// Gün → 7A (gündüz mesaisi) çalışanı; o kişinin hücresinde "7A" yazar.
+  final Map<int, DayShift> dayShifts;
 
   /// Kural ihlali olan hücreler.
   final Set<RosterCell> violationCells;
@@ -178,7 +183,12 @@ class RosterTable extends StatelessWidget {
                       : radiationLeave.contains(d)
                       ? LeaveType.radiation
                       : null,
-                  label: _labelFor(row.id, d, personDays.contains(d)),
+                  label:
+                      _labelFor(row.id, d, personDays.contains(d)) ??
+                      (dayShifts[d]?.personId == row.id ? '7A' : null),
+                  isDayShift:
+                      !personDays.contains(d) &&
+                      dayShifts[d]?.personId == row.id,
                   columnColor: columnColor(d),
                 ),
               ),
@@ -319,6 +329,7 @@ class RosterTable extends StatelessWidget {
     required String? label,
     required Color? columnColor,
     required LeaveType? leave,
+    bool isDayShift = false,
   }) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -340,11 +351,15 @@ class RosterTable extends StatelessWidget {
         ? scheme.primary
         : violated
         ? scheme.dangerTint
+        : isDayShift
+        ? scheme.dayShiftTint
         : leaveTint ?? columnColor;
     final textColor = selected
         ? scheme.onPrimary
         : violated
         ? scheme.error
+        : isDayShift
+        ? scheme.dayShiftColor
         : leaveInk ?? scheme.primary;
     return box(
       width: _cellWidth,

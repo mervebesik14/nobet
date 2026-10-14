@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/month_plan_repository.dart';
 import '../../data/providers.dart';
 import '../../data/turkish_holidays.dart';
+import '../../logic/day_shift_planner.dart';
 import '../../logic/feasibility_checker.dart';
 import '../../logic/leave_rules.dart';
 import '../../logic/roster_generator.dart';
@@ -372,6 +373,25 @@ Map<String, List<int>> computeEffectiveBlockedDays(
   }
   return result;
 }
+
+/// Seçili ayın 7A (gündüz mesaisi) planı: sorumlu hemşire ya da yerine
+/// çalışan hemşire. Liste yoksa boş.
+final dayShiftsProvider = Provider<Map<int, DayShift>>((ref) {
+  final plan = ref.watch(monthPlanProvider);
+  if (!plan.hasRoster) return const {};
+  final tail = ref.read(monthPlanProvider.notifier).previousMonthTail();
+  return DayShiftPlanner.plan(
+    year: plan.year,
+    month: plan.month,
+    assignments: plan.assignments,
+    people: ref.watch(peopleProvider),
+    holidays: ref.watch(holidaysProvider),
+    settings: ref.watch(effectiveSettingsProvider),
+    leaveDays: plan.leaveDays,
+    unavailableDays: plan.unavailableDays,
+    previousMonthLastDay: tail.isEmpty ? const {} : tail.last,
+  );
+});
 
 /// Seçili ayın etkin bloklu günleri. Üretim, uygunluk ve doğrulama kullanır.
 final effectiveBlockedDaysProvider = Provider<Map<String, List<int>>>((ref) {

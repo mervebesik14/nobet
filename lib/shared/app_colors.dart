@@ -38,4 +38,10 @@ extension AppTints on ColorScheme {
 
   /// Şua izni lejantı/zemini: mor tonun hafif hali.
   Color get radiationTint => _tint(radiationColor, 0.16);
+
+  /// 7A (gündüz mesaisi) yazısı: sıcak, nöbetten ayrışan ton.
+  Color get dayShiftColor => const Color(0xFFB26A00);
+
+  /// 7A hücresi zemini.
+  Color get dayShiftTint => _tint(dayShiftColor, 0.14);
 }

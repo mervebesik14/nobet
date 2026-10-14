@@ -59,13 +59,14 @@ class PersonAdapter extends TypeAdapter<Person> {
       role: fields[2] as Role,
       isActive: fields[3] == null ? true : fields[3] as bool,
       colorValue: (fields[4] as num?)?.toInt(),
+      isChargeNurse: fields[5] == null ? false : fields[5] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, Person obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(6)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -75,7 +76,9 @@ class PersonAdapter extends TypeAdapter<Person> {
       ..writeByte(3)
       ..write(obj.isActive)
       ..writeByte(4)
-      ..write(obj.colorValue);
+      ..write(obj.colorValue)
+      ..writeByte(5)
+      ..write(obj.isChargeNurse);
   }
 
   @override

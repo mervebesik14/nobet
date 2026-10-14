@@ -108,6 +108,39 @@ void main() {
     expect(saved.role, Role.radiologyTech);
   });
 
+  testWidgets('sorumlu hemşire işaretlenir; tek kişi olur', (tester) async {
+    await seed(const [
+      Person(id: '1', name: 'Ayşe', role: Role.nurse, isChargeNurse: true),
+    ]);
+    await pumpPage(tester);
+    expect(find.text('Sorumlu hemşire · 7A'), findsOneWidget);
+
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField), 'Banu');
+    // Önceki sorumlu hemşire uyarıda adıyla görünür.
+    expect(find.textContaining('Şu an sorumlu hemşire: Ayşe'), findsOneWidget);
+    await tester.tap(find.text('Sorumlu hemşire'));
+    await tester.tap(find.text('Kaydet'));
+    await tester.pumpAndSettle();
+
+    final banu = boxes.people.values.firstWhere((p) => p.name == 'Banu');
+    expect(banu.isChargeNurse, isTrue);
+    // Yenisi işaretlenince öncekinin işareti kalkar.
+    expect(boxes.people.get('1')!.isChargeNurse, isFalse);
+    expect(find.text('Sorumlu hemşire · 7A'), findsOneWidget);
+  });
+
+  testWidgets('teknikerde sorumlu hemşire seçeneği yok', (tester) async {
+    await pumpPage(tester);
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pumpAndSettle();
+    expect(find.text('Sorumlu hemşire'), findsOneWidget);
+    await tester.tap(find.text('Radyoloji Teknikeri'));
+    await tester.pumpAndSettle();
+    expect(find.text('Sorumlu hemşire'), findsNothing);
+  });
+
   testWidgets('aynı adla ikinci kişi eklenemez', (tester) async {
     await seed(const [Person(id: '1', name: 'Ayşe', role: Role.nurse)]);
     await pumpPage(tester);
@@ -133,7 +166,7 @@ void main() {
     expect(find.text('Kişiyi Düzenle'), findsOneWidget);
 
     await tester.enterText(find.byType(TextFormField), 'Ayşe Kaya');
-    await tester.tap(find.byType(Switch));
+    await tester.tap(find.text('Aktif'));
     await tester.tap(find.text('Kaydet'));
     await tester.pumpAndSettle();
 

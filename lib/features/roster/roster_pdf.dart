@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../logic/day_shift_planner.dart';
 import '../../logic/roster_summary.dart';
 import '../../models/models.dart';
 import 'roster_table.dart';
@@ -24,6 +25,7 @@ Future<Uint8List> buildRosterPdf({
   required pw.Font font,
   required pw.Font boldFont,
   Map<int, int> missingByDay = const {},
+  Map<int, DayShift> dayShifts = const {},
   bool singlePage = false,
 }) async {
   final title =
@@ -40,6 +42,7 @@ Future<Uint8List> buildRosterPdf({
       holidayDays: holidayDays,
       shiftHours: shiftHours,
       missingByDay: missingByDay,
+      dayShifts: dayShifts,
       boldFont: boldFont,
     ),
     pw.SizedBox(height: 4),
@@ -52,6 +55,10 @@ Future<Uint8List> buildRosterPdf({
         _legend(_leaveColor, 'Y.İ. = Yıllık izin'),
         pw.SizedBox(width: 12),
         _legend(_radiationColor, 'Ş.İ. = Şua izni'),
+        if (dayShifts.isNotEmpty) ...[
+          pw.SizedBox(width: 12),
+          _legend(_dayShiftColor, '7A = Gündüz mesaisi'),
+        ],
       ],
     ),
     pw.SizedBox(height: 14),
@@ -101,6 +108,7 @@ const _groupColor = PdfColor.fromInt(0xFFB9E9E1);
 const _missingColor = PdfColor.fromInt(0xFFF9D6D2);
 const _leaveColor = PdfColor.fromInt(0xFFCADEE2);
 const _radiationColor = PdfColor.fromInt(0xFFDDD2EE);
+const _dayShiftColor = PdfColor.fromInt(0xFFF5E3C8);
 
 pw.Widget _legend(PdfColor color, String label) => pw.Row(
   children: [
@@ -117,6 +125,7 @@ pw.Widget _rosterTable({
   required Set<int> holidayDays,
   required int shiftHours,
   required Map<int, int> missingByDay,
+  required Map<int, DayShift> dayShifts,
   required pw.Font boldFont,
 }) {
   final days = [for (var d = 1; d <= plan.daysInMonth; d++) d];
@@ -200,6 +209,8 @@ pw.Widget _rosterTable({
                 color: columnColor(d),
                 bold: true,
               )
+            else if (dayShifts[d]?.personId == row.id)
+              cell('7A', color: _dayShiftColor, bold: true)
             else if (annualLeave.contains(d))
               cell('Y.İ.', color: _leaveColor, bold: true)
             else if (radiationLeave.contains(d))
@@ -239,6 +250,7 @@ pw.Widget _rosterTable({
 pw.Widget _summaryTable(RosterSummary summary, pw.Font boldFont) {
   final number = NumberFormat('#,##0.#', 'tr_TR');
   String n(num v) => number.format(v);
+  final has7A = summary.people.any((r) => r.dayShifts > 0);
   return pw.TableHelper.fromTextArray(
     border: pw.TableBorder.all(color: PdfColors.grey500, width: 0.4),
     headerStyle: pw.TextStyle(font: boldFont, fontSize: 8),
@@ -246,12 +258,13 @@ pw.Widget _summaryTable(RosterSummary summary, pw.Font boldFont) {
     headerDecoration: const pw.BoxDecoration(color: PdfColors.grey200),
     cellAlignment: pw.Alignment.centerRight,
     cellAlignments: {0: pw.Alignment.centerLeft, 1: pw.Alignment.centerLeft},
-    headers: const [
+    headers: [
       'Ad',
       'Görev',
       'Toplam nöbet',
       'Hafta sonu nöbet',
       'Gün aşırı çift',
+      if (has7A) '7A gün',
       'Çalışılan saat',
       'Gereken saat',
       'Fazla mesai',
@@ -260,10 +273,11 @@ pw.Widget _summaryTable(RosterSummary summary, pw.Font boldFont) {
       for (final r in summary.people)
         [
           r.name,
-          r.role.label,
+          r.isChargeNurse ? 'Sorumlu hemşire' : r.role.label,
           n(r.shifts),
           n(r.weekendShifts),
           n(r.everyOtherDayPairs),
+          if (has7A) n(r.dayShifts),
           n(r.workedHours),
           n(r.requiredHours),
           n(r.overtimeHours),
@@ -275,6 +289,7 @@ pw.Widget _summaryTable(RosterSummary summary, pw.Font boldFont) {
           n(a.shifts),
           n(a.weekendShifts),
           n(a.everyOtherDayPairs),
+          if (has7A) '',
           n(a.workedHours),
           n(summary.requiredHours),
           n(a.overtimeHours),

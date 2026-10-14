@@ -25,30 +25,36 @@ class SummaryTable extends StatelessWidget {
     DataCell number(num value, {TextStyle? style}) =>
         DataCell(Text(fmt(value), style: style));
 
+    final has7A = summary.people.any((r) => r.dayShifts > 0);
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: DataTable(
         columnSpacing: 20,
         headingRowHeight: 56,
-        columns: const [
-          DataColumn(label: Text('Ad')),
-          DataColumn(label: Text('Görev')),
-          DataColumn(label: Text('Toplam\nnöbet'), numeric: true),
-          DataColumn(label: Text('Hafta sonu\nnöbet'), numeric: true),
-          DataColumn(label: Text('Gün aşırı\nçift'), numeric: true),
-          DataColumn(label: Text('Çalışılan\nsaat'), numeric: true),
-          DataColumn(label: Text('Gereken\nsaat'), numeric: true),
-          DataColumn(label: Text('Fazla\nmesai'), numeric: true),
+        columns: [
+          const DataColumn(label: Text('Ad')),
+          const DataColumn(label: Text('Görev')),
+          const DataColumn(label: Text('Toplam\nnöbet'), numeric: true),
+          const DataColumn(label: Text('Hafta sonu\nnöbet'), numeric: true),
+          const DataColumn(label: Text('Gün aşırı\nçift'), numeric: true),
+          if (has7A) const DataColumn(label: Text('7A\ngün'), numeric: true),
+          const DataColumn(label: Text('Çalışılan\nsaat'), numeric: true),
+          const DataColumn(label: Text('Gereken\nsaat'), numeric: true),
+          const DataColumn(label: Text('Fazla\nmesai'), numeric: true),
         ],
         rows: [
           for (final r in summary.people)
             DataRow(
               cells: [
                 DataCell(Text(r.name)),
-                DataCell(Text(r.role.label)),
+                DataCell(
+                  Text(r.isChargeNurse ? 'Sorumlu hemşire' : r.role.label),
+                ),
                 number(r.shifts),
                 number(r.weekendShifts),
                 number(r.everyOtherDayPairs),
+                if (has7A) number(r.dayShifts),
                 number(r.workedHours),
                 number(r.requiredHours),
                 number(r.overtimeHours),
@@ -63,6 +69,7 @@ class SummaryTable extends StatelessWidget {
                 number(a.shifts, style: averageStyle),
                 number(a.weekendShifts, style: averageStyle),
                 number(a.everyOtherDayPairs, style: averageStyle),
+                if (has7A) const DataCell(Text('')),
                 number(a.workedHours, style: averageStyle),
                 number(summary.requiredHours, style: averageStyle),
                 number(a.overtimeHours, style: averageStyle),

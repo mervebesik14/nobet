@@ -189,6 +189,10 @@ class RosterGenerator {
       tail: _tailFor(nurseMembers),
       yearToDate: yearToDate,
       allowance: _allowanceFor(nurseMembers),
+      reserve: {
+        for (final p in nurseMembers)
+          if (p.isChargeNurse) p.id,
+      },
       settings: settings,
     ).solve(rng, attempts, _polishCount);
 
@@ -304,21 +308,57 @@ class _RoleSolver {
     required this.tail,
     required Map<String, PersonTotals> yearToDate,
     this.allowance = const {},
+    this.reserve = const {},
     required RosterSettings settings,
-  }) : ytdShifts = _relative(members, yearToDate, (t) => t.shifts),
-       ytdWeekend = _relative(members, yearToDate, (t) => t.weekendShifts),
-       ytdPairs = _relative(members, yearToDate, (t) => t.everyOtherDayPairs),
+  }) : ytdShifts = _relative(
+         _fair(members, reserve),
+         yearToDate,
+         (t) => t.shifts,
+       ),
+       ytdWeekend = _relative(
+         _fair(members, reserve),
+         yearToDate,
+         (t) => t.weekendShifts,
+       ),
+       ytdPairs = _relative(
+         _fair(members, reserve),
+         yearToDate,
+         (t) => t.everyOtherDayPairs,
+       ),
        forbidConsecutive = settings.forbidConsecutiveDays,
        maxChain = max(1, settings.maxEveryOtherDayChain),
        ids = [for (final p in members) p.id],
-       cap = settings.maxExtraOverAverage == null || members.isEmpty
+       fairIds = [
+         for (final p in members)
+           if (!reserve.contains(p.id)) p.id,
+       ],
+       cap =
+           settings.maxExtraOverAverage == null ||
+               _fair(members, reserve).isEmpty
            ? null
-           : (days * perDay / members.length).ceil() +
+           : (days * perDay / _fair(members, reserve).length).ceil() +
                  settings.maxExtraOverAverage!;
+
+  static List<Person> _fair(List<Person> members, Set<String> reserve) => [
+    for (final p in members)
+      if (!reserve.contains(p.id)) p,
+  ];
 
   final Role role;
   final List<Person> members;
   final List<String> ids;
+
+  /// Dengeye giren kişiler ([reserve] dışındakiler).
+  final List<String> fairIds;
+
+  /// Yedek kişiler (sorumlu hemşire): nöbet dengesine girmez, yalnızca
+  /// başka uygun kişi yoksa nöbete yazılır.
+  final Set<String> reserve;
+
+  /// Yedek kişinin her nöbetinin cezası: boş koltuktan ucuz, dengeyi
+  /// bozan her hamleden pahalı.
+  static const _reservePenalty = 200.0;
+
   final int perDay;
   final int days;
   final Map<String, Set<int>> available;
@@ -417,7 +457,9 @@ class _RoleSolver {
       return _Block.consecutive;
     }
     if (_breaksChain(id, d)) return _Block.chain;
-    if (cap != null && _worked[id]!.length >= cap! + _allow(id)) {
+    if (cap != null &&
+        !reserve.contains(id) &&
+        _worked[id]!.length >= cap! + _allow(id)) {
       return _Block.cap;
     }
     return null;
@@ -444,7 +486,15 @@ class _RoleSolver {
   /// Rol puanı: grup içi sapmaların kareleri + toplam çift cezası + boş
   /// koltuk cezası.
   double _score() {
-    if (ids.isEmpty) return _emptySlots() * RosterGenerator.emptySlotPenalty;
+    var reserveShifts = 0;
+    for (final id in reserve) {
+      reserveShifts += _worked[id]?.length ?? 0;
+    }
+    final reserveCost = reserveShifts * _reservePenalty;
+    final ids = fairIds;
+    if (ids.isEmpty) {
+      return _emptySlots() * RosterGenerator.emptySlotPenalty + reserveCost;
+    }
     final n = ids.length;
     // Fazla mesai isteyenin payı sayısından düşülür: böylece birkaç fazla
     // nöbet dengesizlik sayılmaz ve o kişi fazlayı üstlenir.
@@ -471,7 +521,8 @@ class _RoleSolver {
         yearly(weekends, ytdWeekend) +
         yearly(pairs, ytdPairs) +
         0.75 * totalPairs +
-        _emptySlots() * RosterGenerator.emptySlotPenalty;
+        _emptySlots() * RosterGenerator.emptySlotPenalty +
+        reserveCost;
   }
 
   int _emptySlots() {
@@ -544,7 +595,9 @@ class _RoleSolver {
 
   /// Açgözlü adımda [id] kişisini [d] gününe atamanın ceza puanı.
   double _cost(String id, int d) {
-    final n = ids.length;
+    // Yedek kişi yalnızca başka aday kalmazsa seçilsin.
+    if (reserve.contains(id)) return 1e6 + _worked[id]!.length;
+    final n = fairIds.length;
     // Fazla mesai payı sayıdan düşülünce o kişi fazla nöbet için öne geçer.
     var cost = (_worked[id]!.length - _allow(id) + 1 - _totalSlots / n) * 10;
     cost += ytdShifts[id]! * _ytdGreedyWeight;
@@ -555,7 +608,7 @@ class _RoleSolver {
     final newPairs =
         (d - 2 >= 1 && _works(id, d - 2) ? 1 : 0) + (_works(id, d + 2) ? 1 : 0);
     if (newPairs > 0) {
-      final meanPairs = ids.map(_pairs).fold(0, (a, b) => a + b) / n;
+      final meanPairs = fairIds.map(_pairs).fold(0, (a, b) => a + b) / n;
       cost += newPairs * ((_pairs(id) + 1 - meanPairs) * 10 + 3);
       cost += newPairs * ytdPairs[id]! * _ytdGreedyWeight;
     }

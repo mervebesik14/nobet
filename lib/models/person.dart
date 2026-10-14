@@ -8,6 +8,7 @@ class Person {
     required this.role,
     this.isActive = true,
     this.colorValue,
+    this.isChargeNurse = false,
   });
 
   final String id;
@@ -20,12 +21,18 @@ class Person {
   /// Listede ayırt etmek için renk (ARGB). Boşsa varsayılan renk kullanılır.
   final int? colorValue;
 
+  /// Sorumlu hemşire: nöbet tutmadığı mesai günlerinde 7A (gündüz) çalışır;
+  /// nöbet sayısı grup ortalamasına eşitlenmez, nöbete gerektiğinde yazılır.
+  /// Yalnızca hemşireler için anlamlıdır.
+  final bool isChargeNurse;
+
   Person copyWith({
     String? name,
     Role? role,
     bool? isActive,
     int? colorValue,
     bool clearColor = false,
+    bool? isChargeNurse,
   }) {
     return Person(
       id: id,
@@ -33,6 +40,7 @@ class Person {
       role: role ?? this.role,
       isActive: isActive ?? this.isActive,
       colorValue: clearColor ? null : (colorValue ?? this.colorValue),
+      isChargeNurse: isChargeNurse ?? this.isChargeNurse,
     );
   }
 
@@ -42,6 +50,7 @@ class Person {
     'role': role.name,
     'isActive': isActive,
     'colorValue': colorValue,
+    'isChargeNurse': isChargeNurse,
   };
 
   factory Person.fromJson(Map<String, dynamic> json) => Person(
@@ -50,6 +59,7 @@ class Person {
     role: Role.fromName(json['role'] as String),
     isActive: json['isActive'] as bool? ?? true,
     colorValue: json['colorValue'] as int?,
+    isChargeNurse: json['isChargeNurse'] as bool? ?? false,
   );
 
   @override
@@ -59,10 +69,12 @@ class Person {
       other.name == name &&
       other.role == role &&
       other.isActive == isActive &&
-      other.colorValue == colorValue;
+      other.colorValue == colorValue &&
+      other.isChargeNurse == isChargeNurse;
 
   @override
-  int get hashCode => Object.hash(id, name, role, isActive, colorValue);
+  int get hashCode =>
+      Object.hash(id, name, role, isActive, colorValue, isChargeNurse);
 
   @override
   String toString() => 'Person($name, ${role.label})';

@@ -13,7 +13,7 @@ class PersonTotals {
   final int shifts;
   final int weekendShifts;
   final int everyOtherDayPairs;
-  final int workedHours;
+  final double workedHours;
   final double requiredHours;
 
   /// Ay ay hesaplanan fazla mesailerin toplamı (her ay max(0, ...)).

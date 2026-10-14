@@ -16,8 +16,17 @@ void main() {
       role: Role.radiologyTech,
       isActive: false,
       colorValue: 0xFF00897B,
+      isChargeNurse: true,
     );
     expect(Person.fromJson(p.toJson()), p);
+    expect(
+      Person.fromJson(const {
+        'id': 'x',
+        'name': 'X',
+        'role': 'nurse',
+      }).isChargeNurse,
+      isFalse,
+    );
   });
 
   test('Holiday tarihi gün başına indirir ve JSON gidiş-dönüş', () {

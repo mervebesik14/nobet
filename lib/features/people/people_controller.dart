@@ -29,12 +29,14 @@ class PeopleController extends Notifier<List<Person>> {
     required String name,
     required Role role,
     bool isActive = true,
+    bool isChargeNurse = false,
   }) async {
     final person = Person(
       id: _uuid.v4(),
       name: _cleanName(name),
       role: role,
       isActive: isActive,
+      isChargeNurse: isChargeNurse,
     );
     await _save(person);
     return person;
@@ -78,8 +80,28 @@ class PeopleController extends Notifier<List<Person>> {
 
   Future<void> _save(Person person) async {
     final repo = ref.read(peopleRepositoryProvider);
-    await repo.save(person);
+    // Sorumlu hemşire yalnızca hemşire olabilir ve tek kişidir: yenisi
+    // işaretlenince öncekinin işareti kalkar.
+    final saved = person.role == Role.nurse
+        ? person
+        : person.copyWith(isChargeNurse: false);
+    if (saved.isChargeNurse) {
+      for (final other in repo.getAll()) {
+        if (other.id != saved.id && other.isChargeNurse) {
+          await repo.save(other.copyWith(isChargeNurse: false));
+        }
+      }
+    }
+    await repo.save(saved);
     state = repo.getAll();
+  }
+
+  /// Aktif sorumlu hemşire (yoksa null).
+  Person? get chargeNurse {
+    for (final p in state) {
+      if (p.isActive && p.isChargeNurse && p.role == Role.nurse) return p;
+    }
+    return null;
   }
 
   static String _cleanName(String name) =>

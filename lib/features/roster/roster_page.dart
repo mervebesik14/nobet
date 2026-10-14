@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../logic/day_shift_planner.dart';
 import '../../logic/roster_editor.dart';
 import '../../logic/roster_generator.dart';
 import '../../logic/roster_summary.dart';
@@ -399,6 +400,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     required Set<int> holidayDays,
     required Map<int, int> missingByDay,
     required int shiftHours,
+    required Map<int, DayShift> dayShifts,
   }) async {
     final services = ref.read(platformServicesProvider);
     final fileBase =
@@ -416,6 +418,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         holidayDays: holidayDays,
         shiftHours: shiftHours,
         missingByDay: missingByDay,
+        dayShifts: dayShifts,
         font: fonts.regular,
         boldFont: fonts.bold,
         singlePage: action == _ShareAction.png,
@@ -450,6 +453,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     // Yalnız hemşire ayında teknikeri kapatılmış etkin ayarlar kullanılır.
     final settings = ref.watch(effectiveSettingsProvider);
     final violations = ref.watch(rosterViolationsProvider);
+    final dayShifts = ref.watch(dayShiftsProvider);
     final holidays = ref
         .watch(holidaysProvider)
         .where((h) => h.date.year == plan.year && h.date.month == plan.month)
@@ -466,6 +470,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       settings: settings,
       onlyRoles: plan.nurseOnly ? const {Role.nurse} : null,
       leaveDays: plan.leaveDays,
+      dayShifts: dayShifts,
     );
     final missingByDay = <int, int>{};
     for (var d = 1; d <= plan.daysInMonth; d++) {
@@ -526,6 +531,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
               holidayDays: holidayDays,
               missingByDay: missingByDay,
               shiftHours: settings.shiftHours,
+              dayShifts: dayShifts,
             ),
             itemBuilder: (_) => const [
               PopupMenuItem(
@@ -624,6 +630,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
               holidayDays: holidayDays,
               shiftHours: settings.shiftHours,
               missingByDay: missingByDay,
+              dayShifts: dayShifts,
               violationCells: {
                 for (final v in violations)
                   if (v.personId case final id?)

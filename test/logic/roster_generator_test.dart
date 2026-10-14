@@ -545,4 +545,39 @@ void main() {
       expect(c24['t1']!, greaterThan(base));
     });
   });
+
+  group('sorumlu hemşire', () {
+    final people = [
+      ...team(7, 4),
+      const Person(
+        id: 'c',
+        name: 'Sorumlu',
+        role: Role.nurse,
+        isChargeNurse: true,
+      ),
+    ];
+
+    test('başka hemşire yeterliyse nöbet almaz, diğerleri dengede', () {
+      for (final seed in [1, 2, 3]) {
+        final r = generator(people: people, seed: seed).generate();
+        expectHardRules(r, people, const {}, settings);
+        final w = workedDays(r);
+        expect(w['c'] ?? const <int>{}, isEmpty, reason: 'seed $seed');
+        expect(
+          spread([for (var i = 1; i <= 7; i++) (w['n$i'] ?? {}).length]),
+          lessThanOrEqualTo(1),
+        );
+      }
+    });
+
+    test('başka uygun hemşire kalmayan günde nöbete yazılır', () {
+      // 14 Ekim'de n2–n7 istemiyor: tek uygun n1 + sorumlu hemşire.
+      final unavailable = {
+        for (var i = 2; i <= 7; i++) 'n$i': [14],
+      };
+      final r = generator(people: people, unavailable: unavailable).generate();
+      expectHardRules(r, people, unavailable, settings);
+      expect(workedDays(r)['c'], {14});
+    });
+  });
 }
