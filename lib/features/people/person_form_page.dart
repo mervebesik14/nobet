@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../models/models.dart';
 import '../../shared/providers.dart';
@@ -24,8 +23,9 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
   late bool _isActive;
   late bool _isChargeNurse;
 
-  /// Pasif başlangıç günü (Aktif kapalıyken).
+  /// Pasif dönemi (Aktif kapalıyken): başlangıç ve (boşsa süresiz) bitiş.
   DateTime? _inactiveFrom;
+  DateTime? _inactiveUntil;
   late final bool _roleLocked;
   bool _saving = false;
 
@@ -45,9 +45,17 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
     final person = widget.person;
     _name = TextEditingController(text: person?.name ?? '');
     _role = person?.role ?? Role.nurse;
-    _isActive = person?.isActive ?? true;
+    final today = ref.read(todayProvider);
+    // Pasif dönemi bitmiş kişi aktif görünür; dönemi sürüyor ya da
+    // ilerideyse "Aktif" kapalı ve dönem gösterilir.
+    _isActive = person == null
+        ? true
+        : person.inactiveFrom == null
+        ? person.isActive
+        : person.hasEndedInactivity(today);
     _isChargeNurse = person?.isChargeNurse ?? false;
-    _inactiveFrom = person?.inactiveFrom;
+    _inactiveFrom = _isActive ? null : person?.inactiveFrom;
+    _inactiveUntil = _isActive ? null : person?.inactiveUntil;
     // Geçmiş listelerde geçen kişinin görevi değişirse o listeler bozulur.
     _roleLocked =
         person != null &&
@@ -94,23 +102,27 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
         ),
       );
       final from = _inactiveFrom;
+      final until = _inactiveUntil;
       if (!_isActive &&
           from != null &&
-          (person.isActive || person.inactiveFrom != from)) {
-        // Pasife alındı ya da pasif başlangıcı değişti: listeler onarılır.
-        final report = await controller.deactivate(person.id, from: from);
+          (person.inactiveFrom != from || person.inactiveUntil != until)) {
+        // Pasife alındı ya da pasif dönemi değişti: listeler onarılır.
+        final report = await controller.deactivate(
+          person.id,
+          from: from,
+          until: until,
+        );
         messenger
           ..hideCurrentSnackBar()
           ..showSnackBar(
             SnackBar(
               content: Text(
-                deactivationMessage(_name.text.trim(), from, report),
+                deactivationMessage(_name.text.trim(), from, until, report),
               ),
             ),
           );
-      } else if (!_isActive && person.isActive) {
-        await controller.deactivate(person.id);
-      } else if (_isActive && !person.isActive) {
+      } else if (_isActive &&
+          (!person.isActive || person.inactiveFrom != null)) {
         await controller.activate(person.id);
       }
     }
@@ -201,7 +213,7 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
               value: _isActive,
               onChanged: (value) => setState(() {
                 _isActive = value;
-                // Pasife alınırken varsayılan başlangıç bugündür.
+                // Pasife alınırken varsayılan: bugünden itibaren, süresiz.
                 if (!value) _inactiveFrom ??= ref.read(todayProvider);
               }),
             ),
@@ -209,19 +221,25 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.event_busy_outlined),
-                title: const Text('Pasif başlangıcı'),
+                title: const Text('Pasif dönemi'),
                 subtitle: Text(
-                  '${DateFormat('d MMMM y EEEE', 'tr_TR').format(_inactiveFrom!)}. '
-                  'Bu günden önceki nöbetleri kalır; sonrakiler başkalarına '
-                  'verilir.',
+                  '${inactivePeriodText(_inactiveFrom!, _inactiveUntil)}. '
+                  'Bu dönemdeki nöbetleri başkalarına verilir; dönem dışında '
+                  'çalışır.',
                 ),
                 trailing: TextButton(
                   onPressed: () async {
-                    final picked = await pickInactiveFrom(
+                    final period = await pickInactivePeriod(
                       context,
-                      _inactiveFrom!,
+                      from: _inactiveFrom!,
+                      until: _inactiveUntil,
                     );
-                    if (picked != null) setState(() => _inactiveFrom = picked);
+                    if (period != null) {
+                      setState(() {
+                        _inactiveFrom = period.from;
+                        _inactiveUntil = period.until;
+                      });
+                    }
                   },
                   child: const Text('Değiştir'),
                 ),

@@ -10,6 +10,7 @@ class Person {
     this.colorValue,
     this.isChargeNurse = false,
     this.inactiveFrom,
+    this.inactiveUntil,
   });
 
   final String id;
@@ -27,34 +28,54 @@ class Person {
   /// Yalnızca hemşireler için anlamlıdır.
   final bool isChargeNurse;
 
-  /// Pasifliğin başladığı gün. Doluysa kişi bu günden önce çalışır, bu
-  /// günden itibaren nöbete yazılmaz. Boş ve [isActive] false ise kişi
-  /// tamamen pasiftir.
+  /// Pasif döneminin ilk günü. Doluysa kişi [inactiveFrom]–[inactiveUntil]
+  /// arasında (iki gün dahil) nöbete yazılmaz, dışında çalışır. Boş ve
+  /// [isActive] false ise kişi tamamen pasiftir.
   final DateTime? inactiveFrom;
+
+  /// Pasif döneminin son günü (dahil). Boşsa dönem süresizdir.
+  final DateTime? inactiveUntil;
+
+  static DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
 
   /// Kişi [date] gününde çalışabilir mi (aktif mi)?
   bool isActiveOn(DateTime date) {
     final from = inactiveFrom;
     if (from == null) return isActive;
-    return DateTime(
-      date.year,
-      date.month,
-      date.day,
-    ).isBefore(DateTime(from.year, from.month, from.day));
+    final day = _day(date);
+    if (day.isBefore(_day(from))) return true;
+    final until = inactiveUntil;
+    return until != null && day.isAfter(_day(until));
+  }
+
+  /// Pasif dönemi [date] günü itibarıyla bitmiş mi (ya da hiç yok mu)?
+  /// Bitmiş ya da henüz başlamamış dönem kişiyi aktif saymaya engel değildir.
+  bool hasEndedInactivity(DateTime date) {
+    final until = inactiveUntil;
+    return inactiveFrom != null &&
+        until != null &&
+        _day(date).isAfter(_day(until));
   }
 
   /// Kişi [year]/[month] ayında en az bir gün aktif mi?
-  bool worksInMonth(int year, int month) => isActiveOn(DateTime(year, month));
-
-  /// [year]/[month] ayında pasif olduğu günler (ay içinde pasife geçtiyse
-  /// pasiflik gününden ay sonuna kadar). Ayda hiç aktif değilse ya da
-  /// tamamen aktifse boş.
-  List<int> inactiveDaysIn(int year, int month) {
-    final from = inactiveFrom;
-    if (from == null || !worksInMonth(year, month)) return const [];
-    if (from.year != year || from.month != month) return const [];
+  bool worksInMonth(int year, int month) {
+    if (inactiveFrom == null) return isActive;
     final last = DateTime(year, month + 1, 0).day;
-    return [for (var d = from.day; d <= last; d++) d];
+    for (var d = 1; d <= last; d++) {
+      if (isActiveOn(DateTime(year, month, d))) return true;
+    }
+    return false;
+  }
+
+  /// [year]/[month] ayında, ayın bir kısmında çalıştığı halde pasif olduğu
+  /// günler. Ayda hiç aktif değilse ya da tamamen aktifse boş.
+  List<int> inactiveDaysIn(int year, int month) {
+    if (inactiveFrom == null || !worksInMonth(year, month)) return const [];
+    final last = DateTime(year, month + 1, 0).day;
+    return [
+      for (var d = 1; d <= last; d++)
+        if (!isActiveOn(DateTime(year, month, d))) d,
+    ];
   }
 
   Person copyWith({
@@ -65,7 +86,9 @@ class Person {
     bool clearColor = false,
     bool? isChargeNurse,
     DateTime? inactiveFrom,
+    DateTime? inactiveUntil,
     bool clearInactiveFrom = false,
+    bool clearInactiveUntil = false,
   }) {
     return Person(
       id: id,
@@ -77,6 +100,9 @@ class Person {
       inactiveFrom: clearInactiveFrom
           ? null
           : (inactiveFrom ?? this.inactiveFrom),
+      inactiveUntil: clearInactiveUntil || clearInactiveFrom
+          ? null
+          : (inactiveUntil ?? this.inactiveUntil),
     );
   }
 
@@ -88,6 +114,7 @@ class Person {
     'colorValue': colorValue,
     'isChargeNurse': isChargeNurse,
     'inactiveFrom': inactiveFrom?.toIso8601String(),
+    'inactiveUntil': inactiveUntil?.toIso8601String(),
   };
 
   factory Person.fromJson(Map<String, dynamic> json) => Person(
@@ -100,6 +127,9 @@ class Person {
     inactiveFrom: json['inactiveFrom'] == null
         ? null
         : DateTime.parse(json['inactiveFrom'] as String),
+    inactiveUntil: json['inactiveUntil'] == null
+        ? null
+        : DateTime.parse(json['inactiveUntil'] as String),
   );
 
   @override
@@ -111,7 +141,8 @@ class Person {
       other.isActive == isActive &&
       other.colorValue == colorValue &&
       other.isChargeNurse == isChargeNurse &&
-      other.inactiveFrom == inactiveFrom;
+      other.inactiveFrom == inactiveFrom &&
+      other.inactiveUntil == inactiveUntil;
 
   @override
   int get hashCode => Object.hash(
@@ -122,6 +153,7 @@ class Person {
     colorValue,
     isChargeNurse,
     inactiveFrom,
+    inactiveUntil,
   );
 
   @override

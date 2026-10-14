@@ -26,7 +26,8 @@ class RosterRepairResult {
   int get removed => replacements.length + unfilledDays.length;
 }
 
-/// Bir kişiyi belirli günden itibaren listeden çıkarır ve boşalan koltukları
+/// Bir kişiyi [fromDay]–[toDay] (dahil; [toDay] boşsa ay sonu) günlerinde
+/// listeden çıkarır ve boşalan koltukları
 /// diğer kişileri en az etkileyecek şekilde doldurur (saf Dart).
 ///
 /// Diğer kişilerin mevcut nöbetlerine dokunulmaz; yalnızca boşalan koltuğa
@@ -45,6 +46,7 @@ class RosterRepair {
     required Map<int, DayAssignment> assignments,
     required String personId,
     required int fromDay,
+    int? toDay,
     required Iterable<Person> people,
     required RosterSettings settings,
     Map<String, List<int>> blockedDays = const {},
@@ -86,7 +88,8 @@ class RosterRepair {
     final replacements = <int, String>{};
     final unfilled = <int>[];
 
-    for (var d = fromDay < 1 ? 1 : fromDay; d <= daysInMonth; d++) {
+    final lastDay = toDay == null || toDay > daysInMonth ? daysInMonth : toDay;
+    for (var d = fromDay < 1 ? 1 : fromDay; d <= lastDay; d++) {
       final day = current[d];
       if (day == null || !day.includes(personId)) continue;
       final role = day.nurseIds.contains(personId)

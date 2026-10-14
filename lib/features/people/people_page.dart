@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../models/models.dart';
+import '../../shared/providers.dart';
 import '../../shared/widgets/placeholder_view.dart';
 import '../../shared/widgets/section_header.dart';
 import 'people_controller.dart';
@@ -25,8 +25,11 @@ class PeoplePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final people = ref.watch(peopleProvider);
-    final active = people.where((p) => p.isActive).toList();
-    final inactive = people.where((p) => !p.isActive).toList();
+    // Bugün pasif döneminde olanlar Pasif bölümünde; dönemi ilerideyse ya
+    // da bitmişse aktiflerde görünür.
+    final today = ref.watch(todayProvider);
+    final active = people.where((p) => p.isActiveOn(today)).toList();
+    final inactive = people.where((p) => !p.isActiveOn(today)).toList();
 
     return Scaffold(
       appBar: AppBar(title: const Text('Kişiler')),
@@ -110,6 +113,14 @@ class _PersonTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final initial = person.name.isEmpty ? '?' : person.name.characters.first;
+    final today = ref.watch(todayProvider);
+    final activeNow = person.isActiveOn(today);
+    final from = person.inactiveFrom;
+    // Pasif dönemi (bitmemişse) her durumda yazılır.
+    final period = from == null || person.hasEndedInactivity(today)
+        ? null
+        : '${person.role.label} · pasif: '
+              '${inactivePeriodText(from, person.inactiveUntil)}';
     final tile = ListTile(
       leading: CircleAvatar(
         backgroundColor: person.colorValue != null
@@ -118,14 +129,10 @@ class _PersonTile extends ConsumerWidget {
         child: Text(initial),
       ),
       title: Text(person.name),
-      subtitle: !person.isActive
-          ? Text(
-              person.inactiveFrom == null
-                  ? '${person.role.label} · pasif'
-                  : '${person.role.label} · '
-                        '${DateFormat('d MMMM y', 'tr_TR').format(person.inactiveFrom!)} '
-                        'itibarıyla pasif',
-            )
+      subtitle: period != null
+          ? Text(period)
+          : !activeNow
+          ? Text('${person.role.label} · pasif')
           : person.isChargeNurse
           ? const Text('Sorumlu hemşire · 7A')
           : null,
@@ -146,7 +153,7 @@ class _PersonTile extends ConsumerWidget {
       ),
       confirmDismiss: (_) => _confirm(context, ref),
       onDismissed: (_) => _delete(context, ref),
-      child: person.isActive ? tile : Opacity(opacity: 0.5, child: tile),
+      child: activeNow ? tile : Opacity(opacity: 0.5, child: tile),
     );
   }
 }

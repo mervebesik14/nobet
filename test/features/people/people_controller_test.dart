@@ -148,6 +148,45 @@ void main() {
       }
     });
 
+    test('bitiş tarihli dönemde yalnızca dönem içi nöbetler değişir', () async {
+      await seedTeam();
+      final original = rotation();
+      await boxes.monthPlans.put(
+        '2026-10',
+        MonthPlan(year: 2026, month: 10, assignments: original),
+      );
+
+      await controller().deactivate(
+        'n0',
+        from: DateTime(2026, 10, 10),
+        until: DateTime(2026, 10, 20),
+      );
+
+      final person = boxes.people.get('n0')!;
+      // Bitişi belli dönem: ertesi gün kendiliğinden yeniden aktif.
+      expect(person.isActive, isTrue);
+      expect(person.inactiveUntil, DateTime(2026, 10, 20));
+      expect(person.isActiveOn(DateTime(2026, 10, 21)), isTrue);
+
+      final plan = boxes.monthPlans.get('2026-10')!;
+      for (var d = 1; d <= 31; d++) {
+        if (d >= 10 && d <= 20) {
+          expect(
+            plan.assignments[d]!.includes('n0'),
+            isFalse,
+            reason: 'gün $d',
+          );
+        } else {
+          // Dönem dışındaki nöbetler aynen kalır.
+          expect(
+            plan.assignments[d]!.includes('n0'),
+            original[d]!.includes('n0'),
+            reason: 'gün $d',
+          );
+        }
+      }
+    });
+
     test('pasiflik gününden önce biten aylara dokunulmaz', () async {
       await seedTeam();
       final september = MonthPlan(

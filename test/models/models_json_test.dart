@@ -73,6 +73,43 @@ void main() {
     });
   });
 
+  group('Person pasif dönemi (başlangıç–bitiş)', () {
+    final p = Person(
+      id: 'p',
+      name: 'Ali',
+      role: Role.nurse,
+      inactiveFrom: DateTime(2026, 10, 20),
+      inactiveUntil: DateTime(2026, 11, 5),
+    );
+
+    test('JSON gidiş-dönüş', () {
+      expect(Person.fromJson(p.toJson()), p);
+    });
+
+    test('dönem içinde pasif, dışında aktif (iki uç dahil)', () {
+      expect(p.isActiveOn(DateTime(2026, 10, 19)), isTrue);
+      expect(p.isActiveOn(DateTime(2026, 10, 20)), isFalse);
+      expect(p.isActiveOn(DateTime(2026, 11, 5)), isFalse);
+      expect(p.isActiveOn(DateTime(2026, 11, 6)), isTrue);
+      expect(p.hasEndedInactivity(DateTime(2026, 11, 5)), isFalse);
+      expect(p.hasEndedInactivity(DateTime(2026, 11, 6)), isTrue);
+    });
+
+    test('ay bazında pasif günler', () {
+      expect(p.inactiveDaysIn(2026, 10), [for (var d = 20; d <= 31; d++) d]);
+      expect(p.inactiveDaysIn(2026, 11), [1, 2, 3, 4, 5]);
+      expect(p.inactiveDaysIn(2026, 12), isEmpty);
+      expect(p.worksInMonth(2026, 11), isTrue);
+    });
+
+    test('ayın tamamını kapsayan dönemde o ay çalışmaz', () {
+      final q = p.copyWith(inactiveUntil: DateTime(2026, 12, 15));
+      expect(q.worksInMonth(2026, 11), isFalse);
+      expect(q.inactiveDaysIn(2026, 11), isEmpty);
+      expect(q.inactiveDaysIn(2026, 12), [for (var d = 1; d <= 15; d++) d]);
+    });
+  });
+
   test('Holiday tarihi gün başına indirir ve JSON gidiş-dönüş', () {
     final h = Holiday(
       date: DateTime(2026, 10, 28, 13, 45),

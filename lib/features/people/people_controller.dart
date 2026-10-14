@@ -85,15 +85,16 @@ class PeopleController extends Notifier<List<Person>> {
     state = repo.getAll();
   }
 
-  /// Kişiyi [from] gününden itibaren pasif yapar: o günden önce çalışır,
-  /// o günden itibaren nöbete yazılmaz; geçmiş listelerde adıyla kalır.
-  /// Kayıtlı listelerdeki o günden sonraki nöbetleri kaldırılır ve boşalan
-  /// koltuklar diğer kişileri en az etkileyecek şekilde doldurulur
-  /// ([RosterRepair]). [from] verilmezse kişi tamamen pasif olur ve
-  /// listelere dokunulmaz.
+  /// Kişiyi [from]–[until] arasında (iki gün dahil) pasif yapar; [until]
+  /// boşsa dönem süresizdir. Kişi dönem dışında çalışır, dönem içinde
+  /// nöbete yazılmaz; geçmiş listelerde adıyla kalır. Kayıtlı listelerdeki
+  /// dönem içi nöbetleri kaldırılır ve boşalan koltuklar diğer kişileri en
+  /// az etkileyecek şekilde doldurulur ([RosterRepair]). [from] verilmezse
+  /// kişi tamamen pasif olur ve listelere dokunulmaz.
   Future<DeactivationReport> deactivate(
     String personId, {
     DateTime? from,
+    DateTime? until,
   }) async {
     final repo = ref.read(peopleRepositoryProvider);
     final person = repo.getById(personId);
@@ -101,11 +102,18 @@ class PeopleController extends Notifier<List<Person>> {
     final start = from == null
         ? null
         : DateTime(from.year, from.month, from.day);
+    var end = start == null || until == null
+        ? null
+        : DateTime(until.year, until.month, until.day);
+    if (start != null && end != null && end.isBefore(start)) end = start;
     await repo.save(
       person.copyWith(
-        isActive: false,
+        // Bitişi belli dönemden sonra kişi kendiliğinden yeniden aktif olur.
+        isActive: end != null,
         inactiveFrom: start,
+        inactiveUntil: end,
         clearInactiveFrom: start == null,
+        clearInactiveUntil: end == null,
       ),
     );
     state = repo.getAll();
@@ -115,16 +123,21 @@ class PeopleController extends Notifier<List<Person>> {
     final holidays = ref.read(holidaysProvider);
     var report = const DeactivationReport();
     for (final plan in plans.getAll()) {
-      // Pasiflik gününden önce biten ayların listesine dokunulmaz.
+      // Yalnızca pasif dönemiyle kesişen ayların listesi onarılır.
       if (!plan.hasRoster ||
-          DateTime(plan.year, plan.month + 1, 0).isBefore(start)) {
+          DateTime(plan.year, plan.month + 1, 0).isBefore(start) ||
+          (end != null && DateTime(plan.year, plan.month).isAfter(end))) {
         continue;
       }
       final fromDay = plan.year == start.year && plan.month == start.month
           ? start.day
           : 1;
+      final toDay =
+          end != null && plan.year == end.year && plan.month == end.month
+          ? end.day
+          : plan.daysInMonth;
       if (!plan.assignments.values.any(
-        (a) => a.day >= fromDay && a.includes(personId),
+        (a) => a.day >= fromDay && a.day <= toDay && a.includes(personId),
       )) {
         continue;
       }
@@ -138,6 +151,7 @@ class PeopleController extends Notifier<List<Person>> {
         assignments: plan.assignments,
         personId: personId,
         fromDay: fromDay,
+        toDay: toDay,
         people: state,
         settings: settings,
         blockedDays: computeEffectiveBlockedDays(

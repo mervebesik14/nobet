@@ -175,23 +175,29 @@ void main() {
     await tester.enterText(find.byType(TextFormField), 'Ayşe Kaya');
     await tester.tap(find.text('Aktif'));
     await tester.pumpAndSettle();
-    // Pasif başlangıcı varsayılan olarak bugün.
-    expect(find.text('Pasif başlangıcı'), findsOneWidget);
-    expect(find.textContaining('11 Ekim 2026 Pazar'), findsOneWidget);
+    // Pasif dönemi varsayılan olarak bugünden itibaren, süresiz.
+    expect(find.text('Pasif dönemi'), findsOneWidget);
+    expect(
+      find.textContaining('11 Ekim 2026 itibarıyla, süresiz'),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Kaydet'));
     await tester.pumpAndSettle();
 
     expect(find.text('Ayşe Kaya'), findsOneWidget);
     expect(
-      find.text('Hemşire · 11 Ekim 2026 itibarıyla pasif'),
+      find.text('Hemşire · pasif: 11 Ekim 2026 itibarıyla, süresiz'),
       findsOneWidget,
     );
     final saved = boxes.people.get('1')!;
     expect(saved.isActive, isFalse);
     expect(saved.inactiveFrom, DateTime(2026, 10, 11));
+    expect(saved.inactiveUntil, isNull);
   });
 
-  testWidgets('pasif başlangıcı formda değiştirilebilir', (tester) async {
+  testWidgets('pasif dönemi formda başlangıç ve bitişiyle seçilir', (
+    tester,
+  ) async {
     await seed(const [Person(id: '1', name: 'Ayşe', role: Role.nurse)]);
     await pumpPage(tester);
 
@@ -201,14 +207,41 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Değiştir'));
     await tester.pumpAndSettle();
+    expect(find.text('Pasif dönemi'), findsNWidgets(2)); // form + pencere
+    expect(find.text('Süresiz'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('inactive-from')));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('20'));
     await tester.tap(find.text('Tamam'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('20 Ekim 2026 Salı'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('inactive-until')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('25'));
+    await tester.tap(find.text('Tamam'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('25 Ekim 2026 Pazar'), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Kaydet'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.textContaining('20 Ekim 2026 – 25 Ekim 2026'), findsOneWidget);
 
     await tester.tap(find.text('Kaydet'));
     await tester.pumpAndSettle();
-    expect(boxes.people.get('1')!.inactiveFrom, DateTime(2026, 10, 20));
+    final saved = boxes.people.get('1')!;
+    expect(saved.inactiveFrom, DateTime(2026, 10, 20));
+    expect(saved.inactiveUntil, DateTime(2026, 10, 25));
+    // Dönem ileride: bugün aktif, dönemi alt yazıda.
+    expect(saved.isActiveOn(DateTime(2026, 10, 11)), isTrue);
+    expect(
+      find.text('Hemşire · pasif: 20 Ekim 2026 – 25 Ekim 2026'),
+      findsOneWidget,
+    );
+    expect(find.text('Pasif'), findsNothing); // Pasif bölümü yok
   });
 
   testWidgets('planda geçen kişinin görevi değiştirilemez', (tester) async {
@@ -302,23 +335,24 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Pasif yap'));
     await tester.pumpAndSettle();
-    // Tarih seçici açılır; varsayılan bugün.
-    expect(find.text('Hangi günden itibaren pasif?'), findsOneWidget);
-    await tester.tap(find.text('Tamam'));
+    // Pasif dönemi penceresi açılır; varsayılan bugünden itibaren, süresiz.
+    expect(find.text('Pasif dönemi'), findsOneWidget);
+    await tester.tap(find.text('Kaydet'));
     await tester.pumpAndSettle();
 
     expect(find.text('Ali'), findsOneWidget);
     expect(
-      find.text('Radyoloji Teknikeri · 11 Ekim 2026 itibarıyla pasif'),
+      find.text(
+        'Radyoloji Teknikeri · pasif: 11 Ekim 2026 itibarıyla, süresiz',
+      ),
       findsOneWidget,
     );
     expect(find.text('Ali 11 Ekim 2026 itibarıyla pasif.'), findsOneWidget);
     expect(boxes.people.get('1')!.isActive, isFalse);
 
-    // Pasif kişi de silinebilir; bu kez "Pasif yap" seçeneği çıkmaz.
+    // Pasif kişi de silinebilir.
     await tester.drag(find.text('Ali'), const Offset(-500, 0));
     await tester.pumpAndSettle();
-    expect(find.text('Pasif yap'), findsNothing);
     await tester.tap(find.text('Sil'));
     await tester.pumpAndSettle();
     expect(boxes.people.get('1'), isNull);
