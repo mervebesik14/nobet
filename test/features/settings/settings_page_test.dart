@@ -121,9 +121,11 @@ void main() {
       const Person(id: 'a', name: 'Ayşe', role: Role.nurse),
     );
     await pump(tester);
+    expect(find.textContaining('Henüz yedek alınmadı.'), findsOneWidget);
 
     await tester.tap(find.text('Yedeği dışa aktar'));
     await tester.pumpAndSettle();
+    expect(find.textContaining('Son yedek: 11 Ekim 2026'), findsOneWidget);
 
     final file = services.sharedFiles.single;
     expect(file.name, 'nobet-yedek-2026-10-11.json');

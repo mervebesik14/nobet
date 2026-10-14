@@ -74,3 +74,53 @@ class ThemeModeController extends Notifier<ThemeMode> {
 final themeModeProvider = NotifierProvider<ThemeModeController, ThemeMode>(
   ThemeModeController.new,
 );
+
+/// Yedek durumu: son yedek ve "Sonra" denince hatırlatmanın susacağı gün.
+class BackupStatus {
+  const BackupStatus({this.lastBackup, this.snoozedUntil});
+
+  final DateTime? lastBackup;
+  final DateTime? snoozedUntil;
+}
+
+/// Yedek tarihlerini `app_meta` kutusunda saklar.
+class BackupStatusController extends Notifier<BackupStatus> {
+  static const _lastKey = 'lastBackupAt';
+  static const _snoozeKey = 'backupSnoozedUntil';
+
+  DateTime? _read(String key) {
+    final v = ref.read(hiveBoxesProvider).meta.get(key);
+    return v is String ? DateTime.tryParse(v) : null;
+  }
+
+  @override
+  BackupStatus build() {
+    ref.watch(hiveBoxesProvider);
+    return BackupStatus(
+      lastBackup: _read(_lastKey),
+      snoozedUntil: _read(_snoozeKey),
+    );
+  }
+
+  /// Yedek alındı: hatırlatma sayacı sıfırlanır.
+  Future<void> markBackedUp(DateTime at) async {
+    state = BackupStatus(lastBackup: at);
+    final meta = ref.read(hiveBoxesProvider).meta;
+    await meta.put(_lastKey, at.toIso8601String());
+    await meta.delete(_snoozeKey);
+  }
+
+  /// Hatırlatmayı [until] gününe kadar sustur.
+  Future<void> snooze(DateTime until) async {
+    state = BackupStatus(lastBackup: state.lastBackup, snoozedUntil: until);
+    await ref
+        .read(hiveBoxesProvider)
+        .meta
+        .put(_snoozeKey, until.toIso8601String());
+  }
+}
+
+final backupStatusProvider =
+    NotifierProvider<BackupStatusController, BackupStatus>(
+      BackupStatusController.new,
+    );

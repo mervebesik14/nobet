@@ -8,10 +8,10 @@ import '../../data/backup_service.dart';
 import '../../data/providers.dart';
 import '../../models/models.dart';
 import '../../shared/platform_services.dart';
-import '../../shared/providers.dart';
 import '../holidays/holidays_controller.dart';
 import '../month/month_plan_controller.dart';
 import '../people/people_controller.dart';
+import 'backup_actions.dart';
 
 /// Ayarlar sekmesi: nöbet kuralları, mesai hesabı, tema ve yedekleme.
 class SettingsPage extends ConsumerWidget {
@@ -198,8 +198,12 @@ class SettingsPage extends ConsumerWidget {
           ListTile(
             leading: const Icon(Icons.upload_file),
             title: const Text('Yedeği dışa aktar'),
-            subtitle: const Text('Tüm veriler tek bir JSON dosyası olarak.'),
-            onTap: () => _export(context, ref),
+            subtitle: Text(
+              'Tüm veriler tek bir JSON dosyası olarak.\n'
+              '${_lastBackupText(ref.watch(backupStatusProvider).lastBackup)}',
+            ),
+            isThreeLine: true,
+            onTap: () => exportBackup(context, ref),
           ),
           ListTile(
             leading: const Icon(Icons.restore),
@@ -212,23 +216,14 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
+  static String _lastBackupText(DateTime? last) => last == null
+      ? 'Henüz yedek alınmadı.'
+      : 'Son yedek: ${DateFormat('d MMMM y', 'tr_TR').format(last)}';
+
   static void _notify(BuildContext context, String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  Future<void> _export(BuildContext context, WidgetRef ref) async {
-    final now = ref.read(todayProvider);
-    final text = BackupService(ref.read(hiveBoxesProvider)).exportJson();
-    final name = 'nobet-yedek-${DateFormat('yyyy-MM-dd').format(now)}.json';
-    try {
-      await ref
-          .read(platformServicesProvider)
-          .shareFile(utf8.encode(text), name, 'application/json');
-    } catch (e) {
-      if (context.mounted) _notify(context, 'Yedek paylaşılamadı: $e');
-    }
   }
 
   Future<void> _restore(BuildContext context, WidgetRef ref) async {

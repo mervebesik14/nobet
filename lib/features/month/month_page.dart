@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/providers.dart';
+import '../../logic/backup_reminder.dart';
 import '../../logic/feasibility_checker.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/month_selector.dart';
@@ -12,6 +14,8 @@ import '../roster/yearly_summary_page.dart';
 import 'month_plan_controller.dart';
 import 'unavailable_days_page.dart';
 import '../../shared/app_colors.dart';
+import '../../shared/providers.dart';
+import '../settings/backup_actions.dart';
 
 /// Ay Planı sekmesi: ay seçici, aktif kişiler ve istenmeyen gün sayıları,
 /// liste oluşturmadan önceki uygunluk uyarıları.
@@ -39,6 +43,7 @@ class MonthPage extends ConsumerWidget {
         .toList();
     final report = ref.watch(monthFeasibilityProvider);
     final theme = Theme.of(context);
+    final backup = ref.watch(backupStatusProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -76,6 +81,13 @@ class MonthPage extends ConsumerWidget {
             month: month,
             onChanged: ref.read(planMonthProvider.notifier).select,
           ),
+          if (BackupReminder.isDue(
+            today: ref.watch(todayProvider),
+            hasData: ref.watch(peopleProvider).isNotEmpty,
+            lastBackup: backup.lastBackup,
+            snoozedUntil: backup.snoozedUntil,
+          ))
+            _BackupReminderCard(lastBackup: backup.lastBackup),
           if (plan.isLocked)
             Card(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -300,6 +312,69 @@ class _FeasibilitySection extends StatelessWidget {
                   style: TextStyle(color: theme.colorScheme.onErrorContainer),
                 ),
               ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Düzenli yedek hatırlatması: "Yedek al" paylaşır, "Sonra" bir hafta susturur.
+class _BackupReminderCard extends ConsumerWidget {
+  const _BackupReminderCard({required this.lastBackup});
+
+  final DateTime? lastBackup;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final days = BackupReminder.daysSince(ref.watch(todayProvider), lastBackup);
+    final theme = Theme.of(context);
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      color: theme.colorScheme.tertiaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.backup_outlined,
+                  color: theme.colorScheme.onTertiaryContainer,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    days == null
+                        ? 'Henüz yedek alınmadı. Veriler yalnızca bu '
+                              'telefonda; kaybolmasın diye yedek alın.'
+                        : '$days gündür yedek alınmadı.',
+                    style: TextStyle(
+                      color: theme.colorScheme.onTertiaryContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    final today = ref.read(todayProvider);
+                    ref
+                        .read(backupStatusProvider.notifier)
+                        .snooze(today.add(BackupReminder.snooze));
+                  },
+                  child: const Text('Sonra'),
+                ),
+                FilledButton.tonal(
+                  onPressed: () => exportBackup(context, ref),
+                  child: const Text('Yedek al'),
+                ),
+              ],
+            ),
           ],
         ),
       ),

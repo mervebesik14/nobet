@@ -7,6 +7,7 @@ import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/data/holiday_repository.dart';
 import 'package:nobet_listesi/features/month/month_page.dart';
 import 'package:nobet_listesi/models/models.dart';
+import 'package:nobet_listesi/shared/platform_services.dart';
 import 'package:nobet_listesi/shared/providers.dart';
 
 import '../../helpers.dart';
@@ -46,6 +47,8 @@ void main() {
     if (plan != null) await boxes.monthPlans.put(plan.key, plan);
   }
 
+  final services = FakePlatformServices();
+
   Future<void> pumpPage(WidgetTester tester) async {
     tester.view.physicalSize = const Size(1200, 5200);
     tester.view.devicePixelRatio = 2.5;
@@ -55,6 +58,7 @@ void main() {
         overrides: [
           ...boxOverrides(boxes),
           todayProvider.overrideWithValue(DateTime(2026, 10, 11)),
+          platformServicesProvider.overrideWithValue(services),
         ],
         child: const MaterialApp(home: MonthPage()),
       ),
@@ -421,5 +425,53 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Kasım 2026'), findsOneWidget);
     expect(find.text('4 gün istemiyor'), findsOneWidget);
+  });
+
+  group('yedek hatırlatması', () {
+    testWidgets('kişi yokken çıkmaz', (tester) async {
+      await pumpPage(tester);
+      expect(find.text('Yedek al'), findsNothing);
+    });
+
+    testWidgets('hiç yedek yoksa çıkar; "Yedek al" paylaşır ve kapanır', (
+      tester,
+    ) async {
+      await seed(_team);
+      await pumpPage(tester);
+      expect(find.textContaining('Henüz yedek alınmadı'), findsOneWidget);
+
+      await tester.tap(find.text('Yedek al'));
+      await tester.pumpAndSettle();
+      expect(services.calls.last, 'shareFile:nobet-yedek-2026-10-11.json');
+      expect(find.text('Yedek al'), findsNothing);
+      expect(boxes.meta.get('lastBackupAt'), startsWith('2026-10-11'));
+    });
+
+    testWidgets('14 günü geçmiş yedek hatırlatılır; "Sonra" susturur', (
+      tester,
+    ) async {
+      await seed(_team);
+      await boxes.meta.put(
+        'lastBackupAt',
+        DateTime(2026, 9, 20).toIso8601String(),
+      );
+      await pumpPage(tester);
+      expect(find.text('21 gündür yedek alınmadı.'), findsOneWidget);
+
+      await tester.tap(find.text('Sonra'));
+      await tester.pumpAndSettle();
+      expect(find.text('Yedek al'), findsNothing);
+      expect(boxes.meta.get('backupSnoozedUntil'), startsWith('2026-10-18'));
+    });
+
+    testWidgets('yakın tarihli yedek varsa çıkmaz', (tester) async {
+      await seed(_team);
+      await boxes.meta.put(
+        'lastBackupAt',
+        DateTime(2026, 10, 5).toIso8601String(),
+      );
+      await pumpPage(tester);
+      expect(find.text('Yedek al'), findsNothing);
+    });
   });
 }
