@@ -124,6 +124,41 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     if (_swapFrom != null) return _completeSwap(cell, role);
     if (!_ensureUnlocked()) return;
 
+    // 7A yazan hücre: 7A'yı başkasına vermek ya da 24 nöbete yazmak.
+    final dayShift = ref.read(dayShiftsProvider)[cell.day];
+    if (dayShift?.personId == cell.personId &&
+        !(_plan.assignments[cell.day]?.includes(cell.personId) ?? false)) {
+      final choice = await showModalBottomSheet<String>(
+        context: context,
+        showDragHandle: true,
+        builder: (context) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: Text(
+                  '${_name(cell.personId)} · ${_dayLabel(cell.day)} · 7A',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.swap_horiz),
+                title: const Text("7A'yı başkasına ver"),
+                onTap: () => Navigator.of(context).pop('7a'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.nights_stay_outlined),
+                title: const Text('24 nöbete yaz'),
+                onTap: () => Navigator.of(context).pop('24'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (choice == '7a') return _chooseDayShift(cell.day);
+      if (choice != '24' || !mounted) return;
+    }
+
     final plan = _plan;
     final settings = ref.read(effectiveSettingsProvider);
     final nursesPerDay = settings.nursesPerDay;
@@ -263,6 +298,91 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       );
     }
     await _apply(result);
+  }
+
+  /// [day] gününün 7A'sını elle başka bir hemşireye verir (ya da otomatik
+  /// seçime döndürür). O gün nöbetli, nöbet ertesi ya da izinli/istemediği
+  /// günde olanlar uyarıyla birlikte altta listelenir.
+  Future<void> _chooseDayShift(int day) async {
+    final plan = _plan;
+    final current = ref.read(dayShiftsProvider)[day]?.personId;
+    final blocked = ref.read(effectiveBlockedDaysProvider);
+    final tail = ref.read(monthPlanProvider.notifier).previousMonthTail();
+    bool onDuty(String id, int d) => d < 1
+        ? tail.isNotEmpty && tail.last.contains(id)
+        : plan.assignments[d]?.includes(id) ?? false;
+
+    final candidates = [
+      for (final p in _activeOfRole(Role.nurse))
+        if (p.id != current)
+          (
+            person: p,
+            reasons: [
+              if (onDuty(p.id, day)) 'o gün nöbetçi',
+              if (onDuty(p.id, day - 1)) 'nöbet ertesi',
+              if (blocked[p.id]?.contains(day) ?? false)
+                'izinli ya da istemediği gün',
+            ],
+          ),
+    ]..sort((a, b) => a.reasons.length.compareTo(b.reasons.length));
+
+    const auto = '';
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.6,
+          maxChildSize: 0.9,
+          builder: (context, controller) => ListView(
+            controller: controller,
+            children: [
+              ListTile(
+                title: Text(
+                  '${_dayLabel(day)} · 7A',
+                  style: theme.textTheme.titleMedium,
+                ),
+                subtitle: Text(
+                  current == null
+                      ? 'Şu an 7A boş.'
+                      : 'Şu an: ${_name(current)}',
+                ),
+              ),
+              if (plan.dayShiftOverrides.containsKey(day))
+                ListTile(
+                  leading: const Icon(Icons.auto_mode),
+                  title: const Text('Otomatik seçime dön'),
+                  onTap: () => Navigator.of(context).pop(auto),
+                ),
+              for (final c in candidates)
+                ListTile(
+                  leading: Icon(
+                    c.reasons.isEmpty
+                        ? Icons.check_circle_outline
+                        : Icons.warning_amber_rounded,
+                    color: c.reasons.isEmpty
+                        ? theme.colorScheme.primary
+                        : Colors.orange,
+                  ),
+                  title: Text(c.person.name),
+                  subtitle: c.reasons.isEmpty
+                      ? null
+                      : Text(c.reasons.join(', ')),
+                  onTap: () => Navigator.of(context).pop(c.person.id),
+                ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+    if (picked == null) return;
+    await ref
+        .read(monthPlanProvider.notifier)
+        .setDayShiftOverride(day, picked == auto ? null : picked);
   }
 
   Future<void> _onMissingTap(int day) async {

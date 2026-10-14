@@ -81,6 +81,7 @@ class YearlySummary {
         previousMonthLastDay: {
           ...?previous?.assignments[previous.daysInMonth]?.personIds,
         },
+        overrides: plan.dayShiftOverrides,
       );
       final summary = RosterSummary.build(
         year: plan.year,

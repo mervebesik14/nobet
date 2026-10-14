@@ -49,7 +49,8 @@ class DayShift {
 ///
 /// Yerine yazılacak hemşire de o gün nöbetli, nöbet ertesi, izinli ya da
 /// nöbet istemediği günde olmamalı. Adaylar arasında bu ay en az 7A yerine
-/// geçmiş, eşitlikte en az nöbeti olan seçilir. Sorumlu hemşire yoksa
+/// geçmiş, eşitlikte en az nöbeti olan seçilir. [overrides] ile elle
+/// seçilen kişi o günün 7A'sına yazılır. Sorumlu hemşire yoksa
 /// 7A planı boştur.
 class DayShiftPlanner {
   const DayShiftPlanner._();
@@ -64,6 +65,7 @@ class DayShiftPlanner {
     Map<String, List<int>> leaveDays = const {},
     Map<String, List<int>> unavailableDays = const {},
     Set<String> previousMonthLastDay = const {},
+    Map<int, String> overrides = const {},
   }) {
     final nurses = [
       for (final p in people)
@@ -128,6 +130,20 @@ class DayShiftPlanner {
     for (var d = 1; d <= daysInMonth; d++) {
       final hours = hoursOn(d);
       if (hours == null) continue;
+      // Elle seçilen kişi otomatik seçimin önüne geçer.
+      if (overrides[d] case final id?) {
+        final substitute = id != charge.id;
+        if (substitute) {
+          substituteCount[id] = (substituteCount[id] ?? 0) + 1;
+        }
+        result[d] = DayShift(
+          day: d,
+          personId: id,
+          hours: hours,
+          isSubstitute: substitute,
+        );
+        continue;
+      }
       if (canWork(charge.id, d)) {
         result[d] = DayShift(
           day: d,

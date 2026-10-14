@@ -273,12 +273,29 @@ class MonthPlanController extends Notifier<MonthPlan> {
     final result = await ref.read(rosterRunnerProvider)(generator);
     state = state.copyWith(
       assignments: result.assignments,
+      // Yeni listede eski 7A seçimleri geçersiz olabilir.
+      dayShiftOverrides: const {},
       generatedAt: DateTime.now(),
       seed: result.seed,
       nurseOnly: onlyNurses,
     );
     await ref.read(monthPlanRepositoryProvider).save(state);
     return result;
+  }
+
+  /// [day] gününün 7A'sını elle [personId]'ye verir; null ise otomatik
+  /// seçime döner. Kilitli ayda değişmez ve false döner.
+  Future<bool> setDayShiftOverride(int day, String? personId) async {
+    if (state.isLocked) return false;
+    final overrides = {...state.dayShiftOverrides};
+    if (personId == null) {
+      overrides.remove(day);
+    } else {
+      overrides[day] = personId;
+    }
+    state = state.copyWith(dayShiftOverrides: overrides);
+    await ref.read(monthPlanRepositoryProvider).save(state);
+    return true;
   }
 
   /// Elle düzenlenmiş atamaları kaydeder. Kilitli ayda değişiklik
@@ -432,6 +449,7 @@ final dayShiftsProvider = Provider<Map<int, DayShift>>((ref) {
     leaveDays: plan.leaveDays,
     unavailableDays: plan.unavailableDays,
     previousMonthLastDay: tail.isEmpty ? const {} : tail.last,
+    overrides: plan.dayShiftOverrides,
   );
 });
 

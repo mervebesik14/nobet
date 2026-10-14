@@ -57,7 +57,7 @@ types:
         index: 3
   MonthPlan:
     typeId: 4
-    nextIndex: 13
+    nextIndex: 14
     fields:
       year:
         index: 0
@@ -85,6 +85,8 @@ types:
         index: 11
       sickLeave:
         index: 12
+      dayShiftOverrides:
+        index: 13
   RosterSettings:
     typeId: 5
     nextIndex: 11

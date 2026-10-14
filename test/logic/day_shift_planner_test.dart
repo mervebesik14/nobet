@@ -121,4 +121,21 @@ void main() {
     expect(p[1]!.isSubstitute, isTrue);
     expect(p[2]!.personId, 'c');
   });
+
+  test('elle seçilen kişi o günün 7A\'sına yazılır', () {
+    final p = DayShiftPlanner.plan(
+      year: 2026,
+      month: 10,
+      assignments: const {},
+      people: [charge, ...nurses],
+      holidays: holidays,
+      settings: settings,
+      overrides: const {14: 'n3', 3: 'n4'},
+    );
+    expect(p[14]!.personId, 'n3');
+    expect(p[14]!.isSubstitute, isTrue);
+    expect(p[15]!.personId, 'c');
+    // Hafta sonuna (mesai günü olmayan) elle seçim yok sayılır.
+    expect(p.containsKey(3), isFalse);
+  });
 }

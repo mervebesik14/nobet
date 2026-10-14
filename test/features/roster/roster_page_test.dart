@@ -389,6 +389,65 @@ void main() {
     expect(find.text('7A\ngün'), findsOneWidget);
   });
 
+  testWidgets('7A elle başka hemşireye verilir ve otomatiğe döner', (
+    tester,
+  ) async {
+    await boxes.people.put(
+      'c',
+      const Person(
+        id: 'c',
+        name: 'Sorumlu Hemşire',
+        role: Role.nurse,
+        isChargeNurse: true,
+      ),
+    );
+    await pumpMonthPage(tester);
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
+
+    // 14 Ekim ve öncesinde nöbeti olmayan bir hemşire seç.
+    final plan = saved();
+    final free = _team.firstWhere(
+      (p) =>
+          p.role == Role.nurse &&
+          !plan.assignments[14]!.includes(p.id) &&
+          !plan.assignments[13]!.includes(p.id),
+    );
+    Finder cellText(String id, int d, String t) => find.descendant(
+      of: find.byKey(ValueKey('cell-$id-$d')),
+      matching: find.text(t),
+    );
+    expect(cellText('c', 14, '7A'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('cell-c-14')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text("7A'yı başkasına ver"));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.descendant(
+        of: find.byType(BottomSheet),
+        matching: find.text(free.name),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(saved().dayShiftOverrides, {14: free.id});
+    expect(cellText(free.id, 14, '7A'), findsOneWidget);
+    expect(cellText('c', 14, '7A'), findsNothing);
+
+    // Otomatik seçime dön.
+    await tester.tap(find.byKey(ValueKey('cell-${free.id}-14')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text("7A'yı başkasına ver"));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Otomatik seçime dön'));
+    await tester.pumpAndSettle();
+    expect(saved().dayShiftOverrides, isEmpty);
+    expect(cellText('c', 14, '7A'), findsOneWidget);
+  });
+
   testWidgets('sorumlu hemşire seçilen nöbet günlerine yazılır', (
     tester,
   ) async {

@@ -158,6 +158,7 @@ void main() {
       sickLeave: const {
         't3': [7, 8],
       },
+      dayShiftOverrides: const {14: 'n2'},
     );
     expect(MonthPlan.fromJson(plan.toJson()), plan);
     expect(plan.sickLeaveOf('t3'), [7, 8]);
