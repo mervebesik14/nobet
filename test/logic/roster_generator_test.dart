@@ -736,4 +736,28 @@ void main() {
       expect(fresh, greaterThan(5));
     });
   });
+
+  test('hafta sonlarının çoğunu istemeyen olsa da hafta sonu farkı ≤ 1', () {
+    // n1 ilk üç hafta sonunu, n2 son hafta sonunu istemiyor; n3 iki gün.
+    const unavailable = {
+      'n1': [3, 4, 10, 11, 17, 18],
+      'n2': [17, 24, 25, 31],
+      'n3': [3, 10],
+    };
+    final weekend = RosterGenerator.weekendDays(2026, 10, holidays, settings);
+    for (final seed in [1, 2, 3]) {
+      final r = generator(unavailable: unavailable, seed: seed).generate();
+      expectHardRules(r, team(7, 4), unavailable, settings);
+      final w = workedDays(r);
+      final counts = [
+        for (var i = 1; i <= 7; i++)
+          (w['n$i'] ?? const <int>{}).where(weekend.contains).length,
+      ];
+      expect(
+        spread(counts),
+        lessThanOrEqualTo(1),
+        reason: 'seed $seed: $counts',
+      );
+    }
+  });
 }

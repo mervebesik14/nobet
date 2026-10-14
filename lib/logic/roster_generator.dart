@@ -792,8 +792,47 @@ class _RoleSolver {
         }
       }
 
+      // Basit hamleler tükenince zincirli değiştirme dene.
+      if (!improved && _tryChain(current)) {
+        current = _score();
+        improved = true;
+      }
+
       if (!improved) break;
     }
+  }
+
+  /// Zincirli değiştirme: d1 günündeki a yerine b yazılır, b'nin d2 günündeki
+  /// nöbeti c'ye geçer (c = a ise takas). Tek takasın kurallara takıldığı
+  /// durumlarda (ör. hafta sonlarının çoğunu istemeyen kişiye kalan hafta
+  /// sonunu vermek) dengeyi düzeltir. İlk iyileştirmede kalıcı yapar.
+  bool _tryChain(double current) {
+    for (var d1 = 1; d1 <= days; d1++) {
+      for (final a in [..._slots[d1]]) {
+        if (_isFixed(a, d1)) continue;
+        for (final b in ids) {
+          if (_slots[d1].contains(b) || !available[b]!.contains(d1)) continue;
+          for (final d2 in [..._worked[b]!]) {
+            if (d2 == d1 || _isFixed(b, d2)) continue;
+            _remove(a, d1);
+            _remove(b, d2);
+            if (_block(b, d1) == null) {
+              _add(b, d1);
+              for (final c in ids) {
+                if (c == b || _block(c, d2) != null) continue;
+                _add(c, d2);
+                if (_score() < current - 1e-9) return true;
+                _remove(c, d2);
+              }
+              _remove(b, d1);
+            }
+            _add(b, d2);
+            _add(a, d1);
+          }
+        }
+      }
+    }
+    return false;
   }
 
   /// a@d1 ve b@d2'yi takas eder; kurallar geçerli ve puan düşüyorsa
