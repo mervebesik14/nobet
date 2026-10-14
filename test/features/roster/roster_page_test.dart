@@ -189,6 +189,45 @@ void main() {
     expect(saved().assignments[18]!.techId, isNull);
   });
 
+  testWidgets('uygunluk uyarısı izin günlerini de hesaba katar', (
+    tester,
+  ) async {
+    // 18 Ekim'de tüm teknikerler şua izninde: istenmeyen gün yok ama
+    // uygun tekniker de yok.
+    await boxes.monthPlans.put(
+      '2026-10',
+      const MonthPlan(
+        year: 2026,
+        month: 10,
+        radiationLeave: {
+          't1': [18],
+          't2': [18],
+          't3': [18],
+          't4': [18],
+        },
+      ),
+    );
+    await pumpMonthPage(tester);
+
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
+    expect(find.text('Uygunluk sorunları var'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.textContaining(
+          '18 Ekim: uygun radyoloji teknikeri yok.',
+        ),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Vazgeç'));
+    await tester.pumpAndSettle();
+    expect(saved().hasRoster, isFalse);
+  });
+
   testWidgets('kilitle; kilitliyken yeniden oluşturma onay ister', (
     tester,
   ) async {

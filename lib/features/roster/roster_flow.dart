@@ -47,7 +47,8 @@ Future<bool> generateRoster(BuildContext context, WidgetRef ref) async {
         year: plan.year,
         month: plan.month,
         people: ref.read(peopleProvider),
-        unavailableDays: plan.unavailableDays,
+        // İstenmeyen günler + izinler + yıllık izin öncesi/sonrası kuralları.
+        unavailableDays: ref.read(effectiveBlockedDaysProvider),
       );
   if (!report.isFeasible) {
     final ok = await _confirm(
