@@ -204,6 +204,49 @@ void main() {
       expect(boxes.monthPlans.get('2026-09'), september);
     });
 
+    test('süren dönem sonlandırılınca geçmiş kısmı kalır', () async {
+      await seedTeam();
+      await controller().deactivate('n1', from: DateTime(2026, 10, 5));
+      await controller().endInactivity(
+        'n1',
+        activeFrom: DateTime(2026, 10, 11),
+      );
+      final p = boxes.people.get('n1')!;
+      expect(p.isActive, isTrue);
+      expect(p.inactiveFrom, DateTime(2026, 10, 5));
+      expect(p.inactiveUntil, DateTime(2026, 10, 10));
+      expect(p.isActiveOn(DateTime(2026, 10, 10)), isFalse);
+      expect(p.isActiveOn(DateTime(2026, 10, 11)), isTrue);
+    });
+
+    test('başlamamış dönem sonlandırılınca tamamen silinir', () async {
+      await seedTeam();
+      await controller().deactivate(
+        'n1',
+        from: DateTime(2026, 11, 1),
+        until: DateTime(2026, 11, 10),
+      );
+      await controller().endInactivity(
+        'n1',
+        activeFrom: DateTime(2026, 10, 11),
+      );
+      final p = boxes.people.get('n1')!;
+      expect(p.isActive, isTrue);
+      expect(p.inactiveFrom, isNull);
+      expect(p.inactiveUntil, isNull);
+    });
+
+    test('tarihsiz pasif kişi sonlandırılınca aktif olur', () async {
+      await seedTeam();
+      await controller().deactivate('n1');
+      expect(boxes.people.get('n1')!.isActive, isFalse);
+      await controller().endInactivity(
+        'n1',
+        activeFrom: DateTime(2026, 10, 11),
+      );
+      expect(boxes.people.get('n1')!.isActive, isTrue);
+    });
+
     test('yeniden aktif yapılınca pasif başlangıcı silinir', () async {
       await seedTeam();
       await controller().deactivate('n1', from: DateTime(2026, 10, 20));

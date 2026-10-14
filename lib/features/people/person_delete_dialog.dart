@@ -228,3 +228,46 @@ Future<bool> deactivateWithDate(
     );
   return true;
 }
+
+/// Kişinin pasif dönemi sürüyor ya da ileride mi (sonlandırılabilir mi)?
+bool hasOpenInactivity(Person person, DateTime today) =>
+    person.inactiveFrom != null
+    ? !person.hasEndedInactivity(today)
+    : !person.isActive;
+
+/// Pasif dönemini sonlandırır: yeniden aktif olacağı günü sorar (varsayılan
+/// bugün), uygular ve sonucu bildirir. Sonlandırıldıysa true döner.
+Future<bool> endInactivityWithDate(
+  BuildContext context,
+  WidgetRef ref,
+  Person person,
+) async {
+  final messenger = ScaffoldMessenger.of(context);
+  final today = ref.read(todayProvider);
+  final from = person.inactiveFrom;
+  final picked = await showDatePicker(
+    context: context,
+    initialDate: today,
+    // Dönem başlamadan önceki bir gün seçilirse dönem tamamen silinir.
+    firstDate: from != null && from.isBefore(today) ? from : DateTime(2020),
+    lastDate: DateTime(2100),
+    helpText: 'Hangi günden itibaren yeniden aktif?',
+    cancelText: 'Vazgeç',
+    confirmText: 'Tamam',
+  );
+  if (picked == null) return false;
+  await ref
+      .read(peopleProvider.notifier)
+      .endInactivity(person.id, activeFrom: picked);
+  messenger
+    ..hideCurrentSnackBar()
+    ..showSnackBar(
+      SnackBar(
+        content: Text(
+          '${person.name} ${DateFormat('d MMMM y', 'tr_TR').format(picked)} '
+          'itibarıyla yeniden aktif.',
+        ),
+      ),
+    );
+  return true;
+}

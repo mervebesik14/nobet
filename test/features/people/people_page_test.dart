@@ -244,6 +244,62 @@ void main() {
     expect(find.text('Pasif'), findsNothing); // Pasif bölümü yok
   });
 
+  testWidgets('listede pasif dönemi sonlandırılır', (tester) async {
+    await seed([
+      Person(
+        id: '1',
+        name: 'Ayşe',
+        role: Role.nurse,
+        isActive: false,
+        inactiveFrom: DateTime(2026, 10, 1),
+      ),
+    ]);
+    await pumpPage(tester);
+    expect(find.text('Pasif'), findsOneWidget); // Pasif bölümünde
+
+    await tester.tap(find.byTooltip('Pasif dönemi sonlandır'));
+    await tester.pumpAndSettle();
+    expect(find.text('Hangi günden itibaren yeniden aktif?'), findsOneWidget);
+    await tester.tap(find.text('Tamam')); // bugün: 11 Ekim
+    await tester.pumpAndSettle();
+
+    final p = boxes.people.get('1')!;
+    expect(p.inactiveUntil, DateTime(2026, 10, 10));
+    expect(p.isActiveOn(DateTime(2026, 10, 11)), isTrue);
+    expect(find.text('Pasif'), findsNothing); // artık aktiflerde
+    expect(find.byTooltip('Pasif dönemi sonlandır'), findsNothing);
+    expect(
+      find.text('Ayşe 11 Ekim 2026 itibarıyla yeniden aktif.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('düzenleme ekranında "Pasif dönemi sonlandır"', (tester) async {
+    await seed([
+      Person(
+        id: '1',
+        name: 'Ayşe',
+        role: Role.nurse,
+        inactiveFrom: DateTime(2026, 10, 20),
+        inactiveUntil: DateTime(2026, 10, 25),
+      ),
+    ]);
+    await pumpPage(tester);
+
+    await tester.tap(find.text('Ayşe'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pasif dönemi sonlandır'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tamam'));
+    await tester.pumpAndSettle();
+
+    // Dönem henüz başlamamıştı: tamamen silinir, form kapanır.
+    expect(find.text('Kişiyi Düzenle'), findsNothing);
+    final p = boxes.people.get('1')!;
+    expect(p.inactiveFrom, isNull);
+    expect(p.inactiveUntil, isNull);
+  });
+
   testWidgets('planda geçen kişinin görevi değiştirilemez', (tester) async {
     await seed(const [Person(id: '1', name: 'Ayşe', role: Role.nurse)]);
     await boxes.monthPlans.put(

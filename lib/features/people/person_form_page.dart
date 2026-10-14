@@ -129,6 +129,12 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  Future<void> _endInactivity() async {
+    if (await endInactivityWithDate(context, ref, widget.person!) && mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
   Future<void> _delete() async {
     final person = widget.person!;
     final messenger = ScaffoldMessenger.of(context);
@@ -242,6 +248,16 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
                     }
                   },
                   child: const Text('Değiştir'),
+                ),
+              ),
+            if (_isEditing &&
+                hasOpenInactivity(widget.person!, ref.read(todayProvider)))
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: FilledButton.tonalIcon(
+                  onPressed: _saving ? null : _endInactivity,
+                  icon: const Icon(Icons.restart_alt),
+                  label: const Text('Pasif dönemi sonlandır'),
                 ),
               ),
             const SizedBox(height: 24),

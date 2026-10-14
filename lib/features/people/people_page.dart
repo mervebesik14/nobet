@@ -136,6 +136,13 @@ class _PersonTile extends ConsumerWidget {
           : person.isChargeNurse
           ? const Text('Sorumlu hemşire · 7A')
           : null,
+      trailing: hasOpenInactivity(person, today)
+          ? IconButton(
+              tooltip: 'Pasif dönemi sonlandır',
+              icon: const Icon(Icons.restart_alt),
+              onPressed: () => endInactivityWithDate(context, ref, person),
+            )
+          : null,
       onTap: onTap,
     );
 

@@ -178,6 +178,34 @@ class PeopleController extends Notifier<List<Person>> {
     return report;
   }
 
+  /// Pasif dönemini sonlandırır: kişi [activeFrom] gününden itibaren yeniden
+  /// aktif olur. Dönemin o güne kadarki kısmı kayıtta kalır (geçmiş aylar
+  /// doğru kalsın diye); dönem henüz başlamadıysa tamamen silinir. Daha önce
+  /// başkalarına verilmiş nöbetler geri gelmez.
+  Future<void> endInactivity(
+    String personId, {
+    required DateTime activeFrom,
+  }) async {
+    final repo = ref.read(peopleRepositoryProvider);
+    final person = repo.getById(personId);
+    if (person == null) return;
+    final from = person.inactiveFrom;
+    final lastInactive = DateTime(
+      activeFrom.year,
+      activeFrom.month,
+      activeFrom.day - 1,
+    );
+    if (from == null ||
+        lastInactive.isBefore(DateTime(from.year, from.month, from.day))) {
+      await activate(personId);
+      return;
+    }
+    await repo.save(
+      person.copyWith(isActive: true, inactiveUntil: lastInactive),
+    );
+    state = repo.getAll();
+  }
+
   /// Pasif kişiyi yeniden aktif yapar (pasif başlangıcı silinir).
   Future<void> activate(String personId) async {
     final repo = ref.read(peopleRepositoryProvider);
