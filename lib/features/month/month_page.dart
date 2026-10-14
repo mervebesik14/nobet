@@ -130,6 +130,7 @@ class MonthPage extends ConsumerWidget {
                   unavailableCount: plan.unavailableDaysOf(person.id).length,
                   annualLeaveCount: plan.annualLeaveOf(person.id).length,
                   radiationLeaveCount: plan.radiationLeaveOf(person.id).length,
+                  sickLeaveCount: plan.sickLeaveOf(person.id).length,
                   wantsOvertime: plan.wantsOvertime(person.id),
                   requestedCount: plan.requestedShiftsOf(person.id).length,
                 ),
@@ -147,6 +148,7 @@ class _PersonRow extends StatelessWidget {
     required this.unavailableCount,
     required this.annualLeaveCount,
     required this.radiationLeaveCount,
+    this.sickLeaveCount = 0,
     required this.wantsOvertime,
     this.requestedCount = 0,
   });
@@ -155,6 +157,7 @@ class _PersonRow extends StatelessWidget {
   final int unavailableCount;
   final int annualLeaveCount;
   final int radiationLeaveCount;
+  final int sickLeaveCount;
   final bool wantsOvertime;
   final int requestedCount;
 
@@ -192,6 +195,11 @@ class _PersonRow extends StatelessWidget {
             _LeaveLine(
               icon: Icons.radio_button_checked,
               text: '$radiationLeaveCount gün şua izni',
+            ),
+          if (sickLeaveCount > 0)
+            _LeaveLine(
+              icon: Icons.medical_services_outlined,
+              text: '$sickLeaveCount gün rapor',
             ),
           if (wantsOvertime)
             Row(

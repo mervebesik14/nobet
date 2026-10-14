@@ -21,7 +21,24 @@ class UnavailableDaysPage extends ConsumerStatefulWidget {
       _UnavailableDaysPageState();
 }
 
-enum _Tab { unavailable, requested, annual, radiation }
+/// Sekme: istenmeyen günler, sorumlu hemşirenin nöbet günleri ya da bir
+/// izin türü.
+sealed class _Tab {
+  const _Tab();
+}
+
+class _UnavailableTab extends _Tab {
+  const _UnavailableTab();
+}
+
+class _RequestedTab extends _Tab {
+  const _RequestedTab();
+}
+
+class _LeaveTab extends _Tab {
+  const _LeaveTab(this.type);
+  final LeaveType type;
+}
 
 class _UnavailableDaysPageState extends ConsumerState<UnavailableDaysPage>
     with SingleTickerProviderStateMixin {
@@ -29,10 +46,10 @@ class _UnavailableDaysPageState extends ConsumerState<UnavailableDaysPage>
 
   /// Nöbet günleri sekmesi yalnızca sorumlu hemşirede görünür.
   late final List<_Tab> _tabList = [
-    _Tab.unavailable,
-    if (person.isChargeNurse && person.role == Role.nurse) _Tab.requested,
-    _Tab.annual,
-    _Tab.radiation,
+    const _UnavailableTab(),
+    if (person.isChargeNurse && person.role == Role.nurse)
+      const _RequestedTab(),
+    for (final type in LeaveType.values) _LeaveTab(type),
   ];
 
   late final TabController _tabs = TabController(
@@ -53,21 +70,17 @@ class _UnavailableDaysPageState extends ConsumerState<UnavailableDaysPage>
 
     // Aktif sekmedeki verinin varlığı ve "Temizle" eylemi.
     final (hasData, onClear) = switch (_tabList[_tabs.index]) {
-      _Tab.unavailable => (
+      _UnavailableTab() => (
         plan.unavailableDaysOf(person.id).isNotEmpty,
         () => controller.clearUnavailable(person.id),
       ),
-      _Tab.requested => (
+      _RequestedTab() => (
         plan.requestedShiftsOf(person.id).isNotEmpty,
         () => controller.clearRequestedShifts(person.id),
       ),
-      _Tab.annual => (
-        plan.annualLeaveOf(person.id).isNotEmpty,
-        () => controller.clearLeave(person.id, LeaveType.annual),
-      ),
-      _Tab.radiation => (
-        plan.radiationLeaveOf(person.id).isNotEmpty,
-        () => controller.clearLeave(person.id, LeaveType.radiation),
+      _LeaveTab(:final type) => (
+        plan.leaveOf(person.id, type).isNotEmpty,
+        () => controller.clearLeave(person.id, type),
       ),
     };
 
@@ -86,10 +99,9 @@ class _UnavailableDaysPageState extends ConsumerState<UnavailableDaysPage>
             for (final tab in _tabList)
               Tab(
                 text: switch (tab) {
-                  _Tab.unavailable => 'İstenmeyen günler',
-                  _Tab.requested => 'Nöbet günleri',
-                  _Tab.annual => 'Yıllık izin',
-                  _Tab.radiation => 'Şua izni',
+                  _UnavailableTab() => 'İstenmeyen günler',
+                  _RequestedTab() => 'Nöbet günleri',
+                  _LeaveTab(:final type) => type.label,
                 },
               ),
           ],
@@ -100,18 +112,14 @@ class _UnavailableDaysPageState extends ConsumerState<UnavailableDaysPage>
         children: [
           for (final tab in _tabList)
             switch (tab) {
-              _Tab.unavailable => _CalendarEditor(person: person),
-              _Tab.requested => _CalendarEditor(
+              _UnavailableTab() => _CalendarEditor(person: person),
+              _RequestedTab() => _CalendarEditor(
                 person: person,
                 requested: true,
               ),
-              _Tab.annual => _LeaveEditor(
+              _LeaveTab(:final type) => _LeaveEditor(
                 person: person,
-                type: LeaveType.annual,
-              ),
-              _Tab.radiation => _LeaveEditor(
-                person: person,
-                type: LeaveType.radiation,
+                type: type,
               ),
             },
         ],
@@ -302,6 +310,7 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
                           'başlıyorsa Perşembe). İzinden sonra ilk iş günü '
                           'nöbete girebilir.',
                       LeaveType.radiation => 'Kişi iznin bittiği günden sonra nöbete girebilir.',
+                      LeaveType.sick => 'Kişi raporun bittiği günden sonra nöbete girebilir.',
                     }}',
           style: theme.textTheme.bodyMedium,
         ),
@@ -319,14 +328,14 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
           rangeEndDay: _rangeEnd,
           calendarStyle: CalendarStyle(
             outsideDaysVisible: false,
-            rangeHighlightColor: scheme.leaveTint,
+            rangeHighlightColor: scheme.leaveBackground(type),
             withinRangeTextStyle: TextStyle(color: scheme.onSurface),
             rangeStartDecoration: BoxDecoration(
-              color: scheme.leaveColor,
+              color: scheme.leaveInk(type),
               shape: BoxShape.circle,
             ),
             rangeEndDecoration: BoxDecoration(
-              color: scheme.leaveColor,
+              color: scheme.leaveInk(type),
               shape: BoxShape.circle,
             ),
           ),
@@ -342,7 +351,7 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
             prioritizedBuilder: (context, day, _) => days.contains(day.day)
                 ? _DayCell(
                     day: day.day,
-                    background: scheme.leaveColor,
+                    background: scheme.leaveInk(type),
                     foreground: Colors.white,
                     holiday: holidays[day.day],
                     isWeekend:
@@ -381,7 +390,7 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
           ],
         ),
         const SizedBox(height: 8),
-        _Legend(items: [(scheme.leaveColor, type.label)]),
+        _Legend(items: [(scheme.leaveInk(type), type.label)]),
         if (days.isNotEmpty) ...[
           const Divider(height: 32),
           Text(

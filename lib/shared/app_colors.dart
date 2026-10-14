@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../models/month_plan.dart';
+
 /// Uygulama genelinde kullanılan yumuşak, tema uyumlu arka plan tonları.
 ///
 /// Parlak `...Container` renkleri yerine, marka renginin yüzeye düşük oranda
@@ -38,6 +40,26 @@ extension AppTints on ColorScheme {
 
   /// Şua izni lejantı/zemini: mor tonun hafif hali.
   Color get radiationTint => _tint(radiationColor, 0.16);
+
+  /// Rapor günleri: izinlerden ayrışan gül tonu.
+  Color get sickColor => const Color(0xFFC2185B);
+
+  /// Rapor lejantı/zemini: gül tonunun hafif hali.
+  Color get sickTint => _tint(sickColor, 0.14);
+
+  /// İzin türünün yazı rengi.
+  Color leaveInk(LeaveType type) => switch (type) {
+    LeaveType.annual => leaveColor,
+    LeaveType.radiation => radiationColor,
+    LeaveType.sick => sickColor,
+  };
+
+  /// İzin türünün hücre zemini.
+  Color leaveBackground(LeaveType type) => switch (type) {
+    LeaveType.annual => leaveTint,
+    LeaveType.radiation => radiationTint,
+    LeaveType.sick => sickTint,
+  };
 
   /// 7A (gündüz mesaisi) yazısı: sıcak, nöbetten ayrışan ton.
   Color get dayShiftColor => const Color(0xFFB26A00);

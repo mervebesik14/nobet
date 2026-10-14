@@ -203,12 +203,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
     Set<int> days,
   ) async {
     if (state.isLocked) return false;
-    final map = {
-      ...switch (type) {
-        LeaveType.annual => state.annualLeave,
-        LeaveType.radiation => state.radiationLeave,
-      },
-    };
+    final map = {...state.leaveMap(type)};
     if (days.isEmpty) {
       map.remove(personId);
     } else {
@@ -217,6 +212,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
     state = switch (type) {
       LeaveType.annual => state.copyWith(annualLeave: map),
       LeaveType.radiation => state.copyWith(radiationLeave: map),
+      LeaveType.sick => state.copyWith(sickLeave: map),
     };
     await ref.read(monthPlanRepositoryProvider).save(state);
     return true;
@@ -233,6 +229,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       unavailableDays: state.unavailableDays,
       annualLeave: state.annualLeave,
       radiationLeave: state.radiationLeave,
+      sickLeave: state.sickLeave,
       requestedShifts: state.requestedShifts,
       overtimeRequests: state.overtimeRequests,
       nurseOnly: state.nurseOnly,

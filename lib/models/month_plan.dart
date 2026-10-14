@@ -2,12 +2,14 @@ import 'package:collection/collection.dart';
 
 import 'day_assignment.dart';
 
-/// İzin türü: yıllık izin ve şua (radyasyon) izni. İkisi de nöbet verilmesini
-/// engeller ve kişinin gereken saatinden düşülür; listede farklı renk ve
-/// kısaltmayla gösterilir.
+/// İzin türü: yıllık izin, şua (radyasyon) izni ve sağlık raporu. Hepsi
+/// nöbet verilmesini engeller ve kişinin gereken saatinden düşülür; listede
+/// farklı renk ve kısaltmayla gösterilir. Yıllık izin öncesi/sonrası iş günü
+/// kuralları yalnızca yıllık izne uygulanır.
 enum LeaveType {
   annual('Yıllık izin', 'Y.İ.'),
-  radiation('Şua izni', 'Ş.İ.');
+  radiation('Şua izni', 'Ş.İ.'),
+  sick('Rapor', 'R.');
 
   const LeaveType(this.label, this.shortLabel);
 
@@ -32,6 +34,7 @@ class MonthPlan {
     this.overtimeRequests = const {},
     this.annualLeave = const {},
     this.radiationLeave = const {},
+    this.sickLeave = const {},
     this.requestedShifts = const {},
   });
 
@@ -73,6 +76,10 @@ class MonthPlan {
   /// izinle aynı davranır: nöbet engellenir ve gereken saatten düşülür.
   final Map<String, List<int>> radiationLeave;
 
+  /// Kişi kimliği → o kişinin sağlık raporlu olduğu günler. Şua izni gibi
+  /// davranır: nöbet engellenir ve gereken saatten düşülür.
+  final Map<String, List<int>> sickLeave;
+
   /// Kişi kimliği → o kişinin mutlaka nöbet tutacağı günler (sorumlu
   /// hemşire için seçilir). Liste oluşturulurken bu günlere sabit yazılır.
   final Map<String, List<int>> requestedShifts;
@@ -82,27 +89,34 @@ class MonthPlan {
       requestedShifts[personId] ?? const [];
 
   /// Kişinin yıllık izin günleri.
-  List<int> annualLeaveOf(String personId) =>
-      annualLeave[personId] ?? const [];
+  List<int> annualLeaveOf(String personId) => annualLeave[personId] ?? const [];
 
   /// Kişinin şua izni günleri.
   List<int> radiationLeaveOf(String personId) =>
       radiationLeave[personId] ?? const [];
 
-  /// Kişinin verilen türdeki izin günleri.
-  List<int> leaveOf(String personId, LeaveType type) => switch (type) {
-    LeaveType.annual => annualLeaveOf(personId),
-    LeaveType.radiation => radiationLeaveOf(personId),
+  /// Kişinin rapor günleri.
+  List<int> sickLeaveOf(String personId) => sickLeave[personId] ?? const [];
+
+  /// Türün kişi → gün haritası.
+  Map<String, List<int>> leaveMap(LeaveType type) => switch (type) {
+    LeaveType.annual => annualLeave,
+    LeaveType.radiation => radiationLeave,
+    LeaveType.sick => sickLeave,
   };
 
-  /// Kişinin tüm izin günleri (yıllık + şua), tekilleşmiş ve sıralı.
-  List<int> leaveDaysOf(String personId) =>
-      ({...annualLeaveOf(personId), ...radiationLeaveOf(personId)}.toList()
-        ..sort());
+  /// Kişinin verilen türdeki izin günleri.
+  List<int> leaveOf(String personId, LeaveType type) =>
+      leaveMap(type)[personId] ?? const [];
 
-  /// Kişi kimliği → tüm izin günleri (yıllık + şua). Gereken saat düşümü için.
+  /// Kişinin tüm izin günleri (yıllık + şua + rapor), tekilleşmiş ve sıralı.
+  List<int> leaveDaysOf(String personId) => ({
+    for (final type in LeaveType.values) ...leaveOf(personId, type),
+  }.toList()..sort());
+
+  /// Kişi kimliği → tüm izin günleri. Gereken saat düşümü için.
   Map<String, List<int>> get leaveDays {
-    final ids = {...annualLeave.keys, ...radiationLeave.keys};
+    final ids = {for (final type in LeaveType.values) ...leaveMap(type).keys};
     return {for (final id in ids) id: leaveDaysOf(id)};
   }
 
@@ -110,18 +124,11 @@ class MonthPlan {
   Map<String, List<int>> get blockedDays {
     final ids = {
       ...unavailableDays.keys,
-      ...annualLeave.keys,
-      ...radiationLeave.keys,
+      for (final type in LeaveType.values) ...leaveMap(type).keys,
     };
     return {
       for (final id in ids)
-        id:
-            {
-              ...unavailableDaysOf(id),
-              ...annualLeaveOf(id),
-              ...radiationLeaveOf(id),
-            }.toList()
-              ..sort(),
+        id: {...unavailableDaysOf(id), ...leaveDaysOf(id)}.toList()..sort(),
     };
   }
 
@@ -146,6 +153,7 @@ class MonthPlan {
       unavailableDays.containsKey(personId) ||
       annualLeave.containsKey(personId) ||
       radiationLeave.containsKey(personId) ||
+      sickLeave.containsKey(personId) ||
       requestedShifts.containsKey(personId) ||
       assignments.values.any((a) => a.includes(personId));
 
@@ -159,6 +167,7 @@ class MonthPlan {
     Set<String>? overtimeRequests,
     Map<String, List<int>>? annualLeave,
     Map<String, List<int>>? radiationLeave,
+    Map<String, List<int>>? sickLeave,
     Map<String, List<int>>? requestedShifts,
   }) {
     return MonthPlan(
@@ -173,6 +182,7 @@ class MonthPlan {
       overtimeRequests: overtimeRequests ?? this.overtimeRequests,
       annualLeave: annualLeave ?? this.annualLeave,
       radiationLeave: radiationLeave ?? this.radiationLeave,
+      sickLeave: sickLeave ?? this.sickLeave,
       requestedShifts: requestedShifts ?? this.requestedShifts,
     );
   }
@@ -192,6 +202,7 @@ class MonthPlan {
     'overtimeRequests': overtimeRequests.toList(),
     'annualLeave': annualLeave,
     'radiationLeave': radiationLeave,
+    'sickLeave': sickLeave,
     'requestedShifts': requestedShifts,
   };
 
@@ -227,6 +238,10 @@ class MonthPlan {
         for (final e in (json['radiationLeave'] as Map? ?? const {}).entries)
           e.key as String: (e.value as List).cast<int>(),
       },
+      sickLeave: {
+        for (final e in (json['sickLeave'] as Map? ?? const {}).entries)
+          e.key as String: (e.value as List).cast<int>(),
+      },
       requestedShifts: {
         for (final e in (json['requestedShifts'] as Map? ?? const {}).entries)
           e.key as String: (e.value as List).cast<int>(),
@@ -256,6 +271,7 @@ class MonthPlan {
       ) &&
       _unavailableEquality.equals(other.annualLeave, annualLeave) &&
       _unavailableEquality.equals(other.radiationLeave, radiationLeave) &&
+      _unavailableEquality.equals(other.sickLeave, sickLeave) &&
       _unavailableEquality.equals(other.requestedShifts, requestedShifts);
 
   @override
@@ -271,6 +287,7 @@ class MonthPlan {
     const SetEquality<String>().hash(overtimeRequests),
     _unavailableEquality.hash(annualLeave),
     _unavailableEquality.hash(radiationLeave),
+    _unavailableEquality.hash(sickLeave),
     _unavailableEquality.hash(requestedShifts),
   );
 

@@ -155,8 +155,16 @@ void main() {
       requestedShifts: const {
         'n2': [4, 18],
       },
+      sickLeave: const {
+        't3': [7, 8],
+      },
     );
     expect(MonthPlan.fromJson(plan.toJson()), plan);
+    expect(plan.sickLeaveOf('t3'), [7, 8]);
+    expect(plan.leaveOf('t3', LeaveType.sick), [7, 8]);
+    expect(plan.blockedDays['t3'], [7, 8]);
+    expect(plan.leaveDays['t3'], [7, 8]);
+    expect(plan.references('t3'), isTrue);
     expect(plan.requestedShiftsOf('n2'), [4, 18]);
     expect(plan.references('n2'), isTrue);
     expect(plan.key, '2026-10');

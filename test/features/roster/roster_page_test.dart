@@ -297,6 +297,9 @@ void main() {
         radiationLeave: {
           'n2': [12, 13],
         },
+        sickLeave: {
+          'n3': [15, 16],
+        },
       ),
     );
     await pumpMonthPage(tester);
@@ -319,6 +322,10 @@ void main() {
         find.descendant(of: find.byType(RosterTable), matching: find.text(t));
     expect(inTable('Y.İ.'), findsNWidgets(3));
     expect(inTable('Ş.İ.'), findsNWidgets(2));
+    expect(inTable('R.'), findsNWidgets(2));
+    for (final d in [15, 16]) {
+      expect(plan.assignments[d]!.includes('n3'), isFalse);
+    }
   });
 
   testWidgets('yıllık izin öncesi iş günü ve sonrası hafta sonu nöbetsiz', (

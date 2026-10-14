@@ -235,6 +235,36 @@ void main() {
     expect(find.text('3 gün şua izni'), findsOneWidget);
   });
 
+  testWidgets('Rapor sekmesinden aralık eklenir ve satırda görünür', (
+    tester,
+  ) async {
+    await seed(_team);
+    await pumpPage(tester);
+
+    await tester.tap(find.text('Ali'));
+    await tester.pumpAndSettle();
+    await tester.drag(find.byType(TabBar), const Offset(-400, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rapor'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('raporun bittiği'), findsOneWidget);
+
+    await tester.tap(find.text('13'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('14'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('İzin ekle'));
+    await tester.pumpAndSettle();
+
+    final plan = boxes.monthPlans.get('2026-10')!;
+    expect(plan.sickLeaveOf('t1'), [13, 14]);
+    expect(plan.annualLeaveOf('t1'), isEmpty);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('2 gün rapor'), findsOneWidget);
+  });
+
   testWidgets('İzin çipi silinince o aralık kaldırılır', (tester) async {
     await seed(
       _team,

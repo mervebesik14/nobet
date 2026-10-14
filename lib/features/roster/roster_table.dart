@@ -157,8 +157,11 @@ class RosterTable extends StatelessWidget {
         ),
       );
       final personDays = worked[row.id] ?? const <int>{};
-      final annualLeave = plan.annualLeaveOf(row.id).toSet();
-      final radiationLeave = plan.radiationLeaveOf(row.id).toSet();
+      // Gün → o gün geçerli izin türü (ilk eşleşen).
+      final leaveOn = <int, LeaveType>{
+        for (final type in LeaveType.values.reversed)
+          for (final d in plan.leaveOf(row.id, type)) d: type,
+      };
       right.add(
         Row(
           children: [
@@ -176,13 +179,7 @@ class RosterTable extends StatelessWidget {
                   box: box,
                   cell: (personId: row.id, day: d),
                   // İzinli gün (o gün nöbeti yoksa) türüne göre gösterilir.
-                  leave: personDays.contains(d)
-                      ? null
-                      : annualLeave.contains(d)
-                      ? LeaveType.annual
-                      : radiationLeave.contains(d)
-                      ? LeaveType.radiation
-                      : null,
+                  leave: personDays.contains(d) ? null : leaveOn[d],
                   label:
                       _labelFor(row.id, d, personDays.contains(d)) ??
                       (dayShifts[d]?.personId == row.id ? '7A' : null),
@@ -336,16 +333,8 @@ class RosterTable extends StatelessWidget {
     final selected = selectedCell == cell;
     final violated = violationCells.contains(cell);
     // Nöbet yoksa ama izin varsa izin yazısı/rengi gösterilir.
-    final leaveTint = switch (leave) {
-      LeaveType.annual => scheme.leaveTint,
-      LeaveType.radiation => scheme.radiationTint,
-      null => null,
-    };
-    final leaveInk = switch (leave) {
-      LeaveType.annual => scheme.leaveColor,
-      LeaveType.radiation => scheme.radiationColor,
-      null => null,
-    };
+    final leaveTint = leave == null ? null : scheme.leaveBackground(leave);
+    final leaveInk = leave == null ? null : scheme.leaveInk(leave);
     final text = label ?? leave?.shortLabel;
     final color = selected
         ? scheme.primary

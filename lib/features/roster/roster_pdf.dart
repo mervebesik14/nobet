@@ -55,6 +55,8 @@ Future<Uint8List> buildRosterPdf({
         _legend(_leaveColor, 'Y.İ. = Yıllık izin'),
         pw.SizedBox(width: 12),
         _legend(_radiationColor, 'Ş.İ. = Şua izni'),
+        pw.SizedBox(width: 12),
+        _legend(_sickColor, 'R. = Rapor'),
         if (dayShifts.isNotEmpty) ...[
           pw.SizedBox(width: 12),
           _legend(_dayShiftColor, '7A = Gündüz mesaisi'),
@@ -108,6 +110,12 @@ const _groupColor = PdfColor.fromInt(0xFFB9E9E1);
 const _missingColor = PdfColor.fromInt(0xFFF9D6D2);
 const _leaveColor = PdfColor.fromInt(0xFFCADEE2);
 const _radiationColor = PdfColor.fromInt(0xFFDDD2EE);
+const _sickColor = PdfColor.fromInt(0xFFF6D5E1);
+const _leaveColors = {
+  LeaveType.annual: _leaveColor,
+  LeaveType.radiation: _radiationColor,
+  LeaveType.sick: _sickColor,
+};
 const _dayShiftColor = PdfColor.fromInt(0xFFF5E3C8);
 
 pw.Widget _legend(PdfColor color, String label) => pw.Row(
@@ -194,8 +202,11 @@ pw.Widget _rosterTable({
       );
     }
     final personDays = worked[row.id] ?? const <int>{};
-    final annualLeave = plan.annualLeaveOf(row.id).toSet();
-    final radiationLeave = plan.radiationLeaveOf(row.id).toSet();
+    // Gün → o gün geçerli izin türü (ilk eşleşen).
+    final leaveOn = <int, LeaveType>{
+      for (final type in LeaveType.values.reversed)
+        for (final d in plan.leaveOf(row.id, type)) d: type,
+    };
     tableRows.add(
       pw.TableRow(
         children: [
@@ -211,10 +222,8 @@ pw.Widget _rosterTable({
               )
             else if (dayShifts[d]?.personId == row.id)
               cell('7A', color: _dayShiftColor, bold: true)
-            else if (annualLeave.contains(d))
-              cell('Y.İ.', color: _leaveColor, bold: true)
-            else if (radiationLeave.contains(d))
-              cell('Ş.İ.', color: _radiationColor, bold: true)
+            else if (leaveOn[d] case final type?)
+              cell(type.shortLabel, color: _leaveColors[type], bold: true)
             else
               cell('', color: columnColor(d)),
         ],
