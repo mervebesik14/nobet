@@ -288,4 +288,69 @@ void main() {
       'Sorumlu hemşire Sevgi seçmediği güne (6 Şubat) nöbete yazıldı.',
     );
   });
+
+  test('boş koltukta her kişinin neden yazılamadığı açıklanır', () {
+    final v = validator.validate(
+      year: 2027,
+      month: 2,
+      assignments: {
+        ...base(),
+        5: const DayAssignment(day: 5, nurseIds: ['c'], techId: 'm'),
+      },
+      people: people,
+      unavailableDays: {
+        'b': [5],
+      },
+      blockReasons: {
+        'b': {5: BlockReason.annualLeave},
+      },
+    );
+    final gap = v.singleWhere(
+      (x) =>
+          x.kind == ViolationKind.missing &&
+          x.role == Role.nurse &&
+          x.days.single == 5,
+    );
+    expect(gap.message, '5 Şubat: 1 hemşire eksik.');
+    expect(
+      gap.detail,
+      'Ayşe: 1-3-5 gün aşırı zincir olur\n'
+      'Banu: yıllık izinde, 1-3-5 gün aşırı zincir olur\n'
+      'Derya: 4 Şubat nöbetçi (art arda gün)',
+    );
+
+    // Hiç nöbeti olmayan bir günde herkes uygun görünür.
+    final empty = v.firstWhere(
+      (x) =>
+          x.kind == ViolationKind.missing &&
+          x.role == Role.nurse &&
+          x.days.single == 10,
+    );
+    expect(empty.detail, contains('Ayşe: kurallara uyuyor, elle eklenebilir'));
+  });
+
+  test('sorumlu hemşirenin seçmediği gün açıklamada yazar', () {
+    final v = validator.validate(
+      year: 2027,
+      month: 2,
+      assignments: {
+        6: const DayAssignment(day: 6, nurseIds: ['a'], techId: 'm'),
+      },
+      people: const [
+        Person(id: 'a', name: 'Ayşe', role: Role.nurse),
+        Person(id: 's', name: 'Sena', role: Role.nurse, isChargeNurse: true),
+        Person(id: 'm', name: 'Mehmet', role: Role.radiologyTech),
+      ],
+      requestedShifts: {
+        's': [9],
+      },
+    );
+    final gap = v.singleWhere(
+      (x) =>
+          x.kind == ViolationKind.missing &&
+          x.role == Role.nurse &&
+          x.days.single == 6,
+    );
+    expect(gap.detail, 'Sena: sorumlu hemşire, bu günü seçmedi');
+  });
 }

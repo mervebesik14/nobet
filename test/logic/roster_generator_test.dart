@@ -212,8 +212,9 @@ void main() {
       expect(issue.missing, 1);
       expect(
         issue.message,
-        '18 Ekim: 1 radyoloji teknikeri eksik. Tekniker 1 istemiyor; '
-        'Tekniker 2 istemiyor; Tekniker 3 istemiyor; Tekniker 4 istemiyor.',
+        '18 Ekim: 1 radyoloji teknikeri eksik. Tekniker 1 istemiyor ya da izinli; '
+        'Tekniker 2 istemiyor ya da izinli; Tekniker 3 istemiyor ya da izinli; '
+        'Tekniker 4 istemiyor ya da izinli.',
       );
       // Diğer günler yine dolu ve kurallara uygun.
       expect(r.assignments[18]!.techId, isNull);

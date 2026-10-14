@@ -206,6 +206,17 @@ void main() {
 
     expect(find.text('Boş günler (1)'), findsOneWidget);
     expect(find.text('• 4 Ekim: 1 hemşire eksik.'), findsOneWidget);
+    // Boş günün altında kimin neden yazılamadığı açıklanır; nöbeti
+    // kaldırılan Banu kurallara uyduğu için yeniden eklenebilir.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('violations-missing')),
+        matching: find.textContaining(
+          'Banu: kurallara uyuyor, elle eklenebilir',
+        ),
+      ),
+      findsOneWidget,
+    );
     expect(
       find.text('İzinli / istemediği günde çalışanlar (1)'),
       findsOneWidget,

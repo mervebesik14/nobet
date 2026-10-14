@@ -837,7 +837,10 @@ class _RoleSolver {
     ]..sort((a, b) => compareTurkish(a.name, b.name))) {
       if (_slots[d].contains(p.id)) continue;
       final reason = switch (_block(p.id, d)) {
-        _Block.unavailable => 'istemiyor',
+        _Block.unavailable =>
+          reserve.contains(p.id)
+              ? 'sorumlu hemşire, bu günü seçmedi'
+              : 'istemiyor ya da izinli',
         _Block.sameDay || null => null,
         _Block.consecutive =>
           '${date(_works(p.id, d - 1) ? d - 1 : d + 1)} nöbetçi (art arda gün)',

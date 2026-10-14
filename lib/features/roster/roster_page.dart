@@ -904,7 +904,21 @@ class _ViolationCard extends StatelessWidget {
             for (final v in items)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Text('• ${v.message}', style: TextStyle(color: color)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('• ${v.message}', style: TextStyle(color: color)),
+                    // Boş koltukta kimin neden yazılamadığı.
+                    if (v.detail case final detail?)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 12, top: 2),
+                        child: Text(
+                          detail,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
+                  ],
+                ),
               ),
           ],
         ),

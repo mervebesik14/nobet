@@ -41,6 +41,7 @@ class RuleViolation {
     required this.message,
     this.personId,
     this.role,
+    this.detail,
   });
 
   final ViolationKind kind;
@@ -54,6 +55,10 @@ class RuleViolation {
 
   /// Türkçe açıklama, ör. "Mehmet 14 ve 15 Ekim art arda nöbette."
   final String message;
+
+  /// Boş koltukta: o rolden her kişinin o güne neden yazılamadığı, satır
+  /// satır ("Ali: 15 Ekim nöbetçi (art arda gün)").
+  final String? detail;
 
   @override
   String toString() => message;
@@ -198,6 +203,69 @@ class RosterValidator {
     }
 
     final chainLimit = max(1, settings.maxEveryOtherDayChain);
+
+    // Boş koltuklar: o rolden her kişinin o güne neden yazılamadığı.
+    String? gapDetail(int d, Role role) {
+      final lines = <String>[];
+      final members =
+          byId.values
+              .where((p) => p.role == role && p.worksInMonth(year, month))
+              .toList()
+            ..sort((a, b) => compareTurkish(a.name, b.name));
+      final strict =
+          settings.forbidConsecutiveDays ||
+          (role == Role.radiologyTech && settings.techsPerDay >= 2);
+      for (final p in members) {
+        final id = p.id;
+        if (assignments[d]?.includes(id) ?? false) continue;
+        final heavy = blocking24[id] ?? const <int>{};
+        final days = worked[id] ?? const <int>{};
+        final reasons = <String>[
+          if (unavailableDays[id]?.contains(d) ?? false)
+            (blockReasons[id]?[d] ?? BlockReason.unavailable).label,
+          if (p.isChargeNurse && !(requestedShifts[id]?.contains(d) ?? false))
+            'sorumlu hemşire, bu günü seçmedi',
+          if (strict && heavy.contains(d - 1))
+            '${date(d - 1)} nöbetçi (art arda gün)',
+          if (strict && days.contains(d + 1))
+            '${formatDayMonth(d + 1, month)} nöbetçi (art arda gün)',
+        ];
+        // Bu güne yazılsa gün aşırı zincir sınırı aşılır mı?
+        var first = d;
+        while (heavy.contains(first - 2)) {
+          first -= 2;
+        }
+        var last = d;
+        while (heavy.contains(last + 2)) {
+          last += 2;
+        }
+        if ((last - first) ~/ 2 + 1 > chainLimit) {
+          final chain = [
+            for (var x = first; x <= last; x += 2) x >= 1 ? '$x' : date(x),
+          ];
+          reasons.add('${chain.join('-')} gün aşırı zincir olur');
+        }
+        lines.add(
+          reasons.isEmpty
+              ? '${p.name}: kurallara uyuyor, elle eklenebilir'
+              : '${p.name}: ${reasons.join(', ')}',
+        );
+      }
+      return lines.isEmpty ? null : lines.join('\n');
+    }
+
+    for (var i = 0; i < violations.length; i++) {
+      final v = violations[i];
+      if (v.kind != ViolationKind.missing || v.role == null) continue;
+      violations[i] = RuleViolation(
+        kind: v.kind,
+        days: v.days,
+        role: v.role,
+        message: v.message,
+        detail: gapDetail(v.days.single, v.role!),
+      );
+    }
+
     final ids = worked.keys.toList()
       ..sort((a, b) => compareTurkish(name(a), name(b)));
     for (final id in ids) {
