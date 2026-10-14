@@ -324,8 +324,8 @@ final monthPlanProvider = NotifierProvider<MonthPlanController, MonthPlan>(
 );
 
 /// Nöbet dağıtımında kişi başı gerçekten engellenen günler: istenmeyen
-/// günler + tüm izinler + yıllık izin bitişinden sonraki ilk iş gününe kadar
-/// kalan günler.
+/// günler + tüm izinler + yıllık izin öncesi son iş günü ve sonrası ilk iş
+/// gününe kadar kalan günler (bkz. [LeaveRules]).
 Map<String, List<int>> computeEffectiveBlockedDays(
   MonthPlan plan,
   Iterable<Holiday> holidays,
@@ -336,7 +336,7 @@ Map<String, List<int>> computeEffectiveBlockedDays(
   for (final id in ids) {
     final days = {...?base[id]};
     days.addAll(
-      LeaveRules.postAnnualLeaveBlockedDays(
+      LeaveRules.annualLeaveBlockedDays(
         year: plan.year,
         month: plan.month,
         annualLeaveDays: plan.annualLeaveOf(id),

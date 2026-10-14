@@ -282,7 +282,7 @@ void main() {
     expect(inTable('Ş.İ.'), findsNWidgets(2));
   });
 
-  testWidgets('yıllık izin Cuma bitince hafta sonu da nöbetsiz kalır', (
+  testWidgets('yıllık izin öncesi iş günü ve sonrası hafta sonu nöbetsiz', (
     tester,
   ) async {
     // 9 Ekim Cuma. n1 yıllık izni 8–9; 10 Cmt ve 11 Paz da nöbete kapalı,
@@ -304,8 +304,9 @@ void main() {
     await tester.pumpAndSettle();
 
     final plan = saved();
-    // İzin günleri ve iznden sonraki hafta sonu n1'e kapalı.
-    for (final d in [8, 9, 10, 11]) {
+    // İzinden önceki iş günü, izin günleri ve izinden sonraki hafta sonu
+    // n1'e kapalı.
+    for (final d in [7, 8, 9, 10, 11]) {
       expect(plan.assignments[d]!.includes('n1'), isFalse, reason: 'gün $d');
     }
   });

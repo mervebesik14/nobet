@@ -53,4 +53,49 @@ void main() {
     final out = blocked([9]);
     expect(out.contains(9), isFalse);
   });
+
+  group('izin öncesi', () {
+    Set<int> pre(List<int> leave) => LeaveRules.preAnnualLeaveBlockedDays(
+      year: 2026,
+      month: 10,
+      annualLeaveDays: leave,
+      holidays: holidays,
+    );
+
+    test(
+      'Pazartesi başlayan izin: Cuma-Cmt-Paz kapalı, son nöbet Perşembe',
+      () {
+        // İzin 12–16 (12 Pzt). 9 Cum, 10 Cmt, 11 Paz kapalı; 8 Per serbest.
+        expect(pre([12, 13, 14, 15, 16]), {9, 10, 11});
+      },
+    );
+
+    test('hafta ortası başlayan izin: yalnız önceki iş günü kapalı', () {
+      // İzin 14 (Çar). 13 Sal kapalı; 12 Pzt serbest.
+      expect(pre([14]), {13});
+    });
+
+    test('araya tam gün tatil girerse o da atlanır', () {
+      // İzin 30 (Cum). 29 Per Cumhuriyet tam tatil, 28 Çar arife (iş günü):
+      // 28 ve 29 kapalı; son nöbet 27 Sal.
+      expect(pre([30]), {28, 29});
+    });
+
+    test('ayın ilk günleri: ay dışına taşan engel yok', () {
+      expect(pre([1]), isEmpty);
+      // İzin 5 (Pzt): 2 Cum, 3 Cmt, 4 Paz kapalı; son nöbet 1 Per.
+      expect(pre([5, 6]), {2, 3, 4});
+    });
+  });
+
+  test('öncesi ve sonrası birlikte: 12–16 izni', () {
+    final all = LeaveRules.annualLeaveBlockedDays(
+      year: 2026,
+      month: 10,
+      annualLeaveDays: [12, 13, 14, 15, 16],
+      holidays: holidays,
+    );
+    // Önce 9–11, sonra 17–18 (16 Cum biter, ilk nöbet 19 Pzt).
+    expect(all, {9, 10, 11, 17, 18});
+  });
 }

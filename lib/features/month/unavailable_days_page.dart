@@ -59,10 +59,7 @@ class _UnavailableDaysPageState extends ConsumerState<UnavailableDaysPage>
         title: Text(person.name),
         actions: [
           if (hasData && !plan.isLocked)
-            TextButton(
-              onPressed: onClear,
-              child: const Text('Temizle'),
-            ),
+            TextButton(onPressed: onClear, child: const Text('Temizle')),
         ],
         bottom: TabBar(
           controller: _tabs,
@@ -248,12 +245,11 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
               : 'Başlangıç ve bitiş gününü seçin, sonra "İzin ekle"ye dokunun. '
                     'İzin günlerinde nöbet verilmez ve gereken saatten düşülür. '
                     '${switch (type) {
-                      LeaveType.annual =>
-                        'Kişi iznin bittiği günden sonraki ilk iş günü nöbete '
-                            'girebilir (aradaki hafta sonu/tatile nöbet '
-                            'yazılmaz).',
-                      LeaveType.radiation =>
-                        'Kişi iznin bittiği günden sonra nöbete girebilir.',
+                      LeaveType.annual => 'İzinden önceki son nöbet, izinden önceki son iş '
+                          'gününden bir önceki gündür (izin Pazartesi '
+                          'başlıyorsa Perşembe). İzinden sonra ilk iş günü '
+                          'nöbete girebilir.',
+                      LeaveType.radiation => 'Kişi iznin bittiği günden sonra nöbete girebilir.',
                     }}',
           style: theme.textTheme.bodyMedium,
         ),
@@ -405,7 +401,8 @@ class _DayCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final selected = background != null;
-    final bg = background ??
+    final bg =
+        background ??
         (holiday != null
             ? scheme.holidayTint
             : isWeekend
