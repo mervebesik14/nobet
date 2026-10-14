@@ -166,3 +166,126 @@ class RosterRepair {
     return false;
   }
 }
+
+/// Geri verme sonucu.
+class RosterRestoreResult {
+  const RosterRestoreResult({
+    required this.assignments,
+    required this.restoredDays,
+    required this.failedDays,
+  });
+
+  final Map<int, DayAssignment> assignments;
+
+  /// Nöbeti kişiye geri verilen günler.
+  final List<int> restoredDays;
+
+  /// Kural bozacağı ya da koltuk kalmadığı için geri verilemeyen günler.
+  final List<int> failedDays;
+}
+
+/// Pasif dönem kısalınca/sonlanınca devredilen nöbetleri geri verir (saf
+/// Dart).
+class RosterRestore {
+  const RosterRestore._();
+
+  /// [handovers] (gün → devralan; "" ise koltuk boş kalmıştı) içindeki her
+  /// gün için: devralan hâlâ o koltuktaysa yerine [personId] yazılır; boş
+  /// kaldıysa boş koltuğa yazılır. Kişi için yeni kural ihlali çıkıyorsa
+  /// (izin, art arda gün, zincir…) ya da koltuk artık yoksa geri verilmez.
+  static RosterRestoreResult restorePerson({
+    required int year,
+    required int month,
+    required Map<int, DayAssignment> assignments,
+    required String personId,
+    required Role role,
+    required Map<int, String> handovers,
+    required Iterable<Person> people,
+    required RosterSettings settings,
+    Map<String, List<int>> blockedDays = const {},
+    List<Set<String>> previousMonthTail = const [],
+    Set<String> overtimeRequests = const {},
+    Map<String, List<int>> requestedShifts = const {},
+  }) {
+    final validator = RosterValidator(settings);
+    Set<String> problemsOf(Map<int, DayAssignment> a) => {
+      for (final v in validator.validate(
+        year: year,
+        month: month,
+        assignments: a,
+        people: people,
+        unavailableDays: blockedDays,
+        previousMonthTail: previousMonthTail,
+        overtimeRequests: overtimeRequests,
+        requestedShifts: requestedShifts,
+      ))
+        if (v.personId == personId && v.kind != ViolationKind.missing)
+          v.message,
+    };
+
+    var current = {...assignments};
+    final restored = <int>[];
+    final failed = <int>[];
+    for (final day in handovers.keys.toList()..sort()) {
+      final a = current[day] ?? DayAssignment(day: day);
+      if (a.includes(personId)) continue;
+      final taker = handovers[day]!;
+      Map<int, DayAssignment>? trial;
+      try {
+        if (taker.isNotEmpty && a.includes(taker)) {
+          trial = RosterEditor.replace(
+            current,
+            day: day,
+            role: role,
+            oldId: taker,
+            newId: personId,
+            nursesPerDay: settings.nursesPerDay,
+            secondary: a.isSecondaryTech(taker),
+          );
+        } else if (role == Role.nurse) {
+          if (a.nurseIds.length < settings.nursesPerDay) {
+            trial = RosterEditor.replace(
+              current,
+              day: day,
+              role: role,
+              newId: personId,
+              nursesPerDay: settings.nursesPerDay,
+            );
+          }
+        } else if (settings.techsPerDay >= 1 && a.techId == null) {
+          trial = RosterEditor.replace(
+            current,
+            day: day,
+            role: role,
+            newId: personId,
+            nursesPerDay: settings.nursesPerDay,
+          );
+        } else if (settings.techsPerDay >= 2 && a.tech16bId == null) {
+          trial = RosterEditor.replace(
+            current,
+            day: day,
+            role: role,
+            newId: personId,
+            nursesPerDay: settings.nursesPerDay,
+            secondary: true,
+          );
+        }
+      } on RosterEditException {
+        trial = null;
+      }
+      if (trial == null ||
+          (blockedDays[personId]?.contains(day) ?? false) ||
+          !problemsOf(trial).every(problemsOf(current).contains)) {
+        failed.add(day);
+        continue;
+      }
+      current = trial;
+      restored.add(day);
+    }
+    return RosterRestoreResult(
+      assignments: current,
+      restoredDays: restored,
+      failedDays: failed,
+    );
+  }
+}

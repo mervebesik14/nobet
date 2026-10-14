@@ -37,6 +37,7 @@ class MonthPlan {
     this.sickLeave = const {},
     this.requestedShifts = const {},
     this.dayShiftOverrides = const {},
+    this.handovers = const {},
   });
 
   final int year;
@@ -88,6 +89,20 @@ class MonthPlan {
   /// Gün → 7A'ya elle yazılan kişi. Otomatik seçimin (sorumlu hemşire ya da
   /// yerine geçen) yerine geçer. Liste yeniden oluşturulunca temizlenir.
   final Map<int, String> dayShiftOverrides;
+
+  /// Pasif yapılan kişinin başkasına devredilen nöbetleri:
+  /// `"kişi:gün"` → devralan kişi ("" ise kimseye verilemedi, koltuk boş
+  /// kaldı). Pasif dönemi kısalırsa ya da sonlandırılırsa geri vermek için.
+  final Map<String, String> handovers;
+
+  static String handoverKey(String personId, int day) => '$personId:$day';
+
+  /// Kişinin devredilen nöbetleri: gün → devralan ("" ise boş kaldı).
+  Map<int, String> handoversOf(String personId) => {
+    for (final e in handovers.entries)
+      if (e.key.startsWith('$personId:'))
+        int.parse(e.key.substring(personId.length + 1)): e.value,
+  };
 
   /// Kişinin seçilmiş nöbet günleri.
   List<int> requestedShiftsOf(String personId) =>
@@ -175,6 +190,7 @@ class MonthPlan {
     Map<String, List<int>>? sickLeave,
     Map<String, List<int>>? requestedShifts,
     Map<int, String>? dayShiftOverrides,
+    Map<String, String>? handovers,
   }) {
     return MonthPlan(
       year: year,
@@ -191,6 +207,7 @@ class MonthPlan {
       sickLeave: sickLeave ?? this.sickLeave,
       requestedShifts: requestedShifts ?? this.requestedShifts,
       dayShiftOverrides: dayShiftOverrides ?? this.dayShiftOverrides,
+      handovers: handovers ?? this.handovers,
     );
   }
 
@@ -214,6 +231,7 @@ class MonthPlan {
     'dayShiftOverrides': {
       for (final e in dayShiftOverrides.entries) '${e.key}': e.value,
     },
+    'handovers': handovers,
   };
 
   factory MonthPlan.fromJson(Map<String, dynamic> json) {
@@ -260,6 +278,10 @@ class MonthPlan {
         for (final e in (json['dayShiftOverrides'] as Map? ?? const {}).entries)
           int.parse(e.key as String): e.value as String,
       },
+      handovers: {
+        for (final e in (json['handovers'] as Map? ?? const {}).entries)
+          e.key as String: e.value as String,
+      },
     );
   }
 
@@ -290,7 +312,8 @@ class MonthPlan {
       const MapEquality<int, String>().equals(
         other.dayShiftOverrides,
         dayShiftOverrides,
-      );
+      ) &&
+      const MapEquality<String, String>().equals(other.handovers, handovers);
 
   @override
   int get hashCode => Object.hash(
@@ -308,6 +331,7 @@ class MonthPlan {
     _unavailableEquality.hash(sickLeave),
     _unavailableEquality.hash(requestedShifts),
     const MapEquality<int, String>().hash(dayShiftOverrides),
+    const MapEquality<String, String>().hash(handovers),
   );
 
   @override

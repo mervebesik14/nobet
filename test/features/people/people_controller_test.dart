@@ -7,6 +7,11 @@ import 'package:nobet_listesi/models/models.dart';
 
 import '../../helpers.dart';
 
+/// Gün → o günün nöbetçileri (koltuk sırası önemsiz).
+Map<int, Set<String>> byDay(Map<int, DayAssignment> a) => {
+  for (final e in a.entries) e.key: e.value.personIds.toSet(),
+};
+
 void main() {
   late HiveBoxes boxes;
   late ProviderContainer container;
@@ -185,6 +190,66 @@ void main() {
           );
         }
       }
+    });
+
+    test('dönem sonlandırılınca devredilen nöbetler geri verilir', () async {
+      await seedTeam();
+      final original = rotation();
+      await boxes.monthPlans.put(
+        '2026-10',
+        MonthPlan(year: 2026, month: 10, assignments: original),
+      );
+      final out = await controller().deactivate(
+        'n0',
+        from: DateTime(2026, 10, 20),
+      );
+      expect(boxes.monthPlans.get('2026-10')!.handoversOf('n0'), isNotEmpty);
+
+      final back = await controller().endInactivity(
+        'n0',
+        activeFrom: DateTime(2026, 10, 20),
+      );
+      expect(back.restored, out.removed);
+      expect(back.restoreFailed, 0);
+      final plan = boxes.monthPlans.get('2026-10')!;
+      expect(byDay(plan.assignments), byDay(original));
+      expect(plan.handovers, isEmpty);
+    });
+
+    test('dönem kısaltılınca dışarıda kalan günler geri verilir', () async {
+      await seedTeam();
+      final original = rotation();
+      await boxes.monthPlans.put(
+        '2026-10',
+        MonthPlan(year: 2026, month: 10, assignments: original),
+      );
+      await controller().deactivate(
+        'n0',
+        from: DateTime(2026, 10, 10),
+        until: DateTime(2026, 10, 25),
+      );
+      final report = await controller().deactivate(
+        'n0',
+        from: DateTime(2026, 10, 10),
+        until: DateTime(2026, 10, 15),
+      );
+      expect(report.restored, greaterThan(0));
+      final plan = boxes.monthPlans.get('2026-10')!;
+      for (var d = 16; d <= 31; d++) {
+        expect(
+          plan.assignments[d]!.includes('n0'),
+          original[d]!.includes('n0'),
+          reason: 'gün $d',
+        );
+      }
+      for (var d = 10; d <= 15; d++) {
+        expect(plan.assignments[d]!.includes('n0'), isFalse, reason: 'gün $d');
+      }
+      // Kalan devirler yalnızca dönem içi günler.
+      expect(
+        plan.handoversOf('n0').keys.every((d) => d >= 10 && d <= 15),
+        isTrue,
+      );
     });
 
     test('pasiflik gününden önce biten aylara dokunulmaz', () async {

@@ -22,6 +22,11 @@ Map<int, DayAssignment> rotation() => {
     ),
 };
 
+/// Gün → o günün nöbetçileri (koltuk sırası önemsiz).
+Map<int, Set<String>> byDay(Map<int, DayAssignment> a) => {
+  for (final e in a.entries) e.key: e.value.personIds.toSet(),
+};
+
 void main() {
   const settings = RosterSettings();
 
@@ -117,5 +122,67 @@ void main() {
       expect(r.assignments[d]!.techId, id);
     }
     expect(r.assignments.values.any((a) => a.includes('t0')), isFalse);
+  });
+
+  group('geri verme', () {
+    Map<int, String> handoversOf(RosterRepairResult r) => {
+      ...r.replacements,
+      for (final d in r.unfilledDays) d: '',
+    };
+
+    RosterRestoreResult restore(
+      RosterRepairResult r, {
+      Map<String, List<int>> blocked = const {},
+    }) => RosterRestore.restorePerson(
+      year: 2026,
+      month: 10,
+      assignments: r.assignments,
+      personId: 'n0',
+      role: Role.nurse,
+      handovers: handoversOf(r),
+      people: people(),
+      settings: settings,
+      blockedDays: blocked,
+    );
+
+    test('devredilen nöbetler geri verilince liste eski haline döner', () {
+      final r = repair('n0', 20);
+      final back = restore(r);
+      expect(back.failedDays, isEmpty);
+      expect(back.restoredDays.length, r.removed);
+      expect(byDay(back.assignments), byDay(rotation()));
+    });
+
+    test('boş kalan koltuğa geri yazılır', () {
+      final original = rotation();
+      final day = [
+        for (var d = 20; d <= 31; d++)
+          if (original[d]!.includes('n0')) d,
+      ].first;
+      final r = repair(
+        'n0',
+        day,
+        blocked: {
+          for (var i = 1; i <= 7; i++) 'n$i': [day],
+        },
+      );
+      expect(r.unfilledDays, contains(day));
+      final back = restore(r);
+      expect(back.restoredDays, contains(day));
+      expect(back.assignments[day]!.includes('n0'), isTrue);
+    });
+
+    test('kişi o gün uygun değilse geri verilmez', () {
+      final r = repair('n0', 20);
+      final day = r.replacements.keys.first;
+      final back = restore(
+        r,
+        blocked: {
+          'n0': [day],
+        },
+      );
+      expect(back.failedDays, [day]);
+      expect(back.assignments[day]!.includes('n0'), isFalse);
+    });
   });
 }

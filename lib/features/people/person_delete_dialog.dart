@@ -187,6 +187,9 @@ String deactivationMessage(
               'itibarıyla pasif.'
         : '$name ${inactivePeriodText(from, until)} arası pasif.',
   ];
+  if (report.restored > 0) {
+    parts.add('${report.restored} nöbeti geri verildi.');
+  }
   if (report.refilled > 0) {
     parts.add('${report.refilled} nöbeti başkasına verildi.');
   }
@@ -256,7 +259,7 @@ Future<bool> endInactivityWithDate(
     confirmText: 'Tamam',
   );
   if (picked == null) return false;
-  await ref
+  final report = await ref
       .read(peopleProvider.notifier)
       .endInactivity(person.id, activeFrom: picked);
   messenger
@@ -264,8 +267,15 @@ Future<bool> endInactivityWithDate(
     ..showSnackBar(
       SnackBar(
         content: Text(
-          '${person.name} ${DateFormat('d MMMM y', 'tr_TR').format(picked)} '
-          'itibarıyla yeniden aktif.',
+          [
+            '${person.name} ${DateFormat('d MMMM y', 'tr_TR').format(picked)} '
+                'itibarıyla yeniden aktif.',
+            if (report.restored > 0)
+              'Devredilen ${report.restored} nöbeti geri verildi.',
+            if (report.restoreFailed > 0)
+              '${report.restoreFailed} nöbet kural nedeniyle geri '
+                  'verilemedi; devralan kişide kaldı.',
+          ].join(' '),
         ),
       ),
     );

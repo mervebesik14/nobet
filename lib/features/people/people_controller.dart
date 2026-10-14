@@ -11,7 +11,18 @@ import '../month/month_plan_controller.dart';
 
 /// Pasif yapma sonucunda listelerde yapılan değişiklikler.
 class DeactivationReport {
-  const DeactivationReport({this.refilled = 0, this.unfilled = const []});
+  const DeactivationReport({
+    this.refilled = 0,
+    this.unfilled = const [],
+    this.restored = 0,
+    this.restoreFailed = 0,
+  });
+
+  /// Pasif dönemi kısaldığı/sonlandığı için kişiye geri verilen nöbetler.
+  final int restored;
+
+  /// Kural bozacağı için geri verilemeyen nöbetler.
+  final int restoreFailed;
 
   /// Başkasına verilen nöbet sayısı.
   final int refilled;
@@ -30,6 +41,16 @@ class DeactivationReport {
           for (final d in result.unfilledDays)
             DateTime(plan.year, plan.month, d),
         ],
+        restored: restored,
+        restoreFailed: restoreFailed,
+      );
+
+  DeactivationReport withRestore(int restored, int failed) =>
+      DeactivationReport(
+        refilled: refilled,
+        unfilled: unfilled,
+        restored: this.restored + restored,
+        restoreFailed: restoreFailed + failed,
       );
 }
 
@@ -119,9 +140,14 @@ class PeopleController extends Notifier<List<Person>> {
     state = repo.getAll();
     if (start == null) return const DeactivationReport();
 
+    // Dönem kısaldıysa artık dönem dışında kalan devirler geri verilir.
+    final (restored, failed) = await _restoreHandovers(
+      personId,
+      (date) => date.isBefore(start) || (end != null && date.isAfter(end)),
+    );
     final plans = ref.read(monthPlanRepositoryProvider);
     final holidays = ref.read(holidaysProvider);
-    var report = const DeactivationReport();
+    var report = const DeactivationReport().withRestore(restored, failed);
     for (final plan in plans.getAll()) {
       // Yalnızca pasif dönemiyle kesişen ayların listesi onarılır.
       if (!plan.hasRoster ||
@@ -170,7 +196,20 @@ class PeopleController extends Notifier<List<Person>> {
         overtimeRequests: plan.overtimeRequests,
         requestedShifts: plan.requestedShifts,
       );
-      await plans.save(plan.copyWith(assignments: result.assignments));
+      // Kime devredildiği, dönem kısalırsa geri vermek için saklanır.
+      await plans.save(
+        plan.copyWith(
+          assignments: result.assignments,
+          handovers: {
+            ...plan.handovers,
+            for (final MapEntry(key: d, value: id)
+                in result.replacements.entries)
+              MonthPlan.handoverKey(personId, d): id,
+            for (final d in result.unfilledDays)
+              MonthPlan.handoverKey(personId, d): '',
+          },
+        ),
+      );
       report = report.add(plan, result);
     }
     // Açık ayın planı yeniden okunsun.
@@ -180,30 +219,95 @@ class PeopleController extends Notifier<List<Person>> {
 
   /// Pasif dönemini sonlandırır: kişi [activeFrom] gününden itibaren yeniden
   /// aktif olur. Dönemin o güne kadarki kısmı kayıtta kalır (geçmiş aylar
-  /// doğru kalsın diye); dönem henüz başlamadıysa tamamen silinir. Daha önce
-  /// başkalarına verilmiş nöbetler geri gelmez.
-  Future<void> endInactivity(
+  /// doğru kalsın diye); dönem henüz başlamadıysa tamamen silinir. O günden
+  /// sonraki, başkalarına devredilmiş nöbetleri kurala uyuyorsa ona geri
+  /// verilir.
+  Future<DeactivationReport> endInactivity(
     String personId, {
     required DateTime activeFrom,
   }) async {
     final repo = ref.read(peopleRepositoryProvider);
     final person = repo.getById(personId);
-    if (person == null) return;
+    if (person == null) return const DeactivationReport();
     final from = person.inactiveFrom;
-    final lastInactive = DateTime(
-      activeFrom.year,
-      activeFrom.month,
-      activeFrom.day - 1,
-    );
+    final start = DateTime(activeFrom.year, activeFrom.month, activeFrom.day);
+    final lastInactive = DateTime(start.year, start.month, start.day - 1);
     if (from == null ||
         lastInactive.isBefore(DateTime(from.year, from.month, from.day))) {
       await activate(personId);
-      return;
+    } else {
+      await repo.save(
+        person.copyWith(isActive: true, inactiveUntil: lastInactive),
+      );
+      state = repo.getAll();
     }
-    await repo.save(
-      person.copyWith(isActive: true, inactiveUntil: lastInactive),
+    // Yeniden aktif olduğu günden sonraki devirler geri verilir.
+    final (restored, failed) = await _restoreHandovers(
+      personId,
+      (date) => !date.isBefore(start),
     );
-    state = repo.getAll();
+    return const DeactivationReport().withRestore(restored, failed);
+  }
+
+  /// Kişinin [shouldRestore] günlerindeki devredilmiş nöbetlerini, kurala
+  /// uyuyorsa geri verir; işlenen devir kayıtları silinir. (geri verilen,
+  /// verilemeyen) sayılarını döndürür.
+  Future<(int, int)> _restoreHandovers(
+    String personId,
+    bool Function(DateTime date) shouldRestore,
+  ) async {
+    final person = ref.read(peopleRepositoryProvider).getById(personId);
+    if (person == null) return (0, 0);
+    final plans = ref.read(monthPlanRepositoryProvider);
+    final holidays = ref.read(holidaysProvider);
+    var restored = 0;
+    var failed = 0;
+    for (final plan in plans.getAll()) {
+      final handovers = {
+        for (final e in plan.handoversOf(personId).entries)
+          if (shouldRestore(DateTime(plan.year, plan.month, e.key)))
+            e.key: e.value,
+      };
+      if (handovers.isEmpty) continue;
+      final result = RosterRestore.restorePerson(
+        year: plan.year,
+        month: plan.month,
+        assignments: plan.assignments,
+        personId: personId,
+        role: person.role,
+        handovers: handovers,
+        people: state,
+        settings: effectiveSettings(
+          ref.read(rosterSettingsProvider),
+          nurseOnly: plan.nurseOnly,
+        ),
+        blockedDays: computeEffectiveBlockedDays(
+          plan,
+          holidays,
+          repository: plans,
+          people: state,
+        ),
+        previousMonthTail: previousMonthTailOf(plans, plan),
+        overtimeRequests: plan.overtimeRequests,
+        requestedShifts: plan.requestedShifts,
+      );
+      await plans.save(
+        plan.copyWith(
+          assignments: result.assignments,
+          handovers: {
+            for (final e in plan.handovers.entries)
+              if (!handovers.keys.any(
+                (d) => e.key == MonthPlan.handoverKey(personId, d),
+              ))
+                e.key: e.value,
+          },
+        ),
+      );
+      restored += result.restoredDays.length;
+      failed += result.failedDays.length;
+    }
+    if (restored + failed > 0) ref.invalidate(monthPlanProvider);
+    return (restored, failed);
   }
 
   /// Pasif kişiyi yeniden aktif yapar (pasif başlangıcı silinir).

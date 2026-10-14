@@ -273,8 +273,9 @@ class MonthPlanController extends Notifier<MonthPlan> {
     final result = await ref.read(rosterRunnerProvider)(generator);
     state = state.copyWith(
       assignments: result.assignments,
-      // Yeni listede eski 7A seçimleri geçersiz olabilir.
+      // Yeni listede eski 7A seçimleri ve nöbet devirleri geçersiz olur.
       dayShiftOverrides: const {},
+      handovers: const {},
       generatedAt: DateTime.now(),
       seed: result.seed,
       nurseOnly: onlyNurses,
