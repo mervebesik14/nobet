@@ -760,4 +760,33 @@ void main() {
       );
     }
   });
+
+  test('izinli kişi kalan hafta sonlarından eşit pay alır', () {
+    // n1 2–21 Ekim izinli: 3-4, 10-11, 17-18 hafta sonları izne denk gelir
+    // ve "çalışmadığı hafta sonu" sayılır. Kalan 24, 25, 29, 31'den yine
+    // diğerleriyle eşit (fark ≤ 1) hafta sonu nöbeti alır.
+    final unavailable = {
+      'n1': [for (var d = 2; d <= 21; d++) d],
+    };
+    final weekend = RosterGenerator.weekendDays(2026, 10, holidays, settings);
+    final people = team(7, 4);
+    for (final seed in [1, 2, 3]) {
+      final r = generator(
+        people: people,
+        unavailable: unavailable,
+        seed: seed,
+      ).generate();
+      expectHardRules(r, people, unavailable, settings);
+      final w = workedDays(r);
+      final counts = [
+        for (var i = 1; i <= 6; i++)
+          (w['n$i'] ?? const <int>{}).where(weekend.contains).length,
+      ];
+      expect(
+        spread(counts),
+        lessThanOrEqualTo(1),
+        reason: 'seed $seed: $counts',
+      );
+    }
+  });
 }
