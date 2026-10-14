@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/month_plan_repository.dart';
 import '../../data/providers.dart';
 import '../../data/turkish_holidays.dart';
+import '../../logic/block_reason.dart';
 import '../../logic/day_shift_planner.dart';
 import '../../logic/feasibility_checker.dart';
 import '../../logic/leave_rules.dart';
@@ -360,6 +361,7 @@ final rosterViolationsProvider = Provider<List<RuleViolation>>((ref) {
     assignments: plan.assignments,
     people: ref.watch(peopleProvider),
     unavailableDays: ref.watch(effectiveBlockedDaysProvider),
+    blockReasons: ref.watch(blockReasonsProvider),
     previousMonthTail: ref.read(monthPlanProvider.notifier).previousMonthTail(),
     overtimeRequests: plan.overtimeRequests,
     requestedShifts: plan.requestedShifts,
@@ -380,11 +382,10 @@ final monthPlanProvider = NotifierProvider<MonthPlanController, MonthPlan>(
   MonthPlanController.new,
 );
 
-/// Nöbet dağıtımında kişi başı gerçekten engellenen günler: istenmeyen
-/// günler + tüm izinler + yıllık izin öncesi son iş günü ve sonrası ilk iş
-/// gününe kadar kalan günler (bkz. [LeaveRules]). Ay sınırında önceki ve
-/// sonraki ayın yıllık izinleri de [repository] üzerinden hesaba katılır.
-Map<String, List<int>> computeEffectiveBlockedDays(
+/// [plan] ayında kişi → kapalı gün → neden: istemediği günler, izinler
+/// (yıllık, şua, rapor), yıllık izin öncesi/sonrası kuralları (komşu
+/// aylardaki izinler dahil) ve pasif günler.
+Map<String, Map<int, BlockReason>> computeBlockReasons(
   MonthPlan plan,
   Iterable<Holiday> holidays, {
   MonthPlanRepository? repository,
@@ -407,13 +408,10 @@ Map<String, List<int>> computeEffectiveBlockedDays(
     }
   }
 
-  final base = plan.blockedDays;
-  final ids = {...base.keys, for (final p in plans) ...p.annualLeave.keys};
-  final result = <String, List<int>>{};
-  for (final id in ids) {
-    final days = {...?base[id]};
-    days.addAll(
-      LeaveRules.blockedDaysInMonth(
+  final annualIds = {for (final p in plans) ...p.annualLeave.keys};
+  Map<String, Set<int>> annualRule({required bool before}) => {
+    for (final id in annualIds)
+      id: LeaveRules.blockedDaysInMonth(
         year: plan.year,
         month: plan.month,
         annualLeave: [
@@ -421,18 +419,34 @@ Map<String, List<int>> computeEffectiveBlockedDays(
             for (final d in p.annualLeaveOf(id)) DateTime(p.year, p.month, d),
         ],
         holidays: allHolidays,
+        before: before,
+        after: !before,
       ),
-    );
-    if (days.isNotEmpty) result[id] = days.toList()..sort();
-  }
-  // Ay içinde pasife geçenler pasif günlerinde nöbete yazılmaz.
-  for (final p in people) {
-    final inactive = p.inactiveDaysIn(plan.year, plan.month);
-    if (inactive.isEmpty) continue;
-    result[p.id] = {...?result[p.id], ...inactive}.toList()..sort();
-  }
-  return result;
+  };
+
+  return BlockReason.combine({
+    BlockReason.annualLeave: plan.leaveMap(LeaveType.annual),
+    BlockReason.radiationLeave: plan.leaveMap(LeaveType.radiation),
+    BlockReason.sickLeave: plan.leaveMap(LeaveType.sick),
+    BlockReason.inactive: {
+      for (final p in people) p.id: p.inactiveDaysIn(plan.year, plan.month),
+    },
+    BlockReason.unavailable: plan.unavailableDays,
+    BlockReason.beforeAnnualLeave: annualRule(before: true),
+    BlockReason.afterAnnualLeave: annualRule(before: false),
+  });
 }
+
+/// [plan] ayında kişi → nöbet yazılamayan günler (sıralı); nedenleri
+/// [computeBlockReasons] verir.
+Map<String, List<int>> computeEffectiveBlockedDays(
+  MonthPlan plan,
+  Iterable<Holiday> holidays, {
+  MonthPlanRepository? repository,
+  Iterable<Person> people = const [],
+}) => BlockReason.days(
+  computeBlockReasons(plan, holidays, repository: repository, people: people),
+);
 
 /// Seçili ayın 7A (gündüz mesaisi) planı: sorumlu hemşire ya da yerine
 /// çalışan hemşire. Liste yoksa boş.
@@ -454,17 +468,24 @@ final dayShiftsProvider = Provider<Map<int, DayShift>>((ref) {
   );
 });
 
-/// Seçili ayın etkin bloklu günleri. Üretim, uygunluk ve doğrulama kullanır.
-final effectiveBlockedDaysProvider = Provider<Map<String, List<int>>>((ref) {
+/// Seçili ayın kapalı günleri ve nedenleri.
+final blockReasonsProvider = Provider<Map<String, Map<int, BlockReason>>>((
+  ref,
+) {
   final plan = ref.watch(monthPlanProvider);
   final holidays = ref.watch(holidaysProvider);
-  return computeEffectiveBlockedDays(
+  return computeBlockReasons(
     plan,
     holidays,
     repository: ref.read(monthPlanRepositoryProvider),
     people: ref.watch(peopleProvider),
   );
 });
+
+/// Seçili ayın etkin bloklu günleri. Üretim, uygunluk ve doğrulama kullanır.
+final effectiveBlockedDaysProvider = Provider<Map<String, List<int>>>(
+  (ref) => BlockReason.days(ref.watch(blockReasonsProvider)),
+);
 
 /// Seçili ay için liste oluşturmadan önceki uygunluk kontrolü.
 final monthFeasibilityProvider = Provider<FeasibilityReport>((ref) {

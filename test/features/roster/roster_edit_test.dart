@@ -53,6 +53,7 @@ void main() {
   Future<void> pumpRoster(
     WidgetTester tester, {
     Map<String, List<int>> unavailable = const {},
+    Map<String, List<int>> annualLeave = const {},
     bool locked = false,
   }) async {
     await boxes.monthPlans.put(
@@ -62,6 +63,7 @@ void main() {
         month: 10,
         assignments: _rotation(),
         unavailableDays: unavailable,
+        annualLeave: annualLeave,
         isLocked: locked,
         seed: 1,
       ),
@@ -183,9 +185,7 @@ void main() {
     expect(find.text('Kural ihlali yok'), findsOneWidget);
   });
 
-  testWidgets('ihlaller ayrı kutularda; boş günler en üstte', (
-    tester,
-  ) async {
+  testWidgets('ihlaller ayrı kutularda; boş günler en üstte', (tester) async {
     await pumpRoster(
       tester,
       unavailable: {
@@ -206,7 +206,10 @@ void main() {
 
     expect(find.text('Boş günler (1)'), findsOneWidget);
     expect(find.text('• 4 Ekim: 1 hemşire eksik.'), findsOneWidget);
-    expect(find.text('İstemediği günde çalışanlar (1)'), findsOneWidget);
+    expect(
+      find.text('İzinli / istemediği günde çalışanlar (1)'),
+      findsOneWidget,
+    );
     expect(find.text('Diğer kural ihlalleri (1)'), findsNothing);
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('violations-missing'))).dy,
@@ -246,6 +249,30 @@ void main() {
     expect(saved().assignments[3]!.nurseIds, ['n6', 'n7']);
     expect(
       find.text('• Hale istemediği güne (3 Ekim) atandı.'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('yıllık izin öncesi güne atanan kişi için doğru neden yazar', (
+    tester,
+  ) async {
+    // 16 Ekim Cuma nöbetçisinin 19 Ekim Pazartesi yıllık izni başlıyor:
+    // son nöbeti Perşembe olmalı, Cuma kapalı ama "istemediği gün" değil.
+    final id = _rotation()[16]!.nurseIds.first;
+    await pumpRoster(
+      tester,
+      annualLeave: {
+        id: [19, 20],
+      },
+    );
+    final name = boxes.people.get(id)!.name;
+    expect(
+      find.textContaining('$name yıllık izninden hemen önceki güne (16 Ekim)'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('$name istemediği'), findsNothing);
+    expect(
+      find.textContaining('İzinli / istemediği günde çalışanlar'),
       findsOneWidget,
     );
   });

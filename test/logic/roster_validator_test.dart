@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nobet_listesi/logic/block_reason.dart';
 import 'package:nobet_listesi/logic/roster_generator.dart';
 import 'package:nobet_listesi/logic/roster_validator.dart';
 import 'package:nobet_listesi/models/models.dart';
@@ -100,6 +101,41 @@ void main() {
     expect(v.single.personId, 'm');
     expect(v.single.days, [3]);
     expect(v.single.message, 'Mehmet istemediği güne (3 Şubat) atandı.');
+  });
+
+  test('kapalı günün nedeni mesajda yazar (izin, rapor, izin öncesi)', () {
+    String messageFor(BlockReason reason) => except(
+      validator.validate(
+        year: 2027,
+        month: 2,
+        assignments: base(),
+        people: people,
+        unavailableDays: {
+          'm': [3],
+        },
+        blockReasons: {
+          'm': {3: reason},
+        },
+      ),
+      ViolationKind.missing,
+    ).single.message;
+
+    expect(
+      messageFor(BlockReason.annualLeave),
+      'Mehmet yıllık izinli olduğu güne (3 Şubat) atandı.',
+    );
+    expect(
+      messageFor(BlockReason.sickLeave),
+      'Mehmet raporlu olduğu güne (3 Şubat) atandı.',
+    );
+    expect(
+      messageFor(BlockReason.beforeAnnualLeave),
+      startsWith('Mehmet yıllık izninden hemen önceki güne (3 Şubat) atandı.'),
+    );
+    expect(
+      messageFor(BlockReason.unavailable),
+      'Mehmet istemediği güne (3 Şubat) atandı.',
+    );
   });
 
   test('art arda gün', () {

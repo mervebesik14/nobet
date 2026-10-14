@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import '../models/day_assignment.dart';
+import 'block_reason.dart';
 import '../models/person.dart';
 import '../models/role.dart';
 import '../models/roster_settings.dart';
@@ -12,7 +13,8 @@ enum ViolationKind {
   /// O gün o rolde koltuk boş.
   missing,
 
-  /// Kişi istemediği güne atanmış.
+  /// Kişi nöbet yazılamayan güne (istemediği gün, izin, izin öncesi/sonrası,
+  /// pasif) atanmış; nedeni mesajda yazar.
   unavailable,
 
   /// Kişi art arda iki gün nöbette.
@@ -71,6 +73,7 @@ class RosterValidator {
     required Map<int, DayAssignment> assignments,
     required Iterable<Person> people,
     Map<String, List<int>> unavailableDays = const {},
+    Map<String, Map<int, BlockReason>> blockReasons = const {},
     List<Set<String>> previousMonthTail = const [],
     Set<String> overtimeRequests = const {},
     int overtimeAllowance = 2,
@@ -134,7 +137,9 @@ class RosterValidator {
               days: [d],
               personId: id,
               role: role,
-              message: '${name(id)} istemediği güne (${date(d)}) atandı.',
+              // Neden bilinmiyorsa istemediği gün sayılır.
+              message: (blockReasons[id]?[d] ?? BlockReason.unavailable)
+                  .message(name(id), date(d)),
             ),
           );
         }

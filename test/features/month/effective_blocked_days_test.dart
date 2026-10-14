@@ -6,6 +6,7 @@ import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/data/holiday_repository.dart';
 import 'package:nobet_listesi/data/month_plan_repository.dart';
 import 'package:nobet_listesi/features/month/month_plan_controller.dart';
+import 'package:nobet_listesi/logic/block_reason.dart';
 import 'package:nobet_listesi/models/models.dart';
 import 'package:nobet_listesi/shared/providers.dart';
 
@@ -72,9 +73,17 @@ void main() {
         },
       ),
     );
-    final blocked = container().read(effectiveBlockedDaysProvider);
+    final c = container();
+    final blocked = c.read(effectiveBlockedDaysProvider);
     // 1 istenmeyen, 8 izin öncesi iş günü, 9 izin, 10-11 izin sonrası.
     expect(blocked['n1'], [1, 8, 9, 10, 11]);
+    expect(c.read(blockReasonsProvider)['n1'], {
+      1: BlockReason.unavailable,
+      8: BlockReason.beforeAnnualLeave,
+      9: BlockReason.annualLeave,
+      10: BlockReason.afterAnnualLeave,
+      11: BlockReason.afterAnnualLeave,
+    });
   });
 
   test('sonraki ayın yıllık izni bu ayın son günlerini kapatır', () {

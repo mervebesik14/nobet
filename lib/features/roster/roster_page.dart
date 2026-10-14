@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../logic/block_reason.dart';
 import '../../logic/day_shift_planner.dart';
 import '../../logic/personal_roster.dart';
 import '../../logic/roster_editor.dart';
@@ -67,6 +68,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       assignments: assignments,
       people: ref.read(peopleProvider),
       unavailableDays: ref.read(effectiveBlockedDaysProvider),
+      blockReasons: ref.read(blockReasonsProvider),
       previousMonthTail: ref
           .read(monthPlanProvider.notifier)
           .previousMonthTail(),
@@ -302,12 +304,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   }
 
   /// [day] gününün 7A'sını elle başka bir hemşireye verir (ya da otomatik
-  /// seçime döndürür). O gün nöbetli, nöbet ertesi ya da izinli/istemediği
-  /// günde olanlar uyarıyla birlikte altta listelenir.
+  /// seçime döndürür). O gün nöbetli, nöbet ertesi, izinli, raporlu, pasif ya
+  /// da istemediği günde olanlar uyarıyla birlikte altta listelenir.
   Future<void> _chooseDayShift(int day) async {
     final plan = _plan;
     final current = ref.read(dayShiftsProvider)[day]?.personId;
-    final blocked = ref.read(effectiveBlockedDaysProvider);
+    // Yıllık izin öncesi/sonrası kuralı yalnız 24 nöbeti kapatır, 7A'yı değil.
+    final blocked = ref.read(blockReasonsProvider);
     final tail = ref.read(monthPlanProvider.notifier).previousMonthTail();
     bool onDuty(String id, int d) => d < 1
         ? tail.isNotEmpty && tail.last.contains(id)
@@ -321,8 +324,10 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             reasons: [
               if (onDuty(p.id, day)) 'o gün nöbetçi',
               if (onDuty(p.id, day - 1)) 'nöbet ertesi',
-              if (blocked[p.id]?.contains(day) ?? false)
-                'izinli ya da istemediği gün',
+              if (blocked[p.id]?[day] case final reason?
+                  when reason != BlockReason.beforeAnnualLeave &&
+                      reason != BlockReason.afterAnnualLeave)
+                reason.label,
             ],
           ),
     ]..sort((a, b) => a.reasons.length.compareTo(b.reasons.length));
@@ -798,7 +803,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
 }
 
 /// Kural ihlalleri, önem sırasıyla ayrı kutularda: boş günler (en üstte),
-/// istemediği günde çalışanlar ve (elle düzenlemeden doğan) diğer ihlaller.
+/// izinli ya da istemediği günde çalışanlar ve (elle düzenlemeden doğan) diğer ihlaller.
 class _ViolationList extends StatelessWidget {
   const _ViolationList({required this.violations});
 
@@ -843,7 +848,7 @@ class _ViolationList extends StatelessWidget {
         if (unavailable.isNotEmpty)
           _ViolationCard(
             key: const ValueKey('violations-unavailable'),
-            title: 'İstemediği günde çalışanlar',
+            title: 'İzinli / istemediği günde çalışanlar',
             icon: Icons.person_off_outlined,
             color: warning,
             background: scheme.holidayTint,
