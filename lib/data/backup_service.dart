@@ -71,7 +71,7 @@ class BackupService {
     }
     if (decoded is! Map<String, dynamic> || decoded['format'] != format) {
       throw const BackupFormatException(
-        'Bu dosya bir Nöbet Listesi yedeği değil.',
+        'Bu dosya bir Nöbetçi yedeği değil.',
       );
     }
     final v = decoded['version'];

@@ -16,7 +16,7 @@ class NobetApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
       themeMode: ref.watch(themeModeProvider),
-      title: 'Nöbet Listesi',
+      title: 'Nöbetçi',
       debugShowCheckedModeBanner: false,
       locale: const Locale('tr', 'TR'),
       supportedLocales: const [Locale('tr', 'TR')],

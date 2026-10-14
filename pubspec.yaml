@@ -109,11 +109,14 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
-# Uygulama ikonu: dart run flutter_launcher_icons
+# Uygulama ikonu: python3 assets/icon/make_icon.py assets/icon
+# ardından: dart run flutter_launcher_icons
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: assets/icon/icon.png
-  adaptive_icon_background: "#00796B"
+  adaptive_icon_background: assets/icon/icon_background.png
   adaptive_icon_foreground: assets/icon/icon_foreground.png
+  # Ön plan görseli güvenli alana göre zaten küçültüldü.
+  adaptive_icon_foreground_inset: 0
   remove_alpha_ios: true

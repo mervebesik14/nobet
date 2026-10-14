@@ -29,6 +29,6 @@
 - Locale `tr_TR`; tarihler `intl` ile Türkçe biçimlenir.
 - Paylaş / yazdır / PNG'ye çevir / dosya seç işlemleri yalnızca `lib/shared/platform_services.dart` (`platformServicesProvider`) üzerinden çağrılır; testlerde `test/helpers.dart` içindeki `FakePlatformServices` ile override edilir.
 - PDF'te Türkçe karakterler için `assets/fonts` altındaki Roboto gömülür (Apache 2.0).
-- Uygulama ikonu: `assets/icon/` → `dart run flutter_launcher_icons`. Araç `ios/Runner.xcodeproj/project.pbxproj` içinde `ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS` değerini bozar; o değişikliği geri al.
+- Uygulama adı "Nöbetçi". Uygulama ikonu `assets/icon/make_icon.py` ile çizilir (`python3 assets/icon/make_icon.py assets/icon`) → `dart run flutter_launcher_icons`. Araç `ios/Runner.xcodeproj/project.pbxproj` içinde `ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS` değerini bozar; o değişikliği geri al.
 - Her değişiklikten sonra `flutter analyze` ve `flutter test` temiz geçmeli.
 - Aşamalı plan: `gelistirme-plani.md`.

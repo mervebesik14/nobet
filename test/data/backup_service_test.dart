@@ -134,7 +134,7 @@ void main() {
         isA<BackupFormatException>().having(
           (e) => e.message,
           'message',
-          'Bu dosya bir Nöbet Listesi yedeği değil.',
+          'Bu dosya bir Nöbetçi yedeği değil.',
         ),
       ),
     );
