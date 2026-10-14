@@ -215,6 +215,45 @@ void main() {
     );
   });
 
+  testWidgets('Bu güne ata: dolu günde en uygun kişinin yerine atar', (
+    tester,
+  ) async {
+    await pumpRoster(tester);
+
+    // 3 Ekim: Gül (n6) ve Ayşe (n0); ikisinin de 9 nöbeti var, ilki seçilir.
+    await tester.tap(cell('n7', 3));
+    await tester.pumpAndSettle();
+    expect(inSheet('Bu güne ata'), findsOneWidget);
+    expect(inSheet('Gül yerine atanır.'), findsOneWidget);
+    expect(inSheet('Koltuk seç'), findsOneWidget);
+
+    await tester.tap(inSheet('Bu güne ata'));
+    await tester.pumpAndSettle();
+    expect(sheet(), findsNothing);
+    final nurses = saved().assignments[3]!.nurseIds;
+    expect(nurses, containsAll(['n7', 'n0']));
+    expect(nurses, isNot(contains('n6')));
+  });
+
+  testWidgets('Bu güne ata: boş koltuk varsa oraya atar', (tester) async {
+    await pumpRoster(tester);
+
+    // Önce 3 Ekim'de Ayşe'nin nöbetini kaldır: bir hemşire koltuğu boşalır.
+    await tester.tap(cell('n0', 3));
+    await tester.pumpAndSettle();
+    await tester.tap(inSheet('Nöbeti kaldır'));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.nurseIds, ['n6']);
+
+    await tester.tap(cell('n7', 3));
+    await tester.pumpAndSettle();
+    expect(inSheet('Boş koltuğa atanır.'), findsOneWidget);
+    await tester.tap(inSheet('Bu güne ata'));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.nurseIds, containsAll(['n6', 'n7']));
+    expect(find.text('Kural ihlali yok'), findsOneWidget);
+  });
+
   testWidgets('uzun bas → takas modu; ikinci nöbete dokununca takas', (
     tester,
   ) async {

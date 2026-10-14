@@ -208,53 +208,79 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         ],
       );
     } else {
-      final candidates = <EditOption>[];
+      // Kişinin bu güne atanabileceği koltuklar; replaced null = boş koltuk.
+      final seats = <({EditOption option, String? replaced})>[];
+      void seat(String title, String? replaced, {bool secondary = false}) =>
+          seats.add((
+            option: option(
+              title,
+              replace(replaced, id, secondary: secondary),
+              id,
+            ),
+            replaced: replaced,
+          ));
       if (role == Role.nurse) {
         if (current.nurseIds.length < nursesPerDay) {
-          candidates.add(option('Boş koltuğa ata', replace(null, id), id));
+          seat('Boş koltuğa ata', null);
         }
         for (final other in current.nurseIds) {
-          candidates.add(
-            option('${_name(other)} yerine ata', replace(other, id), id),
-          );
+          seat('${_name(other)} yerine ata', other);
         }
       } else {
         // 24 koltuğu
-        candidates.add(
-          current.techId == null
-              ? option(
-                  twoTechs ? '24 koltuğuna ata' : 'Boş koltuğa ata',
-                  replace(null, id),
-                  id,
-                )
-              : option(
-                  '${_name(current.techId!)} yerine ata${twoTechs ? ' (24)' : ''}',
-                  replace(current.techId, id),
-                  id,
-                ),
-        );
-        // 16B koltuğu (yalnız 2 tekniker)
-        if (twoTechs) {
-          candidates.add(
-            current.tech16bId == null
-                ? option(
-                    '16B koltuğuna ata',
-                    replace(null, id, secondary: true),
-                    id,
-                  )
-                : option(
-                    '${_name(current.tech16bId!)} yerine ata (16B)',
-                    replace(current.tech16bId, id, secondary: true),
-                    id,
-                  ),
+        if (current.techId == null) {
+          seat(twoTechs ? '24 koltuğuna ata' : 'Boş koltuğa ata', null);
+        } else {
+          seat(
+            '${_name(current.techId!)} yerine ata${twoTechs ? ' (24)' : ''}',
+            current.techId,
           );
         }
+        // 16B koltuğu (yalnız 2 tekniker)
+        if (twoTechs) {
+          if (current.tech16bId == null) {
+            seat('16B koltuğuna ata', null, secondary: true);
+          } else {
+            seat(
+              '${_name(current.tech16bId!)} yerine ata (16B)',
+              current.tech16bId,
+              secondary: true,
+            );
+          }
+        }
       }
+
+      // "Bu güne ata": önce boş koltuk; yoksa en az yeni uyarı çıkaran,
+      // eşitlikte bu ay en çok nöbeti olanın yerine.
+      int shiftsOf(String p) =>
+          plan.assignments.values.where((a) => a.includes(p)).length;
+      // Eşitlikte listedeki ilk koltuk kalır.
+      ({EditOption option, String? replaced})? best;
+      int rank(({EditOption option, String? replaced}) s) =>
+          (s.replaced == null ? 0 : 1) * 10000 +
+          s.option.warnings.length * 100 -
+          (s.replaced == null ? 0 : shiftsOf(s.replaced!));
+      for (final s in seats) {
+        if (best == null || rank(s) < rank(best)) best = s;
+      }
+
       result = await showEditSheet(
         context,
         title: '${_name(id)} · ${_dayLabel(day)}',
-        subtitle: 'Bu güne ata',
-        candidates: candidates,
+        actions: [
+          if (best != null)
+            EditOption(
+              title: 'Bu güne ata',
+              subtitle: best.replaced == null
+                  ? 'Boş koltuğa atanır.'
+                  : '${_name(best.replaced!)} yerine atanır.',
+              icon: Icons.add_circle_outline,
+              result: best.option.result,
+              warnings: best.option.warnings,
+            ),
+        ],
+        candidatesTitle: 'Koltuk seç',
+        candidates: [for (final s in seats) s.option],
       );
     }
     await _apply(result);
