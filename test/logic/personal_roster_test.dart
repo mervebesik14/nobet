@@ -83,4 +83,27 @@ void main() {
     );
     expect(missing, contains('Hemşire: Banu, Silinmiş kişi'));
   });
+
+  test('build: nöbetler, hafta sonu sayısı, 7A ve izin günleri', () {
+    final data = PersonalRoster.build(
+      plan: plan,
+      person: people.first,
+      people: people,
+      dayShifts: const {
+        9: DayShift(day: 9, personId: 'a', hours: 7, isSubstitute: true),
+      },
+      weekendDays: const {3, 4},
+    );
+    expect(data.monthLabel, 'Ekim 2026');
+    expect([for (final s in data.shifts) s.day], [3, 7]);
+    expect(data.shifts.first.nurses, ['Ayşe', 'Banu']);
+    expect(data.shifts.last.techs, ['Zeynep (24)', 'Mehmet (16B)']);
+    expect(data.weekendShifts, 1);
+    expect(data.dayShiftDays, [9]);
+    expect(data.leaves, {
+      LeaveType.annual: [12, 13, 14, 20],
+    });
+    expect(data.leaveDayCount, 4);
+    expect(data.leaveByDay[13], LeaveType.annual);
+  });
 }

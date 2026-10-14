@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../logic/block_reason.dart';
 import '../../logic/day_shift_planner.dart';
+import '../../logic/file_names.dart';
 import '../../logic/personal_roster.dart';
 import '../../logic/roster_editor.dart';
 import '../../logic/roster_generator.dart';
@@ -18,7 +19,9 @@ import '../holidays/holidays_controller.dart';
 import '../month/month_plan_controller.dart';
 import '../people/people_controller.dart';
 import '../../shared/platform_services.dart';
+import '../../shared/providers.dart';
 import 'edit_sheet.dart';
+import 'personal_roster_pdf.dart';
 import 'roster_pdf.dart';
 import 'roster_flow.dart';
 import 'roster_table.dart';
@@ -499,8 +502,11 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   /// hemşire ve radyoloji nöbetçileriyle birlikte metin olarak paylaşır.
   Future<void> _sharePersonal(
     List<RosterRow> rows,
-    Map<int, DayShift> dayShifts,
-  ) async {
+    Map<int, DayShift> dayShifts, {
+    required bool asPdf,
+    required Set<int> weekendDays,
+    required Set<int> holidayDays,
+  }) async {
     final picked = await showDialog<RosterRow>(
       context: context,
       builder: (context) => SimpleDialog(
@@ -519,24 +525,45 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     final person =
         _peopleById[picked.id] ??
         Person(id: picked.id, name: picked.name, role: picked.role);
-    final text = PersonalRoster.text(
-      plan: plan,
-      person: person,
-      people: ref.read(peopleProvider),
-      dayShifts: dayShifts,
-    );
+    final services = ref.read(platformServicesProvider);
+    final monthLabel = DateFormat.yMMMM(
+      'tr_TR',
+    ).format(DateTime(plan.year, plan.month));
     try {
-      await ref
-          .read(platformServicesProvider)
-          .shareText(
-            text,
-            subject:
-                '${person.name} · '
-                '${DateFormat.yMMMM('tr_TR').format(DateTime(plan.year, plan.month))} '
-                'nöbetleri',
-          );
-    } on Exception catch (e) {
-      _notify('Paylaşılamadı: $e');
+      if (asPdf) {
+        final fonts = await services.loadPdfFonts();
+        final pdf = await buildPersonalRosterPdf(
+          data: PersonalRoster.build(
+            plan: plan,
+            person: person,
+            people: ref.read(peopleProvider),
+            dayShifts: dayShifts,
+            weekendDays: weekendDays,
+          ),
+          weekendDays: weekendDays,
+          holidayDays: holidayDays,
+          font: fonts.regular,
+          boldFont: fonts.bold,
+          createdAt: ref.read(todayProvider),
+        );
+        await services.sharePdf(
+          pdf,
+          'nobet-${fileSlug(person.name)}-${plan.year}-'
+          '${plan.month.toString().padLeft(2, '0')}.pdf',
+        );
+      } else {
+        await services.shareText(
+          PersonalRoster.text(
+            plan: plan,
+            person: person,
+            people: ref.read(peopleProvider),
+            dayShifts: dayShifts,
+          ),
+          subject: '${person.name} · $monthLabel nöbetleri',
+        );
+      }
+    } catch (e) {
+      if (mounted) _notify('Paylaşılamadı: $e');
     }
   }
 
@@ -573,7 +600,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         singlePage: action == _ShareAction.png,
       );
       switch (action) {
-        case _ShareAction.personal:
+        case _ShareAction.personal || _ShareAction.personalPdf:
           return;
         case _ShareAction.pdf:
           await services.sharePdf(pdf, '$fileBase.pdf');
@@ -673,19 +700,27 @@ class _RosterPageState extends ConsumerState<RosterPage> {
           PopupMenuButton<_ShareAction>(
             tooltip: 'Paylaş',
             icon: const Icon(Icons.share),
-            onSelected: (action) => action == _ShareAction.personal
-                ? _sharePersonal(rows, dayShifts)
-                : _share(
-                    action,
-                    plan: plan,
-                    rows: rows,
-                    summary: summary,
-                    weekendDays: weekendDays,
-                    holidayDays: holidayDays,
-                    missingByDay: missingByDay,
-                    shiftHours: settings.shiftHours,
-                    dayShifts: dayShifts,
-                  ),
+            onSelected: (action) => switch (action) {
+              _ShareAction.personal ||
+              _ShareAction.personalPdf => _sharePersonal(
+                rows,
+                dayShifts,
+                asPdf: action == _ShareAction.personalPdf,
+                weekendDays: weekendDays,
+                holidayDays: holidayDays,
+              ),
+              _ => _share(
+                action,
+                plan: plan,
+                rows: rows,
+                summary: summary,
+                weekendDays: weekendDays,
+                holidayDays: holidayDays,
+                missingByDay: missingByDay,
+                shiftHours: settings.shiftHours,
+                dayShifts: dayShifts,
+              ),
+            },
             itemBuilder: (_) => const [
               PopupMenuItem(
                 value: _ShareAction.pdf,
@@ -706,6 +741,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 child: ListTile(
                   leading: Icon(Icons.print_outlined),
                   title: Text('Yazdır'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.personalPdf,
+                child: ListTile(
+                  leading: Icon(Icons.badge_outlined),
+                  title: Text('Kişiye özel liste (PDF)'),
                 ),
               ),
               PopupMenuItem(
@@ -927,4 +969,4 @@ class _ViolationCard extends StatelessWidget {
   }
 }
 
-enum _ShareAction { pdf, png, print, personal }
+enum _ShareAction { pdf, png, print, personalPdf, personal }

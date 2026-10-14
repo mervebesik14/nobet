@@ -109,4 +109,21 @@ void main() {
     expect(text, contains('Radyoloji: Ali'));
     expect(text, endsWith('Toplam: 1 nöbet'));
   });
+
+  testWidgets('kişiye özel liste PDF olarak paylaşılır', (tester) async {
+    await pump(tester);
+    await choose(tester, 'Kişiye özel liste (PDF)');
+    expect(find.text('Kimin listesi?'), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(SimpleDialog),
+        matching: find.text('Banu'),
+      ),
+    );
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+
+    expect(services.calls, ['sharePdf:nobet-banu-2026-10.pdf']);
+    expect(isPdf(services.lastPdf), isTrue);
+  });
 }
