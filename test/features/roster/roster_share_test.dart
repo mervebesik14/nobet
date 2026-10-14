@@ -88,4 +88,25 @@ void main() {
     await choose(tester, 'Yazdır');
     expect(services.calls, ['printPdf:Ekim 2026 Nöbet Listesi']);
   });
+
+  testWidgets('kişiye özel liste mesaj olarak paylaşılır', (tester) async {
+    await pump(tester);
+    await choose(tester, 'Kişiye özel liste (mesaj)');
+    expect(find.text('Kimin listesi?'), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(SimpleDialog),
+        matching: find.text('Banu'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(services.calls, ['shareText']);
+    final text = services.sharedTexts.single;
+    expect(text, startsWith('Banu · Ekim 2026 nöbetleri'));
+    expect(text, contains('• 1 Ekim Perşembe — 24'));
+    expect(text, contains('Hemşire: Ayşe, Banu'));
+    expect(text, contains('Radyoloji: Ali'));
+    expect(text, endsWith('Toplam: 1 nöbet'));
+  });
 }

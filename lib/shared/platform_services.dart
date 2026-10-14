@@ -33,6 +33,10 @@ class PlatformServices {
         ),
       );
 
+  /// Metni paylaşım menüsüyle gönderir (WhatsApp, mesaj vb.).
+  Future<void> shareText(String text, {String? subject}) =>
+      SharePlus.instance.share(ShareParams(text: text, subject: subject));
+
   /// Kullanıcıya bir JSON dosyası seçtirir; vazgeçerse boş döner.
   Future<Uint8List?> pickJsonFile() async {
     final file = await FilePicker.pickFile(

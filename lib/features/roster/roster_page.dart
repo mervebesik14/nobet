@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../logic/day_shift_planner.dart';
+import '../../logic/personal_roster.dart';
 import '../../logic/roster_editor.dart';
 import '../../logic/roster_generator.dart';
 import '../../logic/roster_summary.dart';
@@ -489,6 +490,51 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   }
 
   /// Listeyi PDF / PNG olarak paylaşır ya da yazdırır.
+  /// Kişi seçtirip o kişinin aylık nöbetlerini, her nöbet günündeki tüm
+  /// hemşire ve radyoloji nöbetçileriyle birlikte metin olarak paylaşır.
+  Future<void> _sharePersonal(
+    List<RosterRow> rows,
+    Map<int, DayShift> dayShifts,
+  ) async {
+    final picked = await showDialog<RosterRow>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Kimin listesi?'),
+        children: [
+          for (final r in rows)
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(context).pop(r),
+              child: Text(r.name),
+            ),
+        ],
+      ),
+    );
+    if (picked == null || !mounted) return;
+    final plan = _plan;
+    final person =
+        _peopleById[picked.id] ??
+        Person(id: picked.id, name: picked.name, role: picked.role);
+    final text = PersonalRoster.text(
+      plan: plan,
+      person: person,
+      people: ref.read(peopleProvider),
+      dayShifts: dayShifts,
+    );
+    try {
+      await ref
+          .read(platformServicesProvider)
+          .shareText(
+            text,
+            subject:
+                '${person.name} · '
+                '${DateFormat.yMMMM('tr_TR').format(DateTime(plan.year, plan.month))} '
+                'nöbetleri',
+          );
+    } on Exception catch (e) {
+      _notify('Paylaşılamadı: $e');
+    }
+  }
+
   Future<void> _share(
     _ShareAction action, {
     required MonthPlan plan,
@@ -522,6 +568,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         singlePage: action == _ShareAction.png,
       );
       switch (action) {
+        case _ShareAction.personal:
+          return;
         case _ShareAction.pdf:
           await services.sharePdf(pdf, '$fileBase.pdf');
         case _ShareAction.png:
@@ -620,17 +668,19 @@ class _RosterPageState extends ConsumerState<RosterPage> {
           PopupMenuButton<_ShareAction>(
             tooltip: 'Paylaş',
             icon: const Icon(Icons.share),
-            onSelected: (action) => _share(
-              action,
-              plan: plan,
-              rows: rows,
-              summary: summary,
-              weekendDays: weekendDays,
-              holidayDays: holidayDays,
-              missingByDay: missingByDay,
-              shiftHours: settings.shiftHours,
-              dayShifts: dayShifts,
-            ),
+            onSelected: (action) => action == _ShareAction.personal
+                ? _sharePersonal(rows, dayShifts)
+                : _share(
+                    action,
+                    plan: plan,
+                    rows: rows,
+                    summary: summary,
+                    weekendDays: weekendDays,
+                    holidayDays: holidayDays,
+                    missingByDay: missingByDay,
+                    shiftHours: settings.shiftHours,
+                    dayShifts: dayShifts,
+                  ),
             itemBuilder: (_) => const [
               PopupMenuItem(
                 value: _ShareAction.pdf,
@@ -651,6 +701,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 child: ListTile(
                   leading: Icon(Icons.print_outlined),
                   title: Text('Yazdır'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.personal,
+                child: ListTile(
+                  leading: Icon(Icons.person_outline),
+                  title: Text('Kişiye özel liste (mesaj)'),
                 ),
               ),
             ],
@@ -851,4 +908,4 @@ class _ViolationCard extends StatelessWidget {
   }
 }
 
-enum _ShareAction { pdf, png, print }
+enum _ShareAction { pdf, png, print, personal }
