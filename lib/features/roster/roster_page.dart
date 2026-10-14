@@ -620,6 +620,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   }
 }
 
+/// Kural ihlalleri, önem sırasıyla ayrı kutularda: boş günler (en üstte),
+/// istemediği günde çalışanlar ve (elle düzenlemeden doğan) diğer ihlaller.
 class _ViolationList extends StatelessWidget {
   const _ViolationList({required this.violations});
 
@@ -628,35 +630,99 @@ class _ViolationList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     if (violations.isEmpty) {
       return ListTile(
-        leading: Icon(
-          Icons.check_circle_outline,
-          color: theme.colorScheme.primary,
-        ),
+        leading: Icon(Icons.check_circle_outline, color: scheme.primary),
         title: const Text('Kural ihlali yok'),
       );
     }
-    final onColor = theme.colorScheme.error;
+    final missing = [
+      for (final v in violations)
+        if (v.kind == ViolationKind.missing) v,
+    ];
+    final unavailable = [
+      for (final v in violations)
+        if (v.kind == ViolationKind.unavailable) v,
+    ];
+    final other = [
+      for (final v in violations)
+        if (v.kind != ViolationKind.missing &&
+            v.kind != ViolationKind.unavailable)
+          v,
+    ];
+    const warning = Color(0xFFB26A00);
+    return Column(
+      children: [
+        if (missing.isNotEmpty)
+          _ViolationCard(
+            key: const ValueKey('violations-missing'),
+            title: 'Boş günler',
+            icon: Icons.event_busy,
+            color: scheme.error,
+            background: scheme.dangerTint,
+            items: missing,
+          ),
+        if (unavailable.isNotEmpty)
+          _ViolationCard(
+            key: const ValueKey('violations-unavailable'),
+            title: 'İstemediği günde çalışanlar',
+            icon: Icons.person_off_outlined,
+            color: warning,
+            background: scheme.holidayTint,
+            items: unavailable,
+          ),
+        if (other.isNotEmpty)
+          _ViolationCard(
+            key: const ValueKey('violations-other'),
+            title: 'Diğer kural ihlalleri',
+            icon: Icons.warning_amber_rounded,
+            color: warning,
+            background: scheme.holidayTint,
+            items: other,
+          ),
+      ],
+    );
+  }
+}
+
+class _ViolationCard extends StatelessWidget {
+  const _ViolationCard({
+    super.key,
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.background,
+    required this.items,
+  });
+
+  final String title;
+  final IconData icon;
+  final Color color;
+  final Color background;
+  final List<RuleViolation> items;
+
+  @override
+  Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      color: theme.colorScheme.dangerTint,
+      color: background,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ListTile(
-              leading: Icon(Icons.warning_amber_rounded, color: onColor),
+              leading: Icon(icon, color: color),
               title: Text(
-                'Kural ihlalleri (${violations.length})',
-                style: TextStyle(color: onColor),
+                '$title (${items.length})',
+                style: TextStyle(color: color, fontWeight: FontWeight.w600),
               ),
             ),
-            for (final v in violations)
+            for (final v in items)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Text('• ${v.message}', style: TextStyle(color: onColor)),
+                child: Text('• ${v.message}', style: TextStyle(color: color)),
               ),
           ],
         ),

@@ -154,7 +154,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(saved().assignments[7]!.nurseIds, ['n3', 'n1']);
-    expect(find.text('Kural ihlalleri (1)'), findsOneWidget);
+    expect(find.text('Diğer kural ihlalleri (1)'), findsOneWidget);
     expect(find.text('• Derya 7 ve 8 Ekim art arda nöbette.'), findsOneWidget);
     expect(cellColor(tester, 'n3', 8), isNot(normal));
     expect(cellColor(tester, 'n3', 7), cellColor(tester, 'n3', 8));
@@ -181,6 +181,41 @@ void main() {
 
     expect(saved().assignments[4]!.techId, 't0');
     expect(find.text('Kural ihlali yok'), findsOneWidget);
+  });
+
+  testWidgets('ihlaller ayrı kutularda; boş günler en üstte', (
+    tester,
+  ) async {
+    await pumpRoster(
+      tester,
+      unavailable: {
+        'n7': [3],
+      },
+    );
+
+    // İstemediği güne atama: Hale 3 Ekim'de Ayşe'nin yerine.
+    await tester.tap(cell('n7', 3));
+    await tester.pumpAndSettle();
+    await tester.tap(inSheet('Ayşe yerine ata'));
+    await tester.pumpAndSettle();
+    // Boş gün: 4 Ekim'de Banu'nun nöbeti kaldırılır.
+    await tester.tap(cell('n1', 4));
+    await tester.pumpAndSettle();
+    await tester.tap(inSheet('Nöbeti kaldır'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Boş günler (1)'), findsOneWidget);
+    expect(find.text('• 4 Ekim: 1 hemşire eksik.'), findsOneWidget);
+    expect(find.text('İstemediği günde çalışanlar (1)'), findsOneWidget);
+    expect(find.text('Diğer kural ihlalleri (1)'), findsNothing);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('violations-missing'))).dy,
+      lessThan(
+        tester
+            .getTopLeft(find.byKey(const ValueKey('violations-unavailable')))
+            .dy,
+      ),
+    );
   });
 
   testWidgets('boş hücreye dokun: istemediği güne atanınca uyarı', (
