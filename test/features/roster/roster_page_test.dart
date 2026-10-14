@@ -367,18 +367,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(saved().hasRoster, isTrue);
 
-    await tester.tap(find.byTooltip('Diğer'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Listeyi sıfırla'));
+    await tester.tap(find.byTooltip('Listeyi sıfırla'));
     await tester.pumpAndSettle();
     // Önce vazgeç: değişmez.
     await tester.tap(find.text('Vazgeç'));
     await tester.pumpAndSettle();
     expect(saved().hasRoster, isTrue);
 
-    await tester.tap(find.byTooltip('Diğer'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Listeyi sıfırla'));
+    await tester.tap(find.byTooltip('Listeyi sıfırla'));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, 'Sıfırla'));
     await tester.pumpAndSettle();
@@ -393,6 +389,48 @@ void main() {
     expect(plan.wantsOvertime('t1'), isTrue);
     // Ay Planı'na dönülür.
     expect(find.text('Listeyi Oluştur'), findsOneWidget);
+  });
+
+  testWidgets('kilitli liste de sıfırlanır; kilit açılır', (tester) async {
+    await pumpMonthPage(tester);
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Kilitle'));
+    await tester.pumpAndSettle();
+    expect(saved().isLocked, isTrue);
+
+    await tester.tap(find.byTooltip('Listeyi sıfırla'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('kilidi de açılır'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Sıfırla'));
+    await tester.pumpAndSettle();
+
+    expect(saved().hasRoster, isFalse);
+    expect(saved().isLocked, isFalse);
+    expect(find.text('Listeyi Oluştur'), findsOneWidget);
+  });
+
+  testWidgets('Ay Planı ekranından da liste sıfırlanır', (tester) async {
+    await pumpMonthPage(tester);
+    // Liste yokken buton görünmez.
+    expect(find.text('Listeyi sıfırla'), findsNothing);
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Listeyi sıfırla'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Sıfırla'));
+    await tester.pumpAndSettle();
+
+    expect(saved().hasRoster, isFalse);
+    expect(find.text('Listeyi Oluştur'), findsOneWidget);
+    expect(find.text('Listeyi sıfırla'), findsNothing);
   });
 
   testWidgets('yalnız hemşire: tekniker atanmaz ve listede görünmez', (

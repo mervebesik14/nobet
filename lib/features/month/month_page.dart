@@ -93,6 +93,18 @@ class MonthPage extends ConsumerWidget {
                 tileColor: theme.colorScheme.headerTint,
               ),
             ),
+          if (plan.hasRoster)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  onPressed: () => resetRosterFlow(context, ref),
+                  icon: const Icon(Icons.delete_sweep_outlined),
+                  label: const Text('Listeyi sıfırla'),
+                ),
+              ),
+            ),
           if (active.isEmpty)
             const Padding(
               padding: EdgeInsets.all(24),

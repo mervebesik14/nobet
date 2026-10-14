@@ -128,6 +128,28 @@ Future<bool?> _chooseMode(BuildContext context) {
   );
 }
 
+/// Seçili ayın oluşturulmuş listesini onayla sıfırlar. İstenmeyen günler,
+/// izinler ve fazla mesai istekleri korunur. Liste kilitliyse kilit de
+/// açılır (onay metninde söylenir). Sıfırlandıysa true döner.
+Future<bool> resetRosterFlow(BuildContext context, WidgetRef ref) async {
+  final plan = ref.read(monthPlanProvider);
+  if (!plan.hasRoster) return false;
+  final ok = await _confirm(
+    context,
+    title: 'Listeyi sıfırla',
+    message:
+        'Bu ayın oluşturulan nöbet listesi silinecek. İstenmeyen günler, '
+        'izinler ve fazla mesai istekleri korunur.'
+        '${plan.isLocked ? '\n\nListe kilitli; sıfırlanınca kilidi de açılır.' : ''}'
+        '\n\nDevam edilsin mi?',
+    confirmLabel: 'Sıfırla',
+  );
+  if (!ok) return false;
+  final controller = ref.read(monthPlanProvider.notifier);
+  if (plan.isLocked) await controller.setLocked(false);
+  return controller.resetRoster();
+}
+
 Future<bool> _confirm(
   BuildContext context, {
   required String title,

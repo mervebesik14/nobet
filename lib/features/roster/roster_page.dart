@@ -73,36 +73,11 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     );
   }
 
-  /// Oluşturulmuş listeyi onayla sıfırlar; istenmeyen günler ve izinler
-  /// korunur. Sıfırlanınca liste boş kaldığı için Ay Planı'na dönülür.
-  Future<void> _confirmReset() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Listeyi sıfırla'),
-        content: const Text(
-          'Oluşturulan nöbet listesi silinecek. İstenmeyen günler, yıllık '
-          'izinler ve fazla mesai istekleri korunur. Devam edilsin mi?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Vazgeç'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Sıfırla'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !mounted) return;
-    final done = await ref.read(monthPlanProvider.notifier).resetRoster();
-    if (!mounted) return;
-    if (done) {
+  /// Listeyi onayla sıfırlar; liste boş kaldığı için Ay Planı'na dönülür.
+  Future<void> _reset() async {
+    setState(() => _swapFrom = null);
+    if (await resetRosterFlow(context, ref) && mounted) {
       Navigator.of(context).pop();
-    } else {
-      _notify('Kilitli ay sıfırlanamaz.');
     }
   }
 
@@ -557,22 +532,10 @@ class _RosterPageState extends ConsumerState<RosterPage> {
               ),
             ],
           ),
-          PopupMenuButton<String>(
-            tooltip: 'Diğer',
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) {
-              if (value == 'reset') _confirmReset();
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                value: 'reset',
-                enabled: !plan.isLocked,
-                child: const ListTile(
-                  leading: Icon(Icons.delete_sweep_outlined),
-                  title: Text('Listeyi sıfırla'),
-                ),
-              ),
-            ],
+          IconButton(
+            tooltip: 'Listeyi sıfırla',
+            icon: const Icon(Icons.delete_sweep_outlined),
+            onPressed: _reset,
           ),
         ],
       ),
