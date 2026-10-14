@@ -53,6 +53,18 @@ void main() {
       expect(list.length, 17);
     });
 
+    test('Ramazan ve Kurban günleri dini bayram, diğerleri resmi tatil', () {
+      final list = TurkishHolidays.forYear(2026);
+      expect(list.where((h) => h.isReligious).map((h) => h.key).toList(), [
+        for (final d in [19, 20, 21, 22]) '2026-03-$d',
+        for (final d in [26, 27, 28, 29, 30]) '2026-05-$d',
+      ]);
+      expect(on(list, 10, 29)!.isReligious, isFalse);
+      expect(on(list, 5, 19)!.isReligious, isFalse);
+      // 2027'de 19 Mayıs Kurban'a denk gelir: dini bayram sayılır.
+      expect(on(TurkishHolidays.forYear(2027), 5, 19)!.isReligious, isTrue);
+    });
+
     test('aynı güne düşen tatiller birleşir, tam gün kazanır', () {
       // 2027: Kurban Bayramı 16-19 Mayıs; 4. gün 19 Mayıs'a denk gelir.
       final list = TurkishHolidays.forYear(2027);
@@ -109,6 +121,24 @@ void main() {
         'Ulusal Egemenlik ve Çocuk Bayramı',
       );
       expect(repo.seededYears, {2027});
+    });
+
+    test('eski kayıtlardaki bayramlar bir kez dini bayram yapılır', () async {
+      // Alan eklenmeden önce kaydedilmiş gibi: hepsi isReligious = false.
+      await repo.saveAll([
+        for (final h in TurkishHolidays.forYear(2026))
+          h.copyWith(isReligious: false),
+      ]);
+      await repo.tagReligiousHolidays();
+      expect(repo.getAll().where((h) => h.isReligious).length, 9);
+      expect(repo.getByDate(DateTime(2026, 10, 29))!.isReligious, isFalse);
+
+      // Kullanıcının sonradan değiştirdiği tür korunur.
+      await repo.save(
+        repo.getByDate(DateTime(2026, 3, 20))!.copyWith(isReligious: false),
+      );
+      await repo.tagReligiousHolidays();
+      expect(repo.getByDate(DateTime(2026, 3, 20))!.isReligious, isFalse);
     });
   });
 }

@@ -19,6 +19,9 @@ class HolidaysController extends Notifier<List<Holiday>> {
   Future<void> toggleHalfDay(Holiday holiday) =>
       _run((r) => r.save(holiday.copyWith(isHalfDay: !holiday.isHalfDay)));
 
+  Future<void> toggleReligious(Holiday holiday) =>
+      _run((r) => r.save(holiday.copyWith(isReligious: !holiday.isReligious)));
+
   Future<void> delete(Holiday holiday) => _run((r) => r.delete(holiday.date));
 
   /// [year] yılının hazır Türkiye tatillerini ilk seferde yükler.

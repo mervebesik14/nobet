@@ -42,7 +42,7 @@ void main() {
     expect(ayse.name, 'Ayşe');
     expect(ayse.shifts, 4);
     expect(ayse.weekendShifts, 3); // 3, 10, 29
-    expect(ayse.holidayShifts, 1); // 29 Ekim (tam gün tatil)
+    expect(ayse.nationalHolidayShifts, 1); // 29 Ekim (tam gün tatil)
     expect(ayse.everyOtherDayPairs, 1); // 1-3
     expect(ayse.workedHours, 96);
     expect(ayse.requiredHours, 145);
@@ -174,5 +174,24 @@ void main() {
     expect(s.people.every((r) => r.role == Role.nurse), isTrue);
     expect(s.averages.containsKey(Role.radiologyTech), isFalse);
     expect(s.people.map((r) => r.personId), isNot(contains('t')));
+  });
+
+  test('Mayıs 2026: resmi tatil ve dini bayram nöbetleri ayrı sayılır', () {
+    final s = RosterSummary.build(
+      year: 2026,
+      month: 5,
+      assignments: {
+        // 1 Mayıs ve 19 Mayıs resmi; 27–30 Mayıs Kurban; 26 arife (yarım).
+        for (final d in [1, 19, 26, 27, 29])
+          d: DayAssignment(day: d, nurseIds: const ['a', 'b'], techId: 't'),
+      },
+      people: people,
+      holidays: holidays,
+      settings: settings,
+    );
+    final zeynep = s.people.firstWhere((r) => r.personId == 'a');
+    expect(zeynep.nationalHolidayShifts, 2);
+    expect(zeynep.religiousHolidayShifts, 2);
+    expect(s.averages[Role.radiologyTech]!.religiousHolidayShifts, 2);
   });
 }

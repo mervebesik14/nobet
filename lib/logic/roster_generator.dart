@@ -168,15 +168,20 @@ class RosterGenerator {
     };
   }
 
-  /// Ayın tam gün resmi tatilleri (arifeler hariç). Bu günlerin nöbetleri
-  /// hafta sonundan ayrı olarak da dengelenir.
+  /// Ayın tam gün tatilleri (arifeler hariç). [religious] verilirse yalnız
+  /// dini bayramlar (true) ya da yalnız resmi tatiller (false). Resmi tatil
+  /// ve dini bayram nöbetleri hafta sonundan ve birbirinden ayrı dengelenir.
   static Set<int> holidayDays(
     int year,
     int month,
-    Iterable<Holiday> holidays,
-  ) => {
+    Iterable<Holiday> holidays, {
+    bool? religious,
+  }) => {
     for (final h in holidays)
-      if (!h.isHalfDay && h.date.year == year && h.date.month == month)
+      if (!h.isHalfDay &&
+          h.date.year == year &&
+          h.date.month == month &&
+          (religious == null || h.isReligious == religious))
         h.date.day,
   };
 
@@ -187,7 +192,8 @@ class RosterGenerator {
   RosterResult generate() {
     final rng = Random(seed);
     final weekend = weekendDays(year, month, holidays, settings);
-    final holiday = holidayDays(year, month, holidays);
+    final national = holidayDays(year, month, holidays, religious: false);
+    final religious = holidayDays(year, month, holidays, religious: true);
 
     // Sorumlu hemşire yalnızca seçtiği günlerde nöbete yazılabilir.
     Map<String, Set<int>> availableOf(List<Person> members) => {
@@ -209,7 +215,8 @@ class RosterGenerator {
       days: daysInMonth,
       available: availableOf(nurseMembers),
       weekend: weekend,
-      holiday: holiday,
+      national: national,
+      religious: religious,
       tail: _tailFor(nurseMembers),
       yearToDate: yearToDate,
       allowance: _allowanceFor(nurseMembers),
@@ -248,7 +255,8 @@ class RosterGenerator {
         days: daysInMonth,
         available: techAvailable,
         weekend: weekend,
-        holiday: holiday,
+        national: national,
+        religious: religious,
         tail: techTail,
         yearToDate: yearToDate,
         allowance: _allowanceFor(techMembers),
@@ -272,7 +280,8 @@ class RosterGenerator {
         days: daysInMonth,
         available: techAvailable,
         weekend: weekend,
-        holiday: holiday,
+        national: national,
+        religious: religious,
         tail: techTail,
         yearToDate: yearToDate,
         allowance: _allowanceFor(techMembers),
@@ -342,7 +351,8 @@ class _RoleSolver {
     required this.days,
     required this.available,
     required this.weekend,
-    this.holiday = const {},
+    this.national = const {},
+    this.religious = const {},
     required this.tail,
     required Map<String, PersonTotals> yearToDate,
     this.allowance = const {},
@@ -364,10 +374,15 @@ class _RoleSolver {
          yearToDate,
          (t) => t.everyOtherDayPairs,
        ),
-       ytdHoliday = _relative(
+       ytdNational = _relative(
          _fair(members, reserve),
          yearToDate,
-         (t) => t.holidayShifts,
+         (t) => t.nationalHolidayShifts,
+       ),
+       ytdReligious = _relative(
+         _fair(members, reserve),
+         yearToDate,
+         (t) => t.religiousHolidayShifts,
        ),
        forbidConsecutive = settings.forbidConsecutiveDays,
        maxChain = max(1, settings.maxEveryOtherDayChain),
@@ -425,8 +440,11 @@ class _RoleSolver {
   final Map<String, Set<int>> available;
   final Set<int> weekend;
 
-  /// Tam gün resmi tatiller; nöbetleri ayrıca dengelenir.
-  final Set<int> holiday;
+  /// Tam gün resmi (ulusal) tatiller; nöbetleri ayrıca dengelenir.
+  final Set<int> national;
+
+  /// Tam gün dini bayramlar; nöbetleri resmi tatillerden ayrı dengelenir.
+  final Set<int> religious;
   final Map<String, Set<int>> tail;
   final bool forbidConsecutive;
   final int maxChain;
@@ -443,11 +461,13 @@ class _RoleSolver {
   final Map<String, double> ytdShifts;
   final Map<String, double> ytdWeekend;
   final Map<String, double> ytdPairs;
-  final Map<String, double> ytdHoliday;
+  final Map<String, double> ytdNational;
+  final Map<String, double> ytdReligious;
 
-  /// Yıllık tatil teriminin ek çarpanı: dört yıllık terimin bir hamledeki
+  /// Yıllık tatil terimlerinin ek çarpanı: dört yıllık terimin bir hamledeki
   /// toplam etkisi (4,8 + 0,8 = 5,6) ay içi dengeyi bozmanın bedelinden (6)
-  /// küçük kalsın.
+  /// küçük kalsın. Bir gün ya resmi tatil ya dini bayram olduğundan bir
+  /// hamle bu iki terimden yalnız birini değiştirir.
   static const _ytdHolidayScale = 0.5;
 
   static const _ytdClamp = 2.0;
@@ -551,7 +571,10 @@ class _RoleSolver {
 
   int _weekendCount(String id) => _worked[id]!.where(weekend.contains).length;
 
-  int _holidayCount(String id) => _worked[id]!.where(holiday.contains).length;
+  int _nationalCount(String id) => _worked[id]!.where(national.contains).length;
+
+  int _religiousCount(String id) =>
+      _worked[id]!.where(religious.contains).length;
 
   int _pairs(String id) => RosterGenerator.everyOtherDayPairs(_worked[id]!);
 
@@ -572,7 +595,8 @@ class _RoleSolver {
     // nöbet dengesizlik sayılmaz ve o kişi fazlayı üstlenir.
     final counts = [for (final id in ids) _worked[id]!.length - _allow(id)];
     final weekends = [for (final id in ids) _weekendCount(id)];
-    final holidays = [for (final id in ids) _holidayCount(id)];
+    final nationals = [for (final id in ids) _nationalCount(id)];
+    final religiouses = [for (final id in ids) _religiousCount(id)];
     final pairs = [for (final id in ids) _pairs(id)];
 
     double sq(List<int> values) {
@@ -590,10 +614,15 @@ class _RoleSolver {
 
     final totalPairs = pairs.fold(0, (a, b) => a + b);
     return _balanceWeight *
-            (sq(counts) + sq(weekends) + sq(holidays) + sq(pairs)) +
+            (sq(counts) +
+                sq(weekends) +
+                sq(nationals) +
+                sq(religiouses) +
+                sq(pairs)) +
         yearly(counts, ytdShifts) +
         yearly(weekends, ytdWeekend) +
-        yearly(holidays, ytdHoliday) * _ytdHolidayScale +
+        yearly(nationals, ytdNational) * _ytdHolidayScale +
+        yearly(religiouses, ytdReligious) * _ytdHolidayScale +
         yearly(pairs, ytdPairs) +
         0.75 * totalPairs +
         _emptySlots() * RosterGenerator.emptySlotPenalty +
@@ -681,9 +710,13 @@ class _RoleSolver {
       cost += (_weekendCount(id) + 1 - weekend.length * perDay / n) * 10;
       cost += ytdWeekend[id]! * _ytdGreedyWeight;
     }
-    if (holiday.contains(d)) {
-      cost += (_holidayCount(id) + 1 - holiday.length * perDay / n) * 10;
-      cost += ytdHoliday[id]! * _ytdGreedyWeight;
+    if (national.contains(d)) {
+      cost += (_nationalCount(id) + 1 - national.length * perDay / n) * 10;
+      cost += ytdNational[id]! * _ytdGreedyWeight;
+    }
+    if (religious.contains(d)) {
+      cost += (_religiousCount(id) + 1 - religious.length * perDay / n) * 10;
+      cost += ytdReligious[id]! * _ytdGreedyWeight;
     }
     final newPairs =
         (d - 2 >= 1 && _works(id, d - 2) ? 1 : 0) + (_works(id, d + 2) ? 1 : 0);
@@ -861,7 +894,8 @@ class _TechSolver {
     required this.days,
     required this.available,
     required this.weekend,
-    this.holiday = const {},
+    this.national = const {},
+    this.religious = const {},
     required this.tail,
     required Map<String, PersonTotals> yearToDate,
     this.allowance = const {},
@@ -873,10 +907,15 @@ class _TechSolver {
            : (2 * days / members.length).ceil() +
                  2 * settings.maxExtraOverAverage!,
        ytd = _TechSolver._relative(members, yearToDate, (t) => t.shifts),
-       ytdHoliday = _TechSolver._relative(
+       ytdNational = _TechSolver._relative(
          members,
          yearToDate,
-         (t) => t.holidayShifts,
+         (t) => t.nationalHolidayShifts,
+       ),
+       ytdReligious = _TechSolver._relative(
+         members,
+         yearToDate,
+         (t) => t.religiousHolidayShifts,
        );
 
   final List<Person> members;
@@ -885,8 +924,11 @@ class _TechSolver {
   final Map<String, Set<int>> available;
   final Set<int> weekend;
 
-  /// Tam gün resmi tatiller; nöbetleri ayrıca dengelenir.
-  final Set<int> holiday;
+  /// Tam gün resmi (ulusal) tatiller; nöbetleri ayrıca dengelenir.
+  final Set<int> national;
+
+  /// Tam gün dini bayramlar; nöbetleri resmi tatillerden ayrı dengelenir.
+  final Set<int> religious;
 
   /// Kişi → fazla mesai payı; 24 sayısı dengesinde bu kadarı hoş görülür.
   final Map<String, int> allowance;
@@ -899,7 +941,8 @@ class _TechSolver {
   final int maxChain;
   final int? cap;
   final Map<String, double> ytd;
-  final Map<String, double> ytdHoliday;
+  final Map<String, double> ytdNational;
+  final Map<String, double> ytdReligious;
 
   late List<String?> _slot24;
   late List<String?> _slot16;
@@ -1008,9 +1051,13 @@ class _TechSolver {
       _w24[id]!.where(weekend.contains).length +
       _w16[id]!.where(weekend.contains).length;
 
-  int _holidayCount(String id) =>
-      _w24[id]!.where(holiday.contains).length +
-      _w16[id]!.where(holiday.contains).length;
+  int _nationalCount(String id) =>
+      _w24[id]!.where(national.contains).length +
+      _w16[id]!.where(national.contains).length;
+
+  int _religiousCount(String id) =>
+      _w24[id]!.where(religious.contains).length +
+      _w16[id]!.where(religious.contains).length;
 
   int _pairs24(String id) => RosterGenerator.everyOtherDayPairs(_w24[id]!);
 
@@ -1039,7 +1086,8 @@ class _TechSolver {
             (sq((id) => _w24[id]!.length - _allow(id)) +
                 sq((id) => _w16[id]!.length) +
                 sq(_weekendCount) +
-                sq(_holidayCount) +
+                sq(_nationalCount) +
+                sq(_religiousCount) +
                 sq(_pairs24)) +
         0.75 * totalPairs +
         empty;
@@ -1117,9 +1165,13 @@ class _TechSolver {
     if (weekend.contains(d)) {
       cost += (_weekendCount(id) + 1 - weekend.length * 2 / n) * 10;
     }
-    if (holiday.contains(d)) {
-      cost += (_holidayCount(id) + 1 - holiday.length * 2 / n) * 10;
-      cost += ytdHoliday[id]! * 1.5;
+    if (national.contains(d)) {
+      cost += (_nationalCount(id) + 1 - national.length * 2 / n) * 10;
+      cost += ytdNational[id]! * 1.5;
+    }
+    if (religious.contains(d)) {
+      cost += (_religiousCount(id) + 1 - religious.length * 2 / n) * 10;
+      cost += ytdReligious[id]! * 1.5;
     }
     if (!is16b) {
       final newPairs =

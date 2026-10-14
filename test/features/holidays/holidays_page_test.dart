@@ -40,7 +40,7 @@ void main() {
     expect(find.text('Ekim 2026'), findsOneWidget);
     expect(find.text('Cumhuriyet Bayramı'), findsOneWidget);
     expect(find.text('Cumhuriyet Bayramı Arifesi'), findsOneWidget);
-    expect(find.text('Yarım gün'), findsOneWidget);
+    expect(find.text('Resmi tatil · Yarım gün'), findsOneWidget);
     expect(find.text('Bu ay çalışılması gereken: 145 saat'), findsOneWidget);
     expect(find.text('20 iş günü × 7 saat + 1 arife × 5 saat'), findsOneWidget);
     expect(find.textContaining('tanımlı değil'), findsNothing);
@@ -90,7 +90,7 @@ void main() {
     await tester.tap(find.text('Yarım gün yap'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Yarım gün'), findsNWidgets(2));
+    expect(find.text('Resmi tatil · Yarım gün'), findsNWidgets(2));
     expect(find.text('Bu ay çalışılması gereken: 150 saat'), findsOneWidget);
     expect(boxes.holidays.get('2026-10-29')!.isHalfDay, isTrue);
   });
@@ -135,10 +135,31 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Köprü izni'), findsOneWidget);
-    expect(find.text('Tam gün · elle eklendi'), findsOneWidget);
+    expect(find.text('Resmi tatil · Tam gün · elle eklendi'), findsOneWidget);
     final saved = boxes.holidays.get('2026-10-02')!;
     expect(saved.isPredefined, isFalse);
     expect(saved.isHalfDay, isFalse);
     expect(find.text('Bu ay çalışılması gereken: 138 saat'), findsOneWidget);
+  });
+
+  testWidgets('dini bayram ve resmi tatil ayrı gösterilir, değiştirilebilir', (
+    tester,
+  ) async {
+    await pumpPage(tester, DateTime(2026, 3, 1));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ramazan Bayramı 1. Gün'), findsOneWidget);
+    // 21 Mart Cumartesi, 22 Mart Pazar.
+    expect(find.text('Dini bayram · Tam gün'), findsOneWidget);
+    expect(find.text('Dini bayram · Tam gün · hafta sonu'), findsNWidgets(2));
+    expect(find.text('Dini bayram · Yarım gün'), findsOneWidget);
+
+    // Son satır (22 Mart) resmi tatile çevrilir.
+    await tester.tap(find.byTooltip('Seçenekler').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Resmi tatil yap'));
+    await tester.pumpAndSettle();
+    expect(boxes.holidays.get('2026-03-22')!.isReligious, isFalse);
+    expect(find.text('Resmi tatil · Tam gün · hafta sonu'), findsOneWidget);
   });
 }

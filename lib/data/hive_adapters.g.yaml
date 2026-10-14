@@ -33,7 +33,7 @@ types:
         index: 7
   Holiday:
     typeId: 2
-    nextIndex: 4
+    nextIndex: 5
     fields:
       date:
         index: 0
@@ -43,6 +43,8 @@ types:
         index: 2
       isPredefined:
         index: 3
+      isReligious:
+        index: 4
   DayAssignment:
     typeId: 3
     nextIndex: 4

@@ -136,7 +136,7 @@ class _MissingReligiousNotice extends StatelessWidget {
   }
 }
 
-enum _HolidayAction { toggleHalfDay, delete }
+enum _HolidayAction { toggleHalfDay, toggleReligious, delete }
 
 class _HolidayTile extends ConsumerWidget {
   const _HolidayTile({required this.holiday});
@@ -152,6 +152,8 @@ class _HolidayTile extends ConsumerWidget {
     switch (action) {
       case _HolidayAction.toggleHalfDay:
         await controller.toggleHalfDay(holiday);
+      case _HolidayAction.toggleReligious:
+        await controller.toggleReligious(holiday);
       case _HolidayAction.delete:
         final confirmed = await showDialog<bool>(
           context: context,
@@ -184,6 +186,7 @@ class _HolidayTile extends ConsumerWidget {
     final isWeekend =
         weekday == DateTime.saturday || weekday == DateTime.sunday;
     final details = [
+      holiday.isReligious ? 'Dini bayram' : 'Resmi tatil',
       holiday.isHalfDay ? 'Yarım gün' : 'Tam gün',
       if (isWeekend) 'hafta sonu',
       if (!holiday.isPredefined) 'elle eklendi',
@@ -212,6 +215,12 @@ class _HolidayTile extends ConsumerWidget {
           PopupMenuItem(
             value: _HolidayAction.toggleHalfDay,
             child: Text(holiday.isHalfDay ? 'Tam gün yap' : 'Yarım gün yap'),
+          ),
+          PopupMenuItem(
+            value: _HolidayAction.toggleReligious,
+            child: Text(
+              holiday.isReligious ? 'Resmi tatil yap' : 'Dini bayram yap',
+            ),
           ),
           const PopupMenuItem(value: _HolidayAction.delete, child: Text('Sil')),
         ],

@@ -102,7 +102,8 @@ class YearlySummary {
             PersonTotals(
               shifts: r.shifts,
               weekendShifts: r.weekendShifts,
-              holidayShifts: r.holidayShifts,
+              nationalHolidayShifts: r.nationalHolidayShifts,
+              religiousHolidayShifts: r.religiousHolidayShifts,
               everyOtherDayPairs: r.everyOtherDayPairs,
               workedHours: r.workedHours,
               requiredHours: r.requiredHours,

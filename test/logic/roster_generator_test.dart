@@ -631,27 +631,79 @@ void main() {
   });
 
   group('resmi tatil nöbeti dengesi', () {
-    test('Mayıs 2026: tatil nöbetleri rol içinde fark ≤ 1', () {
-      final holidayDays = RosterGenerator.holidayDays(2026, 5, holidays);
-      expect(holidayDays, {1, 19, 27, 28, 29, 30});
+    test('Mayıs 2026: resmi tatil ve dini bayram ayrı ayrı fark ≤ 1', () {
+      final national = RosterGenerator.holidayDays(
+        2026,
+        5,
+        holidays,
+        religious: false,
+      );
+      final religious = RosterGenerator.holidayDays(
+        2026,
+        5,
+        holidays,
+        religious: true,
+      );
+      expect(national, {1, 19});
+      expect(religious, {27, 28, 29, 30});
+      expect(RosterGenerator.holidayDays(2026, 5, holidays), {
+        ...national,
+        ...religious,
+      });
       final people = team(7, 4);
       for (final seed in [1, 2, 3]) {
         final r = generator(month: 5, seed: seed).generate();
         expectHardRules(r, people, const {}, settings);
         final w = workedDays(r);
-        int count(String id) =>
-            (w[id] ?? const <int>{}).where(holidayDays.contains).length;
-        expect(
-          spread([for (var i = 1; i <= 7; i++) count('n$i')]),
-          lessThanOrEqualTo(1),
-          reason: 'hemşire, seed $seed',
-        );
-        expect(
-          spread([for (var i = 1; i <= 4; i++) count('t$i')]),
-          lessThanOrEqualTo(1),
-          reason: 'tekniker, seed $seed',
-        );
+        for (final (label, days) in [
+          ('resmi', national),
+          ('dini', religious),
+        ]) {
+          int count(String id) =>
+              (w[id] ?? const <int>{}).where(days.contains).length;
+          expect(
+            spread([for (var i = 1; i <= 7; i++) count('n$i')]),
+            lessThanOrEqualTo(1),
+            reason: 'hemşire $label, seed $seed',
+          );
+          expect(
+            spread([for (var i = 1; i <= 4; i++) count('t$i')]),
+            lessThanOrEqualTo(1),
+            reason: 'tekniker $label, seed $seed',
+          );
+        }
       }
+    });
+
+    test('dini bayram yıl içi dengesi resmi tatilden ayrı tutulur', () {
+      // Mayıs 2026: n1–n5 bu yıl 2'şer dini bayram nöbeti tuttu, n6 ve n7
+      // hiç tutmadı. Resmi tatil toplamları eşit → dini bayram günlerinde
+      // n6 ve n7 öne çıkar.
+      final ytd = {
+        for (var i = 1; i <= 5; i++)
+          'n$i': const PersonTotals(religiousHolidayShifts: 2),
+      };
+      var fresh = 0;
+      var others = 0;
+      for (final seed in [1, 2, 3]) {
+        final r = RosterGenerator(
+          year: 2026,
+          month: 5,
+          people: team(7, 4),
+          holidays: holidays,
+          settings: settings,
+          seed: seed,
+          attempts: 150,
+          yearToDate: ytd,
+        ).generate();
+        for (final d in [27, 28, 29, 30]) {
+          final nurses = r.assignments[d]!.nurseIds;
+          fresh += nurses.where({'n6', 'n7'}.contains).length;
+          others += nurses.where((id) => !{'n6', 'n7'}.contains(id)).length;
+        }
+      }
+      // 2/7 oranı (eşit dağılım) 24 koltukta ~6,9 eder; öncelikle daha fazla.
+      expect(fresh, greaterThan(24 * 2 / 7), reason: 'diğerleri $others');
     });
 
     test('yıl içinde tatil nöbeti az olanlara öncelik', () {
@@ -660,7 +712,7 @@ void main() {
       // kurallar ve ay içi denge izin verdiği ölçüde).
       final ytd = {
         for (var i = 1; i <= 5; i++)
-          'n$i': const PersonTotals(holidayShifts: 2),
+          'n$i': const PersonTotals(nationalHolidayShifts: 2),
       };
       var fresh = 0;
       for (final seed in [1, 2, 3, 4, 5]) {

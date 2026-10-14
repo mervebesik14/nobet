@@ -260,7 +260,8 @@ pw.Widget _summaryTable(RosterSummary summary, pw.Font boldFont) {
   final number = NumberFormat('#,##0.#', 'tr_TR');
   String n(num v) => number.format(v);
   final has7A = summary.people.any((r) => r.dayShifts > 0);
-  final hasHoliday = summary.people.any((r) => r.holidayShifts > 0);
+  final hasNational = summary.people.any((r) => r.nationalHolidayShifts > 0);
+  final hasReligious = summary.people.any((r) => r.religiousHolidayShifts > 0);
   return pw.TableHelper.fromTextArray(
     border: pw.TableBorder.all(color: PdfColors.grey500, width: 0.4),
     headerStyle: pw.TextStyle(font: boldFont, fontSize: 8),
@@ -273,7 +274,8 @@ pw.Widget _summaryTable(RosterSummary summary, pw.Font boldFont) {
       'Görev',
       'Toplam nöbet',
       'Hafta sonu nöbet',
-      if (hasHoliday) 'Tatil nöbeti',
+      if (hasNational) 'Resmi tatil nöbeti',
+      if (hasReligious) 'Dini bayram nöbeti',
       'Gün aşırı çift',
       if (has7A) '7A gün',
       'Çalışılan saat',
@@ -287,7 +289,8 @@ pw.Widget _summaryTable(RosterSummary summary, pw.Font boldFont) {
           r.isChargeNurse ? 'Sorumlu hemşire' : r.role.label,
           n(r.shifts),
           n(r.weekendShifts),
-          if (hasHoliday) n(r.holidayShifts),
+          if (hasNational) n(r.nationalHolidayShifts),
+          if (hasReligious) n(r.religiousHolidayShifts),
           n(r.everyOtherDayPairs),
           if (has7A) n(r.dayShifts),
           n(r.workedHours),
@@ -300,7 +303,8 @@ pw.Widget _summaryTable(RosterSummary summary, pw.Font boldFont) {
           a.role.pluralLabel,
           n(a.shifts),
           n(a.weekendShifts),
-          if (hasHoliday) n(a.holidayShifts),
+          if (hasNational) n(a.nationalHolidayShifts),
+          if (hasReligious) n(a.religiousHolidayShifts),
           n(a.everyOtherDayPairs),
           if (has7A) '',
           n(a.workedHours),

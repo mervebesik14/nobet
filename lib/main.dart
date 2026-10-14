@@ -22,6 +22,7 @@ Future<void> main() async {
 
   // Bu yılın ve gelecek yılın Türkiye tatilleri ilk açılışta yüklenir.
   final holidays = HolidayRepository(boxes.holidays, boxes.meta);
+  await holidays.tagReligiousHolidays();
   final thisYear = DateTime.now().year;
   await holidays.ensureYearSeeded(thisYear);
   await holidays.ensureYearSeeded(thisYear + 1);

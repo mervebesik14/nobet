@@ -113,13 +113,14 @@ class HolidayAdapter extends TypeAdapter<Holiday> {
       name: fields[1] as String,
       isHalfDay: fields[2] == null ? false : fields[2] as bool,
       isPredefined: fields[3] == null ? false : fields[3] as bool,
+      isReligious: fields[4] == null ? false : fields[4] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, Holiday obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(5)
       ..writeByte(0)
       ..write(obj.date)
       ..writeByte(1)
@@ -127,7 +128,9 @@ class HolidayAdapter extends TypeAdapter<Holiday> {
       ..writeByte(2)
       ..write(obj.isHalfDay)
       ..writeByte(3)
-      ..write(obj.isPredefined);
+      ..write(obj.isPredefined)
+      ..writeByte(4)
+      ..write(obj.isReligious);
   }
 
   @override

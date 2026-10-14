@@ -120,6 +120,17 @@ void main() {
     expect(h.date, DateTime(2026, 10, 28));
     expect(h.key, '2026-10-28');
     expect(Holiday.fromJson(h.toJson()), h);
+    expect(h.isReligious, isFalse);
+
+    final feast = Holiday(
+      date: DateTime(2026, 3, 20),
+      name: 'Ramazan Bayramı 1. Gün',
+      isReligious: true,
+    );
+    expect(Holiday.fromJson(feast.toJson()), feast);
+    // Eski yedeklerde alan yok: adından tahmin edilir.
+    final old = feast.toJson()..remove('isReligious');
+    expect(Holiday.fromJson(old).isReligious, isTrue);
   });
 
   test('DayAssignment JSON gidiş-dönüş ve personIds', () {

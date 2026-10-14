@@ -26,6 +26,7 @@ class _HolidayFormDialogState extends State<HolidayFormDialog> {
   final _name = TextEditingController();
   int? _day;
   bool _isHalfDay = false;
+  bool _isReligious = false;
 
   @override
   void dispose() {
@@ -48,6 +49,7 @@ class _HolidayFormDialogState extends State<HolidayFormDialog> {
         date: DateTime(widget.month.year, widget.month.month, _day!),
         name: _name.text.trim(),
         isHalfDay: _isHalfDay,
+        isReligious: _isReligious,
       ),
     );
   }
@@ -95,6 +97,15 @@ class _HolidayFormDialogState extends State<HolidayFormDialog> {
               title: const Text('Yarım gün (arife)'),
               value: _isHalfDay,
               onChanged: (v) => setState(() => _isHalfDay = v),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Dini bayram'),
+              subtitle: const Text(
+                'Nöbetleri resmi tatillerden ayrı dengelenir.',
+              ),
+              value: _isReligious,
+              onChanged: (v) => setState(() => _isReligious = v),
             ),
           ],
         ),

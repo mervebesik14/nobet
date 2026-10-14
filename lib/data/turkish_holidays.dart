@@ -45,12 +45,18 @@ class TurkishHolidays {
   /// tatildir.
   static List<Holiday> forYear(int year) {
     final byKey = <String, Holiday>{};
-    void add(DateTime date, String name, {bool halfDay = false}) {
+    void add(
+      DateTime date,
+      String name, {
+      bool halfDay = false,
+      bool religious = false,
+    }) {
       final holiday = Holiday(
         date: date,
         name: name,
         isHalfDay: halfDay,
         isPredefined: true,
+        isReligious: religious,
       );
       final existing = byKey[holiday.key];
       byKey[holiday.key] = existing == null
@@ -58,6 +64,8 @@ class TurkishHolidays {
           : existing.copyWith(
               name: '${existing.name} / $name',
               isHalfDay: existing.isHalfDay && halfDay,
+              // Bayramla çakışan gün (ör. 19 Mayıs 2027) dini bayram sayılır.
+              isReligious: existing.isReligious || religious,
             );
     }
 
@@ -75,14 +83,19 @@ class TurkishHolidays {
   }
 
   static void _addFeast(
-    void Function(DateTime, String, {bool halfDay}) add,
+    void Function(DateTime, String, {bool halfDay, bool religious}) add,
     DateTime firstDay,
     String name,
     int days,
   ) {
-    add(_addDays(firstDay, -1), '$name Arifesi', halfDay: true);
+    add(
+      _addDays(firstDay, -1),
+      '$name Arifesi',
+      halfDay: true,
+      religious: true,
+    );
     for (var i = 0; i < days; i++) {
-      add(_addDays(firstDay, i), '$name ${i + 1}. Gün');
+      add(_addDays(firstDay, i), '$name ${i + 1}. Gün', religious: true);
     }
   }
 

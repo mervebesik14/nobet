@@ -5,6 +5,7 @@ class Holiday {
     required this.name,
     this.isHalfDay = false,
     this.isPredefined = false,
+    this.isReligious = false,
   }) : date = DateTime(date.year, date.month, date.day);
 
   /// Tatilin günü; saat bilgisi atılır (yerel gece yarısı).
@@ -16,6 +17,10 @@ class Holiday {
 
   /// Uygulamayla gelen Türkiye tatili mi (true), kullanıcı mı ekledi (false).
   final bool isPredefined;
+
+  /// Dini bayram (Ramazan / Kurban) günü mü; değilse resmi (ulusal) tatil.
+  /// Nöbetleri ayrı ayrı dengelenir.
+  final bool isReligious;
 
   /// Saklama anahtarı: `yyyy-MM-dd`.
   String get key => keyFor(date);
@@ -30,12 +35,14 @@ class Holiday {
     String? name,
     bool? isHalfDay,
     bool? isPredefined,
+    bool? isReligious,
   }) {
     return Holiday(
       date: date ?? this.date,
       name: name ?? this.name,
       isHalfDay: isHalfDay ?? this.isHalfDay,
       isPredefined: isPredefined ?? this.isPredefined,
+      isReligious: isReligious ?? this.isReligious,
     );
   }
 
@@ -44,6 +51,7 @@ class Holiday {
     'name': name,
     'isHalfDay': isHalfDay,
     'isPredefined': isPredefined,
+    'isReligious': isReligious,
   };
 
   factory Holiday.fromJson(Map<String, dynamic> json) => Holiday(
@@ -51,7 +59,13 @@ class Holiday {
     name: json['name'] as String,
     isHalfDay: json['isHalfDay'] as bool? ?? false,
     isPredefined: json['isPredefined'] as bool? ?? false,
+    isReligious:
+        json['isReligious'] as bool? ?? isReligiousName(json['name'] as String),
   );
+
+  /// Eski kayıtlarda alan yoksa adından tahmin: Ramazan / Kurban Bayramı.
+  static bool isReligiousName(String name) =>
+      name.contains('Ramazan Bayramı') || name.contains('Kurban Bayramı');
 
   @override
   bool operator ==(Object other) =>
@@ -59,11 +73,15 @@ class Holiday {
       other.date == date &&
       other.name == name &&
       other.isHalfDay == isHalfDay &&
-      other.isPredefined == isPredefined;
+      other.isPredefined == isPredefined &&
+      other.isReligious == isReligious;
 
   @override
-  int get hashCode => Object.hash(date, name, isHalfDay, isPredefined);
+  int get hashCode =>
+      Object.hash(date, name, isHalfDay, isPredefined, isReligious);
 
   @override
-  String toString() => 'Holiday($key, $name${isHalfDay ? ', yarım gün' : ''})';
+  String toString() =>
+      'Holiday($key, $name${isHalfDay ? ', yarım gün' : ''}'
+      '${isReligious ? ', dini' : ''})';
 }

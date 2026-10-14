@@ -8,6 +8,7 @@ class HolidayRepository {
   HolidayRepository(this._box, this._meta);
 
   static const _seededYearsKey = 'seededHolidayYears';
+  static const _religiousTaggedKey = 'religiousHolidaysTagged';
 
   final Box<Holiday> _box;
   final Box<dynamic> _meta;
@@ -49,6 +50,18 @@ class HolidayRepository {
     });
     await _meta.put(_seededYearsKey, (seeded..add(year)).toList()..sort());
     return true;
+  }
+
+  /// Dini bayram alanı eklenmeden önce kaydedilmiş Ramazan / Kurban Bayramı
+  /// günlerini bir kez dini bayram olarak işaretler.
+  Future<void> tagReligiousHolidays() async {
+    if (_meta.get(_religiousTaggedKey) == true) return;
+    await _box.putAll({
+      for (final h in _box.values)
+        if (!h.isReligious && Holiday.isReligiousName(h.name))
+          h.key: h.copyWith(isReligious: true),
+    });
+    await _meta.put(_religiousTaggedKey, true);
   }
 
   Stream<BoxEvent> watch() => _box.watch();
