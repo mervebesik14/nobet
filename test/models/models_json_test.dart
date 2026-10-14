@@ -29,6 +29,50 @@ void main() {
     );
   });
 
+  group('Person pasif başlangıcı', () {
+    final p = Person(
+      id: 'p',
+      name: 'Ali',
+      role: Role.nurse,
+      isActive: false,
+      inactiveFrom: DateTime(2026, 10, 20),
+    );
+
+    test('JSON gidiş-dönüş', () {
+      expect(Person.fromJson(p.toJson()), p);
+      expect(
+        Person.fromJson(const {
+          'id': 'x',
+          'name': 'X',
+          'role': 'nurse',
+        }).inactiveFrom,
+        isNull,
+      );
+    });
+
+    test('tarihten önce aktif, tarihten itibaren pasif', () {
+      expect(p.isActiveOn(DateTime(2026, 10, 19, 23)), isTrue);
+      expect(p.isActiveOn(DateTime(2026, 10, 20)), isFalse);
+      expect(p.worksInMonth(2026, 10), isTrue);
+      expect(p.worksInMonth(2026, 11), isFalse);
+      expect(p.worksInMonth(2026, 9), isTrue);
+    });
+
+    test('ay içindeki pasif günler', () {
+      expect(p.inactiveDaysIn(2026, 10), [for (var d = 20; d <= 31; d++) d]);
+      expect(p.inactiveDaysIn(2026, 9), isEmpty);
+      expect(p.inactiveDaysIn(2026, 11), isEmpty);
+    });
+
+    test('tarihsiz pasif tamamen pasif; aktif kişi her gün aktif', () {
+      const off = Person(id: 'a', name: 'A', role: Role.nurse, isActive: false);
+      const on = Person(id: 'b', name: 'B', role: Role.nurse);
+      expect(off.worksInMonth(2026, 10), isFalse);
+      expect(on.isActiveOn(DateTime(2030)), isTrue);
+      expect(on.inactiveDaysIn(2026, 10), isEmpty);
+    });
+  });
+
   test('Holiday tarihi gün başına indirir ve JSON gidiş-dönüş', () {
     final h = Holiday(
       date: DateTime(2026, 10, 28, 13, 45),

@@ -74,7 +74,9 @@ class FeasibilityChecker {
     for (final role in Role.values) {
       final perDay = _perDay(role);
       if (perDay <= 0) continue;
-      final members = people.where((p) => p.isActive && p.role == role);
+      final members = people.where(
+        (p) => p.worksInMonth(year, month) && p.role == role,
+      );
       final available = {
         for (final p in members)
           p.id: {

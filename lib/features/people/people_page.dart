@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../models/models.dart';
 import '../../shared/widgets/placeholder_view.dart';
@@ -87,14 +88,12 @@ class _PersonTile extends ConsumerWidget {
   /// Pasif yapmada satır listede kalır (Pasif bölümüne geçer), bu yüzden
   /// işlem burada yapılır ve false döner.
   Future<bool> _confirm(BuildContext context, WidgetRef ref) async {
-    final messenger = ScaffoldMessenger.of(context);
     final choice = await askPersonDelete(context, ref, person);
     switch (choice) {
       case PersonDeleteChoice.delete:
         return true;
       case PersonDeleteChoice.deactivate:
-        await ref.read(peopleProvider.notifier).deactivate(person.id);
-        _notify(messenger, '${person.name} pasif yapıldı.');
+        if (context.mounted) await deactivateWithDate(context, ref, person);
         return false;
       case null:
         return false;
@@ -120,7 +119,13 @@ class _PersonTile extends ConsumerWidget {
       ),
       title: Text(person.name),
       subtitle: !person.isActive
-          ? Text('${person.role.label} · pasif')
+          ? Text(
+              person.inactiveFrom == null
+                  ? '${person.role.label} · pasif'
+                  : '${person.role.label} · '
+                        '${DateFormat('d MMMM y', 'tr_TR').format(person.inactiveFrom!)} '
+                        'itibarıyla pasif',
+            )
           : person.isChargeNurse
           ? const Text('Sorumlu hemşire · 7A')
           : null,

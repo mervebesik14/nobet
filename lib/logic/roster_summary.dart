@@ -156,7 +156,8 @@ class RosterSummary {
         onlyRoles == null || onlyRoles.contains(role);
     final included = {
       for (final p in people)
-        if ((p.isActive || worked.containsKey(p.id)) && roleAllowed(p.role))
+        if ((p.worksInMonth(year, month) || worked.containsKey(p.id)) &&
+            roleAllowed(p.role))
           p.id,
       for (final id in worked.keys)
         if (roleAllowed(byId[id]?.role ?? assignedRole[id])) id,

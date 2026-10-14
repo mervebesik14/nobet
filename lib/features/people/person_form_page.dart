@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../models/models.dart';
+import '../../shared/providers.dart';
 import 'people_controller.dart';
 import 'person_delete_dialog.dart';
 
@@ -21,6 +23,9 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
   late Role _role;
   late bool _isActive;
   late bool _isChargeNurse;
+
+  /// Pasif başlangıç günü (Aktif kapalıyken).
+  DateTime? _inactiveFrom;
   late final bool _roleLocked;
   bool _saving = false;
 
@@ -42,6 +47,7 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
     _role = person?.role ?? Role.nurse;
     _isActive = person?.isActive ?? true;
     _isChargeNurse = person?.isChargeNurse ?? false;
+    _inactiveFrom = person?.inactiveFrom;
     // Geçmiş listelerde geçen kişinin görevi değişirse o listeler bozulur.
     _roleLocked =
         person != null &&
@@ -79,14 +85,34 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
         isChargeNurse: chargeNurse,
       );
     } else {
+      final messenger = ScaffoldMessenger.of(context);
       await controller.update(
         person.copyWith(
           name: _name.text,
           role: _role,
-          isActive: _isActive,
           isChargeNurse: chargeNurse,
         ),
       );
+      final from = _inactiveFrom;
+      if (!_isActive &&
+          from != null &&
+          (person.isActive || person.inactiveFrom != from)) {
+        // Pasife alındı ya da pasif başlangıcı değişti: listeler onarılır.
+        final report = await controller.deactivate(person.id, from: from);
+        messenger
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                deactivationMessage(_name.text.trim(), from, report),
+              ),
+            ),
+          );
+      } else if (!_isActive && person.isActive) {
+        await controller.deactivate(person.id);
+      } else if (_isActive && !person.isActive) {
+        await controller.activate(person.id);
+      }
     }
     if (mounted) Navigator.of(context).pop();
   }
@@ -96,25 +122,18 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
     final messenger = ScaffoldMessenger.of(context);
     final choice = await askPersonDelete(context, ref, person);
     if (choice == null || !mounted) return;
-    final controller = ref.read(peopleProvider.notifier);
-    if (choice == PersonDeleteChoice.delete) {
-      await controller.delete(person.id);
-    } else {
-      await controller.deactivate(person.id);
+    if (choice == PersonDeleteChoice.deactivate) {
+      if (await deactivateWithDate(context, ref, person) && mounted) {
+        Navigator.of(context).pop();
+      }
+      return;
     }
+    await ref.read(peopleProvider.notifier).delete(person.id);
     if (!mounted) return;
     Navigator.of(context).pop();
     messenger
       ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: Text(
-            choice == PersonDeleteChoice.delete
-                ? '${person.name} silindi.'
-                : '${person.name} pasif yapıldı.',
-          ),
-        ),
-      );
+      ..showSnackBar(SnackBar(content: Text('${person.name} silindi.')));
   }
 
   @override
@@ -180,8 +199,33 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
                 'Pasif kişilere yeni nöbet verilmez, geçmiş listelerde kalır.',
               ),
               value: _isActive,
-              onChanged: (value) => setState(() => _isActive = value),
+              onChanged: (value) => setState(() {
+                _isActive = value;
+                // Pasife alınırken varsayılan başlangıç bugündür.
+                if (!value) _inactiveFrom ??= ref.read(todayProvider);
+              }),
             ),
+            if (!_isActive && _isEditing && _inactiveFrom != null)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.event_busy_outlined),
+                title: const Text('Pasif başlangıcı'),
+                subtitle: Text(
+                  '${DateFormat('d MMMM y EEEE', 'tr_TR').format(_inactiveFrom!)}. '
+                  'Bu günden önceki nöbetleri kalır; sonrakiler başkalarına '
+                  'verilir.',
+                ),
+                trailing: TextButton(
+                  onPressed: () async {
+                    final picked = await pickInactiveFrom(
+                      context,
+                      _inactiveFrom!,
+                    );
+                    if (picked != null) setState(() => _inactiveFrom = picked);
+                  },
+                  child: const Text('Değiştir'),
+                ),
+              ),
             const SizedBox(height: 24),
             FilledButton.icon(
               onPressed: _saving ? null : _save,

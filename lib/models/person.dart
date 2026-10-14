@@ -9,6 +9,7 @@ class Person {
     this.isActive = true,
     this.colorValue,
     this.isChargeNurse = false,
+    this.inactiveFrom,
   });
 
   final String id;
@@ -26,6 +27,36 @@ class Person {
   /// Yalnızca hemşireler için anlamlıdır.
   final bool isChargeNurse;
 
+  /// Pasifliğin başladığı gün. Doluysa kişi bu günden önce çalışır, bu
+  /// günden itibaren nöbete yazılmaz. Boş ve [isActive] false ise kişi
+  /// tamamen pasiftir.
+  final DateTime? inactiveFrom;
+
+  /// Kişi [date] gününde çalışabilir mi (aktif mi)?
+  bool isActiveOn(DateTime date) {
+    final from = inactiveFrom;
+    if (from == null) return isActive;
+    return DateTime(
+      date.year,
+      date.month,
+      date.day,
+    ).isBefore(DateTime(from.year, from.month, from.day));
+  }
+
+  /// Kişi [year]/[month] ayında en az bir gün aktif mi?
+  bool worksInMonth(int year, int month) => isActiveOn(DateTime(year, month));
+
+  /// [year]/[month] ayında pasif olduğu günler (ay içinde pasife geçtiyse
+  /// pasiflik gününden ay sonuna kadar). Ayda hiç aktif değilse ya da
+  /// tamamen aktifse boş.
+  List<int> inactiveDaysIn(int year, int month) {
+    final from = inactiveFrom;
+    if (from == null || !worksInMonth(year, month)) return const [];
+    if (from.year != year || from.month != month) return const [];
+    final last = DateTime(year, month + 1, 0).day;
+    return [for (var d = from.day; d <= last; d++) d];
+  }
+
   Person copyWith({
     String? name,
     Role? role,
@@ -33,6 +64,8 @@ class Person {
     int? colorValue,
     bool clearColor = false,
     bool? isChargeNurse,
+    DateTime? inactiveFrom,
+    bool clearInactiveFrom = false,
   }) {
     return Person(
       id: id,
@@ -41,6 +74,9 @@ class Person {
       isActive: isActive ?? this.isActive,
       colorValue: clearColor ? null : (colorValue ?? this.colorValue),
       isChargeNurse: isChargeNurse ?? this.isChargeNurse,
+      inactiveFrom: clearInactiveFrom
+          ? null
+          : (inactiveFrom ?? this.inactiveFrom),
     );
   }
 
@@ -51,6 +87,7 @@ class Person {
     'isActive': isActive,
     'colorValue': colorValue,
     'isChargeNurse': isChargeNurse,
+    'inactiveFrom': inactiveFrom?.toIso8601String(),
   };
 
   factory Person.fromJson(Map<String, dynamic> json) => Person(
@@ -60,6 +97,9 @@ class Person {
     isActive: json['isActive'] as bool? ?? true,
     colorValue: json['colorValue'] as int?,
     isChargeNurse: json['isChargeNurse'] as bool? ?? false,
+    inactiveFrom: json['inactiveFrom'] == null
+        ? null
+        : DateTime.parse(json['inactiveFrom'] as String),
   );
 
   @override
@@ -70,11 +110,19 @@ class Person {
       other.role == role &&
       other.isActive == isActive &&
       other.colorValue == colorValue &&
-      other.isChargeNurse == isChargeNurse;
+      other.isChargeNurse == isChargeNurse &&
+      other.inactiveFrom == inactiveFrom;
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, role, isActive, colorValue, isChargeNurse);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    role,
+    isActive,
+    colorValue,
+    isChargeNurse,
+    inactiveFrom,
+  );
 
   @override
   String toString() => 'Person($name, ${role.label})';

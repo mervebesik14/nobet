@@ -67,7 +67,7 @@ class DayShiftPlanner {
   }) {
     final nurses = [
       for (final p in people)
-        if (p.isActive && p.role == Role.nurse) p,
+        if (p.worksInMonth(year, month) && p.role == Role.nurse) p,
     ];
     Person? charge;
     for (final p in nurses) {
@@ -103,7 +103,13 @@ class DayShiftPlanner {
       return assignments[d]?.includes(id) ?? false;
     }
 
-    bool onLeave(String id, int d) => leaveDays[id]?.contains(d) ?? false;
+    // Ay içinde pasife geçenin pasif günleri izin gibi sayılır.
+    final inactive = {
+      for (final p in nurses) p.id: p.inactiveDaysIn(year, month).toSet(),
+    };
+    bool onLeave(String id, int d) =>
+        (leaveDays[id]?.contains(d) ?? false) ||
+        (inactive[id]?.contains(d) ?? false);
 
     bool canWork(String id, int d) =>
         !onDuty(id, d) && !onDuty(id, d - 1) && !onLeave(id, d);

@@ -2,8 +2,36 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../data/providers.dart';
+import '../../logic/roster_generator.dart';
+import '../../logic/roster_repair.dart';
 import '../../logic/turkish_collation.dart';
 import '../../models/models.dart';
+import '../holidays/holidays_controller.dart';
+import '../month/month_plan_controller.dart';
+
+/// Pasif yapma sonucunda listelerde yapılan değişiklikler.
+class DeactivationReport {
+  const DeactivationReport({this.refilled = 0, this.unfilled = const []});
+
+  /// Başkasına verilen nöbet sayısı.
+  final int refilled;
+
+  /// Uygun kimse bulunamadığı için boş kalan nöbet günleri.
+  final List<DateTime> unfilled;
+
+  /// Kaldırılan toplam nöbet.
+  int get removed => refilled + unfilled.length;
+
+  DeactivationReport add(MonthPlan plan, RosterRepairResult result) =>
+      DeactivationReport(
+        refilled: refilled + result.replacements.length,
+        unfilled: [
+          ...unfilled,
+          for (final d in result.unfilledDays)
+            DateTime(plan.year, plan.month, d),
+        ],
+      );
+}
 
 /// Kişi listesinin durumu: tüm kişiler, Türkçe alfabe sırasıyla.
 class PeopleController extends Notifier<List<Person>> {
@@ -57,11 +85,90 @@ class PeopleController extends Notifier<List<Person>> {
     state = repo.getAll();
   }
 
-  /// Kişiyi pasif yapar: yeni listelere alınmaz, geçmiş listelerde adıyla
-  /// kalır.
-  Future<void> deactivate(String personId) async {
+  /// Kişiyi [from] gününden itibaren pasif yapar: o günden önce çalışır,
+  /// o günden itibaren nöbete yazılmaz; geçmiş listelerde adıyla kalır.
+  /// Kayıtlı listelerdeki o günden sonraki nöbetleri kaldırılır ve boşalan
+  /// koltuklar diğer kişileri en az etkileyecek şekilde doldurulur
+  /// ([RosterRepair]). [from] verilmezse kişi tamamen pasif olur ve
+  /// listelere dokunulmaz.
+  Future<DeactivationReport> deactivate(
+    String personId, {
+    DateTime? from,
+  }) async {
     final repo = ref.read(peopleRepositoryProvider);
-    await repo.deactivate(personId);
+    final person = repo.getById(personId);
+    if (person == null) return const DeactivationReport();
+    final start = from == null
+        ? null
+        : DateTime(from.year, from.month, from.day);
+    await repo.save(
+      person.copyWith(
+        isActive: false,
+        inactiveFrom: start,
+        clearInactiveFrom: start == null,
+      ),
+    );
+    state = repo.getAll();
+    if (start == null) return const DeactivationReport();
+
+    final plans = ref.read(monthPlanRepositoryProvider);
+    final holidays = ref.read(holidaysProvider);
+    var report = const DeactivationReport();
+    for (final plan in plans.getAll()) {
+      // Pasiflik gününden önce biten ayların listesine dokunulmaz.
+      if (!plan.hasRoster ||
+          DateTime(plan.year, plan.month + 1, 0).isBefore(start)) {
+        continue;
+      }
+      final fromDay = plan.year == start.year && plan.month == start.month
+          ? start.day
+          : 1;
+      if (!plan.assignments.values.any(
+        (a) => a.day >= fromDay && a.includes(personId),
+      )) {
+        continue;
+      }
+      final settings = effectiveSettings(
+        ref.read(rosterSettingsProvider),
+        nurseOnly: plan.nurseOnly,
+      );
+      final result = RosterRepair.removePerson(
+        year: plan.year,
+        month: plan.month,
+        assignments: plan.assignments,
+        personId: personId,
+        fromDay: fromDay,
+        people: state,
+        settings: settings,
+        blockedDays: computeEffectiveBlockedDays(
+          plan,
+          holidays,
+          repository: plans,
+          people: state,
+        ),
+        weekendDays: RosterGenerator.weekendDays(
+          plan.year,
+          plan.month,
+          holidays,
+          settings,
+        ),
+        previousMonthTail: previousMonthTailOf(plans, plan),
+        overtimeRequests: plan.overtimeRequests,
+      );
+      await plans.save(plan.copyWith(assignments: result.assignments));
+      report = report.add(plan, result);
+    }
+    // Açık ayın planı yeniden okunsun.
+    ref.invalidate(monthPlanProvider);
+    return report;
+  }
+
+  /// Pasif kişiyi yeniden aktif yapar (pasif başlangıcı silinir).
+  Future<void> activate(String personId) async {
+    final repo = ref.read(peopleRepositoryProvider);
+    final person = repo.getById(personId);
+    if (person == null) return;
+    await repo.save(person.copyWith(isActive: true, clearInactiveFrom: true));
     state = repo.getAll();
   }
 

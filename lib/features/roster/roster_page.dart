@@ -113,7 +113,9 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   List<Person> _activeOfRole(Role role) =>
       ref
           .read(peopleProvider)
-          .where((p) => p.isActive && p.role == role)
+          .where(
+            (p) => p.worksInMonth(_plan.year, _plan.month) && p.role == role,
+          )
           .toList()
         ..sort((a, b) => compareTurkish(a.name, b.name));
 

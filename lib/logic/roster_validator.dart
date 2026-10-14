@@ -244,7 +244,8 @@ class RosterValidator {
             : settings.techsPerDay;
         // Sorumlu hemşire nöbet dengesine girmez.
         final members = byId.values.where(
-          (p) => p.isActive && p.role == role && !p.isChargeNurse,
+          (p) =>
+              p.worksInMonth(year, month) && p.role == role && !p.isChargeNurse,
         );
         if (members.isEmpty || perDay == 0) continue;
         final baseCap = (daysInMonth * perDay / members.length).ceil() + extra;

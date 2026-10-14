@@ -13,7 +13,7 @@ types:
         index: 1
   Person:
     typeId: 1
-    nextIndex: 6
+    nextIndex: 7
     fields:
       id:
         index: 0
@@ -27,6 +27,8 @@ types:
         index: 4
       isChargeNurse:
         index: 5
+      inactiveFrom:
+        index: 6
   Holiday:
     typeId: 2
     nextIndex: 4

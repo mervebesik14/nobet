@@ -101,11 +101,9 @@ class MonthPlanController extends Notifier<MonthPlan> {
   }
 
   /// Kişinin bu aydaki seçilmiş nöbet günlerini kaldırır.
-  Future<bool> clearRequestedShifts(String personId) => _setDays(
-    personId,
-    {...state.unavailableDaysOf(personId)},
-    requested: const {},
-  );
+  Future<bool> clearRequestedShifts(String personId) => _setDays(personId, {
+    ...state.unavailableDaysOf(personId),
+  }, requested: const {});
 
   /// Kişinin bu aydaki tüm istenmeyen günlerini kaldırır.
   Future<bool> clearUnavailable(String personId) => _setDays(personId, {});
@@ -258,6 +256,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
         plan,
         ref.read(holidaysProvider),
         repository: ref.read(monthPlanRepositoryProvider),
+        people: ref.read(peopleProvider),
       ),
       holidays: ref.read(holidaysProvider),
       settings: effectiveSettings(base, nurseOnly: onlyNurses),
@@ -302,19 +301,23 @@ class MonthPlanController extends Notifier<MonthPlan> {
 
   /// Önceki ayın son 4 gününün nöbetçileri (ay sınırında art arda gün ve
   /// gün aşırı zincir kuralları için).
-  List<Set<String>> previousMonthTail() {
-    final plan = state;
-    final prev = DateTime(plan.year, plan.month - 1);
-    final previous = ref
-        .read(monthPlanRepositoryProvider)
-        .get(prev.year, prev.month);
-    if (previous == null || !previous.hasRoster) return const [];
-    final last = previous.daysInMonth;
-    return [
-      for (var d = last - 3; d <= last; d++)
-        {...?previous.assignments[d]?.personIds},
-    ];
-  }
+  List<Set<String>> previousMonthTail() =>
+      previousMonthTailOf(ref.read(monthPlanRepositoryProvider), state);
+}
+
+/// [plan]dan önceki ayın son 4 gününün nöbetçileri, eskiden yeniye.
+List<Set<String>> previousMonthTailOf(
+  MonthPlanRepository repository,
+  MonthPlan plan,
+) {
+  final prev = DateTime(plan.year, plan.month - 1);
+  final previous = repository.get(prev.year, prev.month);
+  if (previous == null || !previous.hasRoster) return const [];
+  final last = previous.daysInMonth;
+  return [
+    for (var d = last - 3; d <= last; d++)
+      {...?previous.assignments[d]?.personIds},
+  ];
 }
 
 /// Seçili ayın listesindeki kural ihlalleri; her değişiklikte yenilenir.
@@ -369,6 +372,7 @@ Map<String, List<int>> computeEffectiveBlockedDays(
   MonthPlan plan,
   Iterable<Holiday> holidays, {
   MonthPlanRepository? repository,
+  Iterable<Person> people = const [],
 }) {
   final prevMonth = DateTime(plan.year, plan.month - 1);
   final nextMonth = DateTime(plan.year, plan.month + 1);
@@ -405,6 +409,12 @@ Map<String, List<int>> computeEffectiveBlockedDays(
     );
     if (days.isNotEmpty) result[id] = days.toList()..sort();
   }
+  // Ay içinde pasife geçenler pasif günlerinde nöbete yazılmaz.
+  for (final p in people) {
+    final inactive = p.inactiveDaysIn(plan.year, plan.month);
+    if (inactive.isEmpty) continue;
+    result[p.id] = {...?result[p.id], ...inactive}.toList()..sort();
+  }
   return result;
 }
 
@@ -435,6 +445,7 @@ final effectiveBlockedDaysProvider = Provider<Map<String, List<int>>>((ref) {
     plan,
     holidays,
     repository: ref.read(monthPlanRepositoryProvider),
+    people: ref.watch(peopleProvider),
   );
 });
 

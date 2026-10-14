@@ -2,14 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive_ce.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/features/people/people_page.dart';
 import 'package:nobet_listesi/models/models.dart';
+import 'package:nobet_listesi/shared/providers.dart';
 
 import '../../helpers.dart';
 
 void main() {
   late HiveBoxes boxes;
+
+  setUpAll(() => initializeDateFormatting('tr_TR'));
 
   setUp(() async {
     boxes = await openTestBoxes();
@@ -20,7 +24,10 @@ void main() {
   Future<void> pumpPage(WidgetTester tester) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: boxOverrides(boxes),
+        overrides: [
+          ...boxOverrides(boxes),
+          todayProvider.overrideWithValue(DateTime(2026, 10, 11)),
+        ],
         child: const MaterialApp(home: PeoplePage()),
       ),
     );
@@ -167,12 +174,41 @@ void main() {
 
     await tester.enterText(find.byType(TextFormField), 'Ayşe Kaya');
     await tester.tap(find.text('Aktif'));
+    await tester.pumpAndSettle();
+    // Pasif başlangıcı varsayılan olarak bugün.
+    expect(find.text('Pasif başlangıcı'), findsOneWidget);
+    expect(find.textContaining('11 Ekim 2026 Pazar'), findsOneWidget);
     await tester.tap(find.text('Kaydet'));
     await tester.pumpAndSettle();
 
     expect(find.text('Ayşe Kaya'), findsOneWidget);
-    expect(find.text('Hemşire · pasif'), findsOneWidget);
-    expect(boxes.people.get('1')!.isActive, isFalse);
+    expect(
+      find.text('Hemşire · 11 Ekim 2026 itibarıyla pasif'),
+      findsOneWidget,
+    );
+    final saved = boxes.people.get('1')!;
+    expect(saved.isActive, isFalse);
+    expect(saved.inactiveFrom, DateTime(2026, 10, 11));
+  });
+
+  testWidgets('pasif başlangıcı formda değiştirilebilir', (tester) async {
+    await seed(const [Person(id: '1', name: 'Ayşe', role: Role.nurse)]);
+    await pumpPage(tester);
+
+    await tester.tap(find.text('Ayşe'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Aktif'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Değiştir'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('20'));
+    await tester.tap(find.text('Tamam'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('20 Ekim 2026 Salı'), findsOneWidget);
+
+    await tester.tap(find.text('Kaydet'));
+    await tester.pumpAndSettle();
+    expect(boxes.people.get('1')!.inactiveFrom, DateTime(2026, 10, 20));
   });
 
   testWidgets('planda geçen kişinin görevi değiştirilemez', (tester) async {
@@ -266,10 +302,17 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Pasif yap'));
     await tester.pumpAndSettle();
+    // Tarih seçici açılır; varsayılan bugün.
+    expect(find.text('Hangi günden itibaren pasif?'), findsOneWidget);
+    await tester.tap(find.text('Tamam'));
+    await tester.pumpAndSettle();
 
     expect(find.text('Ali'), findsOneWidget);
-    expect(find.text('Radyoloji Teknikeri · pasif'), findsOneWidget);
-    expect(find.text('Ali pasif yapıldı.'), findsOneWidget);
+    expect(
+      find.text('Radyoloji Teknikeri · 11 Ekim 2026 itibarıyla pasif'),
+      findsOneWidget,
+    );
+    expect(find.text('Ali 11 Ekim 2026 itibarıyla pasif.'), findsOneWidget);
     expect(boxes.people.get('1')!.isActive, isFalse);
 
     // Pasif kişi de silinebilir; bu kez "Pasif yap" seçeneği çıkmaz.

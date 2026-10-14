@@ -92,7 +92,7 @@ class RosterGenerator {
     this.overtimeAllowance = 2,
     this.requestedShifts = const {},
     this.attempts = 400,
-  }) : people = people.where((p) => p.isActive).toList()
+  }) : people = people.where((p) => p.worksInMonth(year, month)).toList()
          ..sort((a, b) => a.id.compareTo(b.id));
 
   final int year;

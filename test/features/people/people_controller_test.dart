@@ -88,4 +88,90 @@ void main() {
       expect(boxes.people.get(p.id), isNotNull);
     });
   });
+
+  group('tarihli pasif yapma', () {
+    /// d günü hemşireler (2d, 2d+1) mod 7: kurala uygun dönüşüm.
+    Map<int, DayAssignment> rotation() => {
+      for (var d = 1; d <= 31; d++)
+        d: DayAssignment(
+          day: d,
+          nurseIds: ['n${(2 * d) % 7}', 'n${(2 * d + 1) % 7}'],
+          techId: 't${d % 4}',
+        ),
+    };
+
+    Future<void> seedTeam() async {
+      for (var i = 0; i < 8; i++) {
+        await boxes.people.put(
+          'n$i',
+          Person(id: 'n$i', name: 'Hemşire $i', role: Role.nurse),
+        );
+      }
+      for (var i = 0; i < 4; i++) {
+        await boxes.people.put(
+          't$i',
+          Person(id: 't$i', name: 'Tekniker $i', role: Role.radiologyTech),
+        );
+      }
+      container.invalidate(peopleProvider);
+    }
+
+    test('o günden sonraki nöbetler başkalarına verilir', () async {
+      await seedTeam();
+      final original = rotation();
+      await boxes.monthPlans.put(
+        '2026-10',
+        MonthPlan(year: 2026, month: 10, assignments: original),
+      );
+
+      final report = await controller().deactivate(
+        'n0',
+        from: DateTime(2026, 10, 20),
+      );
+
+      final person = boxes.people.get('n0')!;
+      expect(person.isActive, isFalse);
+      expect(person.inactiveFrom, DateTime(2026, 10, 20));
+
+      final plan = boxes.monthPlans.get('2026-10')!;
+      for (var d = 1; d < 20; d++) {
+        expect(plan.assignments[d], original[d], reason: 'gün $d');
+      }
+      final removed = [
+        for (var d = 20; d <= 31; d++)
+          if (original[d]!.includes('n0')) d,
+      ];
+      expect(report.removed, removed.length);
+      expect(report.refilled + report.unfilled.length, removed.length);
+      for (var d = 20; d <= 31; d++) {
+        expect(plan.assignments[d]!.includes('n0'), isFalse, reason: 'gün $d');
+      }
+    });
+
+    test('pasiflik gününden önce biten aylara dokunulmaz', () async {
+      await seedTeam();
+      final september = MonthPlan(
+        year: 2026,
+        month: 9,
+        assignments: {for (var d = 1; d <= 30; d++) d: rotation()[d]!},
+      );
+      await boxes.monthPlans.put('2026-09', september);
+
+      final report = await controller().deactivate(
+        'n0',
+        from: DateTime(2026, 10, 1),
+      );
+      expect(report.removed, 0);
+      expect(boxes.monthPlans.get('2026-09'), september);
+    });
+
+    test('yeniden aktif yapılınca pasif başlangıcı silinir', () async {
+      await seedTeam();
+      await controller().deactivate('n1', from: DateTime(2026, 10, 20));
+      await controller().activate('n1');
+      final p = boxes.people.get('n1')!;
+      expect(p.isActive, isTrue);
+      expect(p.inactiveFrom, isNull);
+    });
+  });
 }

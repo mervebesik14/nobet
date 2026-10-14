@@ -32,7 +32,11 @@ class MonthPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final month = ref.watch(planMonthProvider);
     final plan = ref.watch(monthPlanProvider);
-    final active = ref.watch(peopleProvider).where((p) => p.isActive).toList();
+    // Bu ay en az bir gün aktif olanlar (ay içinde pasife geçen de dahil).
+    final active = ref
+        .watch(peopleProvider)
+        .where((p) => p.worksInMonth(plan.year, plan.month))
+        .toList();
     final report = ref.watch(monthFeasibilityProvider);
     final theme = Theme.of(context);
 
@@ -125,9 +129,7 @@ class MonthPage extends ConsumerWidget {
                   person: person,
                   unavailableCount: plan.unavailableDaysOf(person.id).length,
                   annualLeaveCount: plan.annualLeaveOf(person.id).length,
-                  radiationLeaveCount: plan
-                      .radiationLeaveOf(person.id)
-                      .length,
+                  radiationLeaveCount: plan.radiationLeaveOf(person.id).length,
                   wantsOvertime: plan.wantsOvertime(person.id),
                   requestedCount: plan.requestedShiftsOf(person.id).length,
                 ),
@@ -237,9 +239,7 @@ class _LeaveLine extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           text,
-          style: Theme.of(
-            context,
-          ).textTheme.bodySmall?.copyWith(color: color),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color),
         ),
       ],
     );

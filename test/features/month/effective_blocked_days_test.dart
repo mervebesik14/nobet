@@ -112,4 +112,19 @@ void main() {
     );
     expect(blocked['n1'], [1]);
   });
+
+  test('ay içinde pasife geçenin pasif günleri kapanır', () async {
+    await boxes.people.put(
+      'n1',
+      Person(
+        id: 'n1',
+        name: 'Ayşe',
+        role: Role.nurse,
+        isActive: false,
+        inactiveFrom: DateTime(2026, 10, 20),
+      ),
+    );
+    final blocked = container().read(effectiveBlockedDaysProvider);
+    expect(blocked['n1'], [for (var d = 20; d <= 31; d++) d]);
+  });
 }
