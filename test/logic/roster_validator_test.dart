@@ -222,4 +222,34 @@ void main() {
     ).where((x) => x.kind == ViolationKind.unavailable);
     expect(v.single.message, startsWith('Silinmiş kişi'));
   });
+
+  test('sorumlu hemşire seçmediği güne yazılırsa uyarı', () {
+    const team = [
+      ...people,
+      Person(id: 's', name: 'Sevgi', role: Role.nurse, isChargeNurse: true),
+    ];
+    final assignments = {
+      ...base(),
+      6: const DayAssignment(day: 6, nurseIds: ['s', 'a'], techId: 'm'),
+      8: const DayAssignment(day: 8, nurseIds: ['s', 'b'], techId: 'z'),
+    };
+    final v = validator.validate(
+      year: 2027,
+      month: 2,
+      assignments: assignments,
+      people: team,
+      requestedShifts: const {
+        's': [8],
+      },
+    );
+    final charge = v
+        .where((x) => x.kind == ViolationKind.chargeNurseUnrequested)
+        .toList();
+    expect(charge.length, 1);
+    expect(charge.single.days, [6]);
+    expect(
+      charge.single.message,
+      'Sorumlu hemşire Sevgi seçmediği güne (6 Şubat) nöbete yazıldı.',
+    );
+  });
 }

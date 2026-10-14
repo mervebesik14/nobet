@@ -32,9 +32,10 @@ class RosterRepairResult {
 /// Diğer kişilerin mevcut nöbetlerine dokunulmaz; yalnızca boşalan koltuğa
 /// biri eklenir. Aday, o gün yeni bir kural ihlali oluşturmayan (istemediği /
 /// izinli gün, art arda gün, gün aşırı zincir, nöbet sınırı) aynı görevdeki
-/// kişilerdir. Adaylar arasında: sorumlu hemşire en son, sonra bu ay en az
-/// nöbeti olan (fazla mesai payı düşülerek), hafta sonu gününde en az hafta
-/// sonu nöbeti olan seçilir. Uygun kimse yoksa koltuk boş kalır.
+/// kişilerdir. Sorumlu hemşire aday olmaz (yalnızca seçtiği günlerde nöbet
+/// tutar). Adaylar arasında bu ay en az nöbeti olan (fazla mesai payı
+/// düşülerek), hafta sonu gününde en az hafta sonu nöbeti olan seçilir.
+/// Uygun kimse yoksa koltuk boş kalır.
 class RosterRepair {
   const RosterRepair._();
 
@@ -51,12 +52,14 @@ class RosterRepair {
     List<Set<String>> previousMonthTail = const [],
     Set<String> overtimeRequests = const {},
     int overtimeAllowance = 2,
+    Map<String, List<int>> requestedShifts = const {},
   }) {
     final validator = RosterValidator(settings);
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final candidates = [
       for (final p in people)
-        if (p.id != personId && p.worksInMonth(year, month)) p,
+        if (p.id != personId && !p.isChargeNurse && p.worksInMonth(year, month))
+          p,
     ]..sort((a, b) => a.id.compareTo(b.id));
 
     /// Kişi → (eksik koltuk dışındaki) ihlal mesajları.
@@ -71,6 +74,7 @@ class RosterRepair {
         previousMonthTail: previousMonthTail,
         overtimeRequests: overtimeRequests,
         overtimeAllowance: overtimeAllowance,
+        requestedShifts: requestedShifts,
       )) {
         if (v.kind == ViolationKind.missing || v.personId == null) continue;
         (result[v.personId!] ??= {}).add(v.message);
@@ -126,7 +130,6 @@ class RosterRepair {
           continue;
         }
         final rank = <num>[
-          c.isChargeNurse ? 1 : 0,
           shiftsOf(c.id) -
               (overtimeRequests.contains(c.id) ? overtimeAllowance : 0),
           weekendDays.contains(d) ? weekendShiftsOf(c.id) : 0,

@@ -74,19 +74,15 @@ void main() {
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
 
-  test('sorumlu hemşire yalnızca son çare olarak seçilir', () {
-    // Hale'nin hiç nöbeti yok: normalde en az nöbetli olduğu için seçilir.
-    // Sorumlu hemşireyse, başka uygun hemşire bulunan günde seçilmez;
-    // kimse uymayan günde ise boş bırakmak yerine o yazılır.
+  test('sorumlu hemşire boşalan koltuğa hiç yazılmaz', () {
+    // Hale normalde (en az nöbetli olduğu için) seçilir; sorumlu
+    // hemşireyse hiç seçilmez. Ondan başka kimsenin uymadığı gün boş kalır.
     final normal = repair('n0', 20);
     final charge = repair('n0', 20, team: people(haleCharge: true));
-    expect(charge.unfilledDays, isEmpty);
-    final otherDays = [
-      for (final e in charge.replacements.entries)
-        if (e.value != 'n7') e.key,
-    ];
-    expect(otherDays, isNotEmpty);
-    for (final d in otherDays) {
+    expect(normal.replacements.values, contains('n7'));
+    expect(charge.replacements.values, isNot(contains('n7')));
+    expect(charge.unfilledDays, isNotEmpty);
+    for (final d in charge.unfilledDays) {
       expect(normal.replacements[d], 'n7', reason: 'gün $d');
     }
   });

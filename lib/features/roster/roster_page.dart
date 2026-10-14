@@ -70,6 +70,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
           .read(monthPlanProvider.notifier)
           .previousMonthTail(),
       overtimeRequests: plan.overtimeRequests,
+      requestedShifts: plan.requestedShifts,
     );
   }
 

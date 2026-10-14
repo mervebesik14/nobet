@@ -614,14 +614,19 @@ void main() {
       expect(workedDays(r)['c'], {5});
     });
 
-    test('başka uygun hemşire kalmayan günde nöbete yazılır', () {
-      // 14 Ekim'de n2–n7 istemiyor: tek uygun n1 + sorumlu hemşire.
+    test('seçmediği güne, başka hemşire kalmasa da yazılmaz', () {
+      // 14 Ekim'de n2–n7 istemiyor: tek uygun n1. Sorumlu hemşire o günü
+      // seçmediği için yazılmaz; ikinci koltuk boş kalır.
       final unavailable = {
         for (var i = 2; i <= 7; i++) 'n$i': [14],
       };
       final r = generator(people: people, unavailable: unavailable).generate();
-      expectHardRules(r, people, unavailable, settings);
-      expect(workedDays(r)['c'], {14});
+      expect(workedDays(r)['c'] ?? const <int>{}, isEmpty);
+      expect(r.assignments[14]!.nurseIds, ['n1']);
+      expect(r.isComplete, isFalse);
+      expect(r.issues.where((i) => i.role == Role.nurse).map((i) => i.day), [
+        14,
+      ]);
     });
   });
 }

@@ -154,6 +154,7 @@ class PeopleController extends Notifier<List<Person>> {
         ),
         previousMonthTail: previousMonthTailOf(plans, plan),
         overtimeRequests: plan.overtimeRequests,
+        requestedShifts: plan.requestedShifts,
       );
       await plans.save(plan.copyWith(assignments: result.assignments));
       report = report.add(plan, result);

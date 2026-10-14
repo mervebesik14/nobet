@@ -185,8 +185,8 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
                 secondary: const Icon(Icons.badge_outlined),
                 title: const Text('Sorumlu hemşire'),
                 subtitle: Text(
-                  'Nöbet tutmadığı mesai günlerinde 7A çalışır; nöbete '
-                  'yalnızca gerektiğinde yazılır.'
+                  'Mesai günlerinde 7A çalışır; 24 nöbete yalnızca Ay '
+                  'Planı\'nda seçtiği günlerde yazılır.'
                   '${_otherChargeNurse == null ? '' : ' Şu an sorumlu hemşire: ${_otherChargeNurse!.name}; bu kişi seçilirse onunki kalkar.'}',
                 ),
                 value: _isChargeNurse,

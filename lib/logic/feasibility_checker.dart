@@ -67,6 +67,7 @@ class FeasibilityChecker {
     required int month,
     required Iterable<Person> people,
     required Map<String, List<int>> unavailableDays,
+    Map<String, List<int>> requestedShifts = const {},
   }) {
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final issues = <FeasibilityIssue>[];
@@ -77,11 +78,15 @@ class FeasibilityChecker {
       final members = people.where(
         (p) => p.worksInMonth(year, month) && p.role == role,
       );
+      // Sorumlu hemşire yalnızca seçtiği nöbet günlerinde uygun sayılır.
       final available = {
         for (final p in members)
           p.id: {
             for (var d = 1; d <= daysInMonth; d++)
-              if (!(unavailableDays[p.id] ?? const []).contains(d)) d,
+              if (!(unavailableDays[p.id] ?? const []).contains(d) &&
+                  (!p.isChargeNurse ||
+                      (requestedShifts[p.id]?.contains(d) ?? false)))
+                d,
           },
       };
 

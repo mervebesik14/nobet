@@ -26,6 +26,9 @@ enum ViolationKind {
 
   /// Kişi kendi görevi olmayan koltukta (ör. tekniker hemşire satırında).
   wrongRole,
+
+  /// Sorumlu hemşire seçmediği bir güne nöbete yazılmış.
+  chargeNurseUnrequested,
 }
 
 /// Bir kural ihlali.
@@ -71,6 +74,7 @@ class RosterValidator {
     List<Set<String>> previousMonthTail = const [],
     Set<String> overtimeRequests = const {},
     int overtimeAllowance = 2,
+    Map<String, List<int>> requestedShifts = const {},
   }) {
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final byId = {for (final p in people) p.id: p};
@@ -131,6 +135,20 @@ class RosterValidator {
               personId: id,
               role: role,
               message: '${name(id)} istemediği güne (${date(d)}) atandı.',
+            ),
+          );
+        }
+        if ((person?.isChargeNurse ?? false) &&
+            !(requestedShifts[id]?.contains(d) ?? false)) {
+          violations.add(
+            RuleViolation(
+              kind: ViolationKind.chargeNurseUnrequested,
+              days: [d],
+              personId: id,
+              role: role,
+              message:
+                  'Sorumlu hemşire ${name(id)} seçmediği güne (${date(d)}) '
+                  'nöbete yazıldı.',
             ),
           );
         }

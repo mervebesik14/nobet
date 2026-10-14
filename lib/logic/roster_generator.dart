@@ -176,11 +176,15 @@ class RosterGenerator {
     final rng = Random(seed);
     final weekend = weekendDays(year, month, holidays, settings);
 
+    // Sorumlu hemşire yalnızca seçtiği günlerde nöbete yazılabilir.
     Map<String, Set<int>> availableOf(List<Person> members) => {
       for (final p in members)
         p.id: {
           for (var d = 1; d <= daysInMonth; d++)
-            if (!(unavailableDays[p.id] ?? const []).contains(d)) d,
+            if (!(unavailableDays[p.id] ?? const []).contains(d) &&
+                (!p.isChargeNurse ||
+                    (requestedShifts[p.id]?.contains(d) ?? false)))
+              d,
         },
     };
 

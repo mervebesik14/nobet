@@ -163,8 +163,8 @@ class _CalendarEditor extends ConsumerWidget {
                     'değiştirilemez.'
               : requested
               ? 'Nöbet tutacağı günlere dokunun; liste oluşturulurken bu '
-                    'günlere nöbet yazılır. Diğer günlerde yalnızca başka '
-                    'uygun hemşire yoksa nöbete yazılır. '
+                    'günlere nöbet yazılır. Seçilmeyen günlerde 24 yazılmaz; '
+                    'mesai günlerinde 7A çalışır. '
                     'Seçili: ${selected.length} gün'
               : 'Nöbet istemediği günlere dokunun. Seçili: ${selected.length} gün',
           style: theme.textTheme.bodyMedium,

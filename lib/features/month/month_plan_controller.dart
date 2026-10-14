@@ -347,6 +347,7 @@ final rosterViolationsProvider = Provider<List<RuleViolation>>((ref) {
     unavailableDays: ref.watch(effectiveBlockedDaysProvider),
     previousMonthTail: ref.read(monthPlanProvider.notifier).previousMonthTail(),
     overtimeRequests: plan.overtimeRequests,
+    requestedShifts: plan.requestedShifts,
   );
 });
 
@@ -457,5 +458,6 @@ final monthFeasibilityProvider = Provider<FeasibilityReport>((ref) {
     month: plan.month,
     people: ref.watch(peopleProvider),
     unavailableDays: ref.watch(effectiveBlockedDaysProvider),
+    requestedShifts: plan.requestedShifts,
   );
 });

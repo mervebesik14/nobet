@@ -235,4 +235,40 @@ void main() {
       expect(cap.message, contains('fazla nöbet sınırı'));
     });
   });
+
+  group('sorumlu hemşire', () {
+    final people = [
+      ...team(7, 4),
+      const Person(
+        id: 'c',
+        name: 'Sorumlu',
+        role: Role.nurse,
+        isChargeNurse: true,
+      ),
+    ];
+    // 14 Ekim'de n2–n7 istemiyor: n1 ve sorumlu hemşire kalır.
+    final unavailable = {
+      for (var i = 2; i <= 7; i++) 'n$i': [14],
+    };
+
+    test('seçmediği gün uygun sayılmaz', () {
+      final r = check(people, unavailable);
+      expect(r.issues.map((i) => i.message), [
+        '14 Ekim: uygun hemşire sayısı 1, gereken 2.',
+      ]);
+    });
+
+    test('seçtiği gün uygun sayılır', () {
+      final r = checker.check(
+        year: 2026,
+        month: 10,
+        people: people,
+        unavailableDays: unavailable,
+        requestedShifts: const {
+          'c': [14],
+        },
+      );
+      expect(r.isFeasible, isTrue);
+    });
+  });
 }
