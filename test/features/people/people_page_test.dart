@@ -205,7 +205,7 @@ void main() {
 
     await tester.drag(find.text('Ayşe'), const Offset(-500, 0));
     await tester.pumpAndSettle();
-    expect(find.text('Silinsin mi?'), findsOneWidget);
+    expect(find.text('Ayşe silinsin mi?'), findsOneWidget);
 
     await tester.tap(find.text('Vazgeç'));
     await tester.pumpAndSettle();
@@ -221,9 +221,7 @@ void main() {
     expect(boxes.people.isEmpty, isTrue);
   });
 
-  testWidgets('planda geçen kişi kaydırınca silinmez, pasif yapılır', (
-    tester,
-  ) async {
+  Future<void> seedReferencedAli() async {
     await seed(const [Person(id: '1', name: 'Ali', role: Role.radiologyTech)]);
     await boxes.monthPlans.put(
       '2026-10',
@@ -235,12 +233,37 @@ void main() {
         },
       ),
     );
+  }
+
+  testWidgets('planda geçen kişi kaydırınca doğrudan silinebilir', (
+    tester,
+  ) async {
+    await seedReferencedAli();
     await pumpPage(tester);
 
     await tester.drag(find.text('Ali'), const Offset(-500, 0));
     await tester.pumpAndSettle();
-    expect(find.text('Pasif yapılsın mı?'), findsOneWidget);
+    expect(find.text('Ali silinsin mi?'), findsOneWidget);
+    expect(find.textContaining('"Silinmiş kişi" olarak kalır'), findsOneWidget);
 
+    await tester.tap(find.text('Sil'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ali'), findsNothing);
+    expect(find.text('Ali silindi.'), findsOneWidget);
+    expect(boxes.people.get('1'), isNull);
+    // Eski liste kaydı yerinde kalır.
+    expect(boxes.monthPlans.get('2026-10')!.assignments[1]!.techId, '1');
+  });
+
+  testWidgets('planda geçen kişi istenirse pasif yapılır, sonra silinir', (
+    tester,
+  ) async {
+    await seedReferencedAli();
+    await pumpPage(tester);
+
+    await tester.drag(find.text('Ali'), const Offset(-500, 0));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Pasif yap'));
     await tester.pumpAndSettle();
 
@@ -249,11 +272,29 @@ void main() {
     expect(find.text('Ali pasif yapıldı.'), findsOneWidget);
     expect(boxes.people.get('1')!.isActive, isFalse);
 
-    // Zaten pasif: tekrar kaydırınca diyalog yok, bilgi mesajı var.
+    // Pasif kişi de silinebilir; bu kez "Pasif yap" seçeneği çıkmaz.
     await tester.drag(find.text('Ali'), const Offset(-500, 0));
     await tester.pumpAndSettle();
-    expect(find.text('Pasif yapılsın mı?'), findsNothing);
-    expect(find.textContaining('zaten pasif'), findsOneWidget);
-    expect(boxes.people.get('1'), isNotNull);
+    expect(find.text('Pasif yap'), findsNothing);
+    await tester.tap(find.text('Sil'));
+    await tester.pumpAndSettle();
+    expect(boxes.people.get('1'), isNull);
+  });
+
+  testWidgets('düzenleme ekranındaki "Kişiyi sil" ile silinir', (tester) async {
+    await seedReferencedAli();
+    await pumpPage(tester);
+
+    await tester.tap(find.text('Ali'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Kişiyi sil'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sil'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Kişiyi Düzenle'), findsNothing);
+    expect(find.text('Ali'), findsNothing);
+    expect(find.text('Ali silindi.'), findsOneWidget);
+    expect(boxes.people.get('1'), isNull);
   });
 }

@@ -5,6 +5,7 @@ import '../../models/models.dart';
 import '../../shared/widgets/placeholder_view.dart';
 import '../../shared/widgets/section_header.dart';
 import 'people_controller.dart';
+import 'person_delete_dialog.dart';
 import 'person_form_page.dart';
 
 /// Kişiler sekmesi: aktif kişiler role göre gruplu, pasifler en altta soluk.
@@ -83,56 +84,26 @@ class _PersonTile extends ConsumerWidget {
   }
 
   /// Kaydırma onayı. Silinecekse true döner, Dismissible satırı kaldırır.
-  /// Pasifleştirmede satır listede kalır (Pasif bölümüne geçer), bu yüzden
+  /// Pasif yapmada satır listede kalır (Pasif bölümüne geçer), bu yüzden
   /// işlem burada yapılır ve false döner.
   Future<bool> _confirm(BuildContext context, WidgetRef ref) async {
-    final controller = ref.read(peopleProvider.notifier);
     final messenger = ScaffoldMessenger.of(context);
-    final referenced = controller.isReferenced(person.id);
-
-    if (referenced && !person.isActive) {
-      _notify(
-        messenger,
-        '${person.name} kayıtlı ay planlarında geçtiği için silinemez; '
-        'zaten pasif.',
-      );
-      return false;
+    final choice = await askPersonDelete(context, ref, person);
+    switch (choice) {
+      case PersonDeleteChoice.delete:
+        return true;
+      case PersonDeleteChoice.deactivate:
+        await ref.read(peopleProvider.notifier).deactivate(person.id);
+        _notify(messenger, '${person.name} pasif yapıldı.');
+        return false;
+      case null:
+        return false;
     }
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(referenced ? 'Pasif yapılsın mı?' : 'Silinsin mi?'),
-        content: Text(
-          referenced
-              ? '${person.name} kayıtlı ay planlarında geçtiği için '
-                    'silinemez. Bunun yerine pasif yapılacak: yeni listelere '
-                    'alınmaz, geçmiş listelerde adı kalır.'
-              : '${person.name} kalıcı olarak silinecek.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Vazgeç'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: Text(referenced ? 'Pasif yap' : 'Sil'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return false;
-    if (!referenced) return true;
-
-    await controller.remove(person.id);
-    _notify(messenger, '${person.name} pasif yapıldı.');
-    return false;
   }
 
   Future<void> _delete(BuildContext context, WidgetRef ref) async {
     final messenger = ScaffoldMessenger.of(context);
-    await ref.read(peopleProvider.notifier).remove(person.id);
+    await ref.read(peopleProvider.notifier).delete(person.id);
     _notify(messenger, '${person.name} silindi.');
   }
 

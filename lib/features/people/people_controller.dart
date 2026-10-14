@@ -5,18 +5,6 @@ import '../../data/providers.dart';
 import '../../logic/turkish_collation.dart';
 import '../../models/models.dart';
 
-/// Kişi kaldırma isteğinin sonucu.
-enum RemovalOutcome {
-  /// Hiçbir planda geçmediği için kalıcı olarak silindi.
-  deleted,
-
-  /// Bir ay planında geçtiği için silinmedi, pasif yapıldı.
-  deactivated,
-
-  /// Zaten pasifti ve bir planda geçtiği için silinemez; değişiklik yok.
-  keptInactive,
-}
-
 /// Kişi listesinin durumu: tüm kişiler, Türkçe alfabe sırasıyla.
 class PeopleController extends Notifier<List<Person>> {
   static const _uuid = Uuid();
@@ -59,23 +47,22 @@ class PeopleController extends Notifier<List<Person>> {
   bool isReferenced(String personId) =>
       ref.read(monthPlanRepositoryProvider).isPersonReferenced(personId);
 
-  /// Kişiyi kaldırır: bir planda geçiyorsa silmek yerine pasifleştirir.
-  Future<RemovalOutcome> remove(String personId) async {
+  /// Kişiyi kalıcı olarak siler. Ay planlarında geçiyorsa oradaki nöbetleri
+  /// geçmiş kaydı olarak kalır ve listelerde "Silinmiş kişi" diye görünür.
+  Future<void> delete(String personId) async {
     final repo = ref.read(peopleRepositoryProvider);
-    final RemovalOutcome outcome;
-    if (!isReferenced(personId)) {
-      // Önce durumdan çıkar: kaydırılan satır aynı karede listeden kalkmalı.
-      state = state.where((p) => p.id != personId).toList();
-      await repo.delete(personId);
-      outcome = RemovalOutcome.deleted;
-    } else if (repo.getById(personId)?.isActive ?? false) {
-      await repo.deactivate(personId);
-      outcome = RemovalOutcome.deactivated;
-    } else {
-      outcome = RemovalOutcome.keptInactive;
-    }
+    // Önce durumdan çıkar: kaydırılan satır aynı karede listeden kalkmalı.
+    state = state.where((p) => p.id != personId).toList();
+    await repo.delete(personId);
     state = repo.getAll();
-    return outcome;
+  }
+
+  /// Kişiyi pasif yapar: yeni listelere alınmaz, geçmiş listelerde adıyla
+  /// kalır.
+  Future<void> deactivate(String personId) async {
+    final repo = ref.read(peopleRepositoryProvider);
+    await repo.deactivate(personId);
+    state = repo.getAll();
   }
 
   Future<void> _save(Person person) async {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/models.dart';
 import 'people_controller.dart';
+import 'person_delete_dialog.dart';
 
 /// Kişi ekleme ve düzenleme formu. [person] boşsa yeni kişi eklenir.
 class PersonFormPage extends ConsumerStatefulWidget {
@@ -90,6 +91,32 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  Future<void> _delete() async {
+    final person = widget.person!;
+    final messenger = ScaffoldMessenger.of(context);
+    final choice = await askPersonDelete(context, ref, person);
+    if (choice == null || !mounted) return;
+    final controller = ref.read(peopleProvider.notifier);
+    if (choice == PersonDeleteChoice.delete) {
+      await controller.delete(person.id);
+    } else {
+      await controller.deactivate(person.id);
+    }
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            choice == PersonDeleteChoice.delete
+                ? '${person.name} silindi.'
+                : '${person.name} pasif yapıldı.',
+          ),
+        ),
+      );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -161,6 +188,17 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
               icon: const Icon(Icons.check),
               label: const Text('Kaydet'),
             ),
+            if (_isEditing) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                ),
+                onPressed: _saving ? null : _delete,
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Kişiyi sil'),
+              ),
+            ],
           ],
         ),
       ),

@@ -52,48 +52,39 @@ void main() {
     expect(controller().isNameTaken('Işıl Yılmaz', exceptId: p.id), isFalse);
   });
 
-  group('remove', () {
+  group('silme ve pasifleştirme', () {
     test('hiçbir planda geçmeyen kişiyi siler', () async {
       final p = await controller().add(name: 'Ali', role: Role.radiologyTech);
 
-      expect(await controller().remove(p.id), RemovalOutcome.deleted);
+      await controller().delete(p.id);
       expect(people(), isEmpty);
       expect(boxes.people.get(p.id), isNull);
     });
 
-    test('nöbet atamasında geçen kişiyi pasifleştirir', () async {
+    test('nöbet atamasında geçen kişi de silinir; nöbet kaydı kalır', () async {
       final p = await controller().add(name: 'Ali', role: Role.radiologyTech);
-      await boxes.monthPlans.put(
-        '2026-10',
-        MonthPlan(
-          year: 2026,
-          month: 10,
-          assignments: {
-            1: DayAssignment(day: 1, nurseIds: const ['x', 'y'], techId: p.id),
-          },
-        ),
+      final plan = MonthPlan(
+        year: 2026,
+        month: 10,
+        assignments: {
+          1: DayAssignment(day: 1, nurseIds: const ['x', 'y'], techId: p.id),
+        },
       );
+      await boxes.monthPlans.put('2026-10', plan);
+      expect(controller().isReferenced(p.id), isTrue);
 
-      expect(await controller().remove(p.id), RemovalOutcome.deactivated);
-      expect(people().single.isActive, isFalse);
+      await controller().delete(p.id);
+      expect(people(), isEmpty);
+      expect(boxes.people.get(p.id), isNull);
+      // Geçmiş liste bozulmaz; listede "Silinmiş kişi" olarak görünür.
+      expect(boxes.monthPlans.get('2026-10'), plan);
     });
 
-    test('istenmeyen günlerde geçen kişi de silinmez', () async {
+    test('pasif yapılan kişi kalır, aktif değildir', () async {
       final p = await controller().add(name: 'Banu', role: Role.nurse);
-      await boxes.monthPlans.put(
-        '2026-11',
-        MonthPlan(
-          year: 2026,
-          month: 11,
-          unavailableDays: {
-            p.id: const [5],
-          },
-        ),
-      );
 
-      expect(controller().isReferenced(p.id), isTrue);
-      expect(await controller().remove(p.id), RemovalOutcome.deactivated);
-      expect(await controller().remove(p.id), RemovalOutcome.keptInactive);
+      await controller().deactivate(p.id);
+      expect(people().single.isActive, isFalse);
       expect(boxes.people.get(p.id), isNotNull);
     });
   });
