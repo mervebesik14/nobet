@@ -33,6 +33,22 @@ class PlatformServices {
         ),
       );
 
+  /// Birden çok dosyayı tek paylaşım menüsüyle gönderir (ör. herkesin
+  /// kişiye özel PDF'i).
+  Future<void> shareFiles(
+    List<({Uint8List bytes, String name, String mime})> files, {
+    String? subject,
+  }) => SharePlus.instance.share(
+    ShareParams(
+      files: [
+        for (final f in files)
+          XFile.fromData(f.bytes, mimeType: f.mime, name: f.name),
+      ],
+      fileNameOverrides: [for (final f in files) f.name],
+      subject: subject,
+    ),
+  );
+
   /// Metni paylaşım menüsüyle gönderir (WhatsApp, mesaj vb.).
   Future<void> shareText(String text, {String? subject}) =>
       SharePlus.instance.share(ShareParams(text: text, subject: subject));

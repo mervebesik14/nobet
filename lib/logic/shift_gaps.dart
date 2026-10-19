@@ -94,4 +94,13 @@ class ShiftGaps {
     }
     return (excess, long, five);
   }
+
+  /// En uzun boşluk (gün); sayılan boşluk yoksa null.
+  static int? longest(Iterable<int> days, {Set<int> absent = const {}}) {
+    int? best;
+    for (final (_, _, gap) in gaps(days, absent: absent)) {
+      if (best == null || gap > best) best = gap;
+    }
+    return best;
+  }
 }

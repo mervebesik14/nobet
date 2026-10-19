@@ -126,4 +126,52 @@ void main() {
     expect(services.calls, ['sharePdf:nobet-banu-2026-10.pdf']);
     expect(isPdf(services.lastPdf), isTrue);
   });
+
+  testWidgets('herkesin kişiye özel PDF\'i tek seferde paylaşılır', (
+    tester,
+  ) async {
+    await pump(tester);
+    await choose(tester, 'Herkesin listesi (PDF)');
+    expect(services.calls, ['shareFiles:3']);
+    expect(services.sharedFiles.map((f) => f.name), {
+      'nobet-ayse-2026-10.pdf',
+      'nobet-banu-2026-10.pdf',
+      'nobet-ali-2026-10.pdf',
+    });
+    for (final f in services.sharedFiles) {
+      expect(f.mime, 'application/pdf');
+      expect(isPdf(f.bytes), isTrue);
+    }
+  });
+
+  testWidgets('isme dokununca kişi vurgulanır ve özeti çıkar', (tester) async {
+    await pump(tester);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('highlight-summary')), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('name-b')));
+    await tester.pumpAndSettle();
+    final summary = find.byKey(const ValueKey('highlight-summary'));
+    expect(summary, findsOneWidget);
+    expect(
+      find.descendant(
+        of: summary,
+        matching: find.textContaining('1 nöbet · 0 hafta sonu · 0 gün aşırı'),
+      ),
+      findsOneWidget,
+    );
+
+    // Aynı isme yeniden dokununca vurgu kalkar.
+    await tester.tap(find.byKey(const ValueKey('name-b')));
+    await tester.pumpAndSettle();
+    expect(summary, findsNothing);
+
+    // Kapat düğmesiyle de kaldırılır.
+    await tester.tap(find.byKey(const ValueKey('name-a')));
+    await tester.pumpAndSettle();
+    expect(summary, findsOneWidget);
+    await tester.tap(find.byTooltip('Vurguyu kaldır'));
+    await tester.pumpAndSettle();
+    expect(summary, findsNothing);
+  });
 }

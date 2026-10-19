@@ -60,4 +60,10 @@ void main() {
     expect(ShiftGaps.unevenMaxGaps([1, 1, 1]), 0);
     expect(ShiftGaps.unevenMaxGaps([]), 0);
   });
+
+  test('en uzun boşluk', () {
+    expect(ShiftGaps.longest([1, 6, 12, 19, 21]), 6);
+    expect(ShiftGaps.longest([1, 6, 12, 19, 21], absent: {15}), 5);
+    expect(ShiftGaps.longest([4]), isNull);
+  });
 }

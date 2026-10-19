@@ -59,6 +59,17 @@ class FakePlatformServices extends PlatformServices {
     sharedFiles.add((name: filename, mime: mimeType, bytes: bytes));
   }
 
+  @override
+  Future<void> shareFiles(
+    List<({Uint8List bytes, String name, String mime})> files, {
+    String? subject,
+  }) async {
+    calls.add('shareFiles:${files.length}');
+    for (final f in files) {
+      sharedFiles.add((name: f.name, mime: f.mime, bytes: f.bytes));
+    }
+  }
+
   /// Paylaşılan metinler.
   final sharedTexts = <String>[];
 

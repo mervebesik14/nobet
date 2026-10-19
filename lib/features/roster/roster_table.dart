@@ -31,6 +31,8 @@ class RosterTable extends StatelessWidget {
     this.onCellTap,
     this.onCellLongPress,
     this.onMissingTap,
+    this.highlightedId,
+    this.onNameTap,
   });
 
   final MonthPlan plan;
@@ -57,6 +59,12 @@ class RosterTable extends StatelessWidget {
   final void Function(RosterCell cell)? onCellLongPress;
   final void Function(int day)? onMissingTap;
 
+  /// Vurgulanan kişi: satırı ve nöbet günlerinin sütunları öne çıkar.
+  final String? highlightedId;
+
+  /// İsme dokunulunca (vurgulamak / kaldırmak için).
+  final void Function(String personId)? onNameTap;
+
   static const _labelWidth = 140.0;
   static const _cellWidth = 44.0;
   static const _headerHeight = 56.0;
@@ -79,7 +87,17 @@ class RosterTable extends StatelessWidget {
       }
     }
 
+    // Vurgulanan kişinin nöbet günleri: o sütunlar hafifçe öne çıkar.
+    final highlightDays = highlightedId == null
+        ? const <int>{}
+        : worked[highlightedId] ?? const <int>{};
+    final highlightTint = Color.alphaBlend(
+      scheme.primary.withValues(alpha: 0.10),
+      scheme.surface,
+    );
+
     Color? columnColor(int day) {
+      if (highlightDays.contains(day)) return highlightTint;
       if (holidayDays.contains(day)) return scheme.holidayTint;
       if (weekendDays.contains(day)) return scheme.weekendTint;
       return null;
@@ -143,16 +161,25 @@ class RosterTable extends StatelessWidget {
           ),
         );
       }
+      final highlighted = row.id == highlightedId;
       left.add(
-        box(
-          width: _labelWidth,
-          height: _rowHeight,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            row.name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium,
+        _tappable(
+          key: ValueKey('name-${row.id}'),
+          onTap: onNameTap == null ? null : () => onNameTap!(row.id),
+          child: box(
+            width: _labelWidth,
+            height: _rowHeight,
+            alignment: Alignment.centerLeft,
+            color: highlighted ? scheme.primaryContainer : null,
+            child: Text(
+              row.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: highlighted ? FontWeight.w700 : null,
+                color: highlighted ? scheme.onPrimaryContainer : null,
+              ),
+            ),
           ),
         ),
       );
@@ -186,7 +213,13 @@ class RosterTable extends StatelessWidget {
                   isDayShift:
                       !personDays.contains(d) &&
                       dayShifts[d]?.personId == row.id,
-                  columnColor: columnColor(d),
+                  columnColor: highlighted
+                      ? Color.alphaBlend(
+                          scheme.primary.withValues(alpha: 0.06),
+                          columnColor(d) ?? scheme.surface,
+                        )
+                      : columnColor(d),
+                  strong: highlighted && personDays.contains(d),
                 ),
               ),
           ],
@@ -327,6 +360,7 @@ class RosterTable extends StatelessWidget {
     required Color? columnColor,
     required LeaveType? leave,
     bool isDayShift = false,
+    bool strong = false,
   }) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
@@ -336,14 +370,14 @@ class RosterTable extends StatelessWidget {
     final leaveTint = leave == null ? null : scheme.leaveBackground(leave);
     final leaveInk = leave == null ? null : scheme.leaveInk(leave);
     final text = label ?? leave?.shortLabel;
-    final color = selected
+    final color = selected || strong
         ? scheme.primary
         : violated
         ? scheme.dangerTint
         : isDayShift
         ? scheme.dayShiftTint
         : leaveTint ?? columnColor;
-    final textColor = selected
+    final textColor = selected || strong
         ? scheme.onPrimary
         : violated
         ? scheme.error

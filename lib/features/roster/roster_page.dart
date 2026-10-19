@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,6 +13,7 @@ import '../../logic/roster_editor.dart';
 import '../../logic/roster_generator.dart';
 import '../../logic/roster_summary.dart';
 import '../../logic/roster_validator.dart';
+import '../../logic/shift_gaps.dart';
 import '../../logic/turkish_collation.dart';
 import '../../logic/turkish_dates.dart';
 import '../../models/models.dart';
@@ -51,6 +53,9 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   /// Serbest düzenleme: dokununca doğrudan ekle / sil.
   bool _freeEdit = false;
 
+  /// Tabloda vurgulanan kişi (adına dokunulunca).
+  String? _highlightId;
+
   MonthPlan get _plan => ref.read(monthPlanProvider);
 
   void _notify(String message) {
@@ -86,6 +91,36 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       requestedShifts: plan.requestedShifts,
       absentDays: plan.leaveDays,
     );
+  }
+
+  /// Vurgulanan kişinin bu ayki kısa özeti.
+  List<String> _personStats(
+    String id,
+    Set<int> weekendDays,
+    Map<int, DayShift> dayShifts,
+  ) {
+    final plan = _plan;
+    final days = {
+      for (final a in plan.assignments.values)
+        if (a.includes(id)) a.day,
+    };
+    final absent = {
+      ...plan.leaveDaysOf(id),
+      ...?_peopleById[id]?.inactiveDaysIn(plan.year, plan.month),
+    };
+    final longest = ShiftGaps.longest(days, absent: absent);
+    final dayShiftCount = dayShifts.values
+        .where((s) => s.personId == id)
+        .length;
+    return [
+      '${days.length} nöbet',
+      '${days.where(weekendDays.contains).length} hafta sonu',
+      '${RosterGenerator.everyOtherDayPairs(days)} gün aşırı',
+      if (longest != null) 'en uzun boşluk $longest gün',
+      '4–5 gün ara: ${ShiftGaps.longCount(days, absent: absent)}',
+      if (dayShiftCount > 0) '$dayShiftCount gün 7A',
+      if (absent.isNotEmpty) '${absent.length} gün izinli/pasif',
+    ];
   }
 
   /// Serbest düzenleme: kişiyi o güne doğrudan ekler ya da siler.
@@ -693,6 +728,56 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     }
   }
 
+  /// Herkesin kişiye özel PDF'ini ayrı dosyalar olarak tek seferde paylaşır.
+  Future<void> _shareAllPersonal(
+    List<RosterRow> rows,
+    Map<int, DayShift> dayShifts, {
+    required Set<int> weekendDays,
+    required Set<int> holidayDays,
+  }) async {
+    final plan = _plan;
+    final services = ref.read(platformServicesProvider);
+    final people = ref.read(peopleProvider);
+    final monthLabel = DateFormat.yMMMM(
+      'tr_TR',
+    ).format(DateTime(plan.year, plan.month));
+    final month = plan.month.toString().padLeft(2, '0');
+    try {
+      final fonts = await services.loadPdfFonts();
+      final files = <({Uint8List bytes, String name, String mime})>[];
+      for (final r in rows) {
+        final person =
+            _peopleById[r.id] ?? Person(id: r.id, name: r.name, role: r.role);
+        final pdf = await buildPersonalRosterPdf(
+          data: PersonalRoster.build(
+            plan: plan,
+            person: person,
+            people: people,
+            dayShifts: dayShifts,
+            weekendDays: weekendDays,
+          ),
+          weekendDays: weekendDays,
+          holidayDays: holidayDays,
+          font: fonts.regular,
+          boldFont: fonts.bold,
+          createdAt: ref.read(todayProvider),
+        );
+        files.add((
+          bytes: pdf,
+          name: 'nobet-${fileSlug(person.name)}-${plan.year}-$month.pdf',
+          mime: 'application/pdf',
+        ));
+      }
+      if (files.isEmpty) return;
+      await services.shareFiles(
+        files,
+        subject: '$monthLabel kişiye özel nöbet listeleri',
+      );
+    } catch (e) {
+      if (mounted) _notify('Paylaşılamadı: $e');
+    }
+  }
+
   Future<void> _share(
     _ShareAction action, {
     required MonthPlan plan,
@@ -726,7 +811,9 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         singlePage: action == _ShareAction.png,
       );
       switch (action) {
-        case _ShareAction.personal || _ShareAction.personalPdf:
+        case _ShareAction.personal ||
+            _ShareAction.personalPdf ||
+            _ShareAction.allPersonalPdf:
           return;
         case _ShareAction.pdf:
           await services.sharePdf(pdf, '$fileBase.pdf');
@@ -835,6 +922,12 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 weekendDays: weekendDays,
                 holidayDays: holidayDays,
               ),
+              _ShareAction.allPersonalPdf => _shareAllPersonal(
+                rows,
+                dayShifts,
+                weekendDays: weekendDays,
+                holidayDays: holidayDays,
+              ),
               _ => _share(
                 action,
                 plan: plan,
@@ -874,6 +967,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 child: ListTile(
                   leading: Icon(Icons.badge_outlined),
                   title: Text('Kişiye özel liste (PDF)'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.allPersonalPdf,
+                child: ListTile(
+                  leading: Icon(Icons.groups_outlined),
+                  title: Text('Herkesin listesi (PDF)'),
                 ),
               ),
               PopupMenuItem(
@@ -965,11 +1065,21 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 style: theme.textTheme.bodySmall,
               ),
             ),
+          if (_highlightId case final id?)
+            _HighlightSummary(
+              key: const ValueKey('highlight-summary'),
+              name: _name(id),
+              stats: _personStats(id, weekendDays, dayShifts),
+              onClose: () => setState(() => _highlightId = null),
+            ),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: RosterTable(
               plan: plan,
               rows: rows,
+              highlightedId: _highlightId,
+              onNameTap: (id) =>
+                  setState(() => _highlightId = _highlightId == id ? null : id),
               weekendDays: weekendDays,
               holidayDays: holidayDays,
               shiftHours: settings.shiftHours,
@@ -1141,4 +1251,59 @@ class _ViolationCard extends StatelessWidget {
   }
 }
 
-enum _ShareAction { pdf, png, print, personalPdf, personal }
+enum _ShareAction { pdf, png, print, personalPdf, allPersonalPdf, personal }
+
+/// Vurgulanan kişinin özeti: tablonun üstünde, kapatılabilir.
+class _HighlightSummary extends StatelessWidget {
+  const _HighlightSummary({
+    super.key,
+    required this.name,
+    required this.stats,
+    required this.onClose,
+  });
+
+  final String name;
+  final List<String> stats;
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      color: scheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: scheme.onPrimaryContainer,
+                    ),
+                  ),
+                  Text(
+                    stats.join(' · '),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onPrimaryContainer,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              tooltip: 'Vurguyu kaldır',
+              icon: Icon(Icons.close, color: scheme.onPrimaryContainer),
+              onPressed: onClose,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
