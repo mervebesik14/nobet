@@ -10,12 +10,14 @@ import '../../logic/day_shift_planner.dart';
 import '../../logic/file_names.dart';
 import '../../logic/personal_roster.dart';
 import '../../logic/roster_editor.dart';
+import '../../logic/roster_excel.dart';
 import '../../logic/roster_generator.dart';
 import '../../logic/roster_summary.dart';
 import '../../logic/roster_validator.dart';
 import '../../logic/shift_gaps.dart';
 import '../../logic/turkish_collation.dart';
 import '../../logic/turkish_dates.dart';
+import '../../logic/xlsx_writer.dart';
 import '../../models/models.dart';
 import '../holidays/holidays_controller.dart';
 import '../month/month_plan_controller.dart';
@@ -796,6 +798,20 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         '${DateFormat.yMMMM('tr_TR').format(DateTime(plan.year, plan.month))} '
         'Nöbet Listesi';
     try {
+      if (action == _ShareAction.excel) {
+        final xlsx = RosterExcel.build(
+          plan: plan,
+          rows: rows,
+          summary: summary,
+          weekendDays: weekendDays,
+          holidayDays: holidayDays,
+          shiftHours: shiftHours,
+          missingByDay: missingByDay,
+          dayShifts: dayShifts,
+        );
+        await services.shareFile(xlsx, '$fileBase.xlsx', XlsxWriter.mimeType);
+        return;
+      }
       final fonts = await services.loadPdfFonts();
       final pdf = await buildRosterPdf(
         plan: plan,
@@ -813,7 +829,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       switch (action) {
         case _ShareAction.personal ||
             _ShareAction.personalPdf ||
-            _ShareAction.allPersonalPdf:
+            _ShareAction.allPersonalPdf ||
+            _ShareAction.excel:
           return;
         case _ShareAction.pdf:
           await services.sharePdf(pdf, '$fileBase.pdf');
@@ -953,6 +970,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 child: ListTile(
                   leading: Icon(Icons.image_outlined),
                   title: Text('Görsel (PNG) olarak paylaş'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.excel,
+                child: ListTile(
+                  leading: Icon(Icons.table_view_outlined),
+                  title: Text('Excel olarak paylaş'),
                 ),
               ),
               PopupMenuItem(
@@ -1251,7 +1275,15 @@ class _ViolationCard extends StatelessWidget {
   }
 }
 
-enum _ShareAction { pdf, png, print, personalPdf, allPersonalPdf, personal }
+enum _ShareAction {
+  pdf,
+  png,
+  excel,
+  print,
+  personalPdf,
+  allPersonalPdf,
+  personal,
+}
 
 /// Vurgulanan kişinin özeti: tablonun üstünde, kapatılabilir.
 class _HighlightSummary extends StatelessWidget {

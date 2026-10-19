@@ -6,6 +6,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/data/holiday_repository.dart';
 import 'package:nobet_listesi/features/roster/roster_page.dart';
+import 'package:nobet_listesi/logic/xlsx_writer.dart';
 import 'package:nobet_listesi/models/models.dart';
 import 'package:nobet_listesi/shared/platform_services.dart';
 import 'package:nobet_listesi/shared/providers.dart';
@@ -81,6 +82,16 @@ void main() {
     expect(services.calls, ['pdfToPng', 'shareFile:nobet-listesi-2026-10.png']);
     expect(services.sharedFiles.single.mime, 'image/png');
     expect(isPdf(services.lastPdf), isTrue);
+  });
+
+  testWidgets('Excel olarak paylaş', (tester) async {
+    await pump(tester);
+    await choose(tester, 'Excel olarak paylaş');
+    expect(services.calls, ['shareFile:nobet-listesi-2026-10.xlsx']);
+    final file = services.sharedFiles.single;
+    expect(file.mime, XlsxWriter.mimeType);
+    // xlsx bir zip dosyasıdır: "PK" ile başlar.
+    expect(String.fromCharCodes(file.bytes.take(2)), 'PK');
   });
 
   testWidgets('Yazdır', (tester) async {
