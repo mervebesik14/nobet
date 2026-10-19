@@ -3,11 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../logic/turkish_dates.dart';
+import '../../logic/xlsx_writer.dart';
+import '../../logic/yearly_excel.dart';
 import '../../logic/yearly_summary.dart';
+import '../../shared/platform_services.dart';
 import '../holidays/holidays_controller.dart';
 import '../people/people_controller.dart';
 import 'monthly_comparison.dart';
 import 'past_roster_page.dart';
+import 'statistics_pdf.dart';
 import '../../shared/providers.dart';
 import '../month/month_plan_controller.dart';
 import '../roster/summary_table.dart';
@@ -22,8 +26,45 @@ class StatisticsPage extends ConsumerStatefulWidget {
   ConsumerState<StatisticsPage> createState() => _StatisticsPageState();
 }
 
+enum _ShareAction { pdf, excel }
+
 class _StatisticsPageState extends ConsumerState<StatisticsPage> {
   late int _year = ref.read(todayProvider).year;
+
+  void _notify(String message) => ScaffoldMessenger.of(context)
+    ..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(content: Text(message)));
+
+  /// Yıllık özeti PDF ya da Excel olarak paylaşır.
+  Future<void> _share(_ShareAction action, YearlySummary summary) async {
+    if (summary.rows.isEmpty) {
+      _notify('$_year için paylaşılacak liste yok.');
+      return;
+    }
+    final services = ref.read(platformServicesProvider);
+    final base = 'nobet-istatistik-$_year';
+    try {
+      switch (action) {
+        case _ShareAction.pdf:
+          final fonts = await services.loadPdfFonts();
+          final pdf = await buildStatisticsPdf(
+            year: _year,
+            summary: summary,
+            font: fonts.regular,
+            boldFont: fonts.bold,
+          );
+          await services.sharePdf(pdf, '$base.pdf');
+        case _ShareAction.excel:
+          await services.shareFile(
+            YearlyExcel.build(year: _year, summary: summary),
+            '$base.xlsx',
+            XlsxWriter.mimeType,
+          );
+      }
+    } catch (e) {
+      if (mounted) _notify('Paylaşılamadı: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +84,27 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
       appBar: AppBar(
         title: const Text('İstatistik'),
         actions: [
+          PopupMenuButton<_ShareAction>(
+            tooltip: 'Paylaş',
+            icon: const Icon(Icons.share),
+            onSelected: (action) => _share(action, summary),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: _ShareAction.pdf,
+                child: ListTile(
+                  leading: Icon(Icons.picture_as_pdf_outlined),
+                  title: Text('PDF olarak paylaş'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.excel,
+                child: ListTile(
+                  leading: Icon(Icons.table_view_outlined),
+                  title: Text('Excel olarak paylaş'),
+                ),
+              ),
+            ],
+          ),
           IconButton(
             tooltip: 'Eski listeleri gir',
             icon: const Icon(Icons.edit_calendar_outlined),
