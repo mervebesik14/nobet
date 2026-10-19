@@ -175,7 +175,7 @@ class _MonthlyComparisonState extends State<MonthlyComparison> {
                     tooltip:
                         '${r.name} · ${monthName.format(DateTime(2000, m))}: '
                         '${fmt(value)} ${metric.unit}'
-                        '${avg == null ? '' : ' (grup ortalaması ${fmt(avg)})'}',
+                        '${avg == null ? '' : ' (ortalama ${fmt(avg)})'}',
                   );
                 }()
               else
@@ -230,11 +230,11 @@ class _MonthlyComparisonState extends State<MonthlyComparison> {
             children: [
               _LegendItem(
                 color: _tint(_full, scheme, dark)!,
-                label: 'Rol ortalamasının üstünde',
+                label: 'Ortalamanın üstünde',
               ),
               _LegendItem(
                 color: _tint(-_full, scheme, dark)!,
-                label: 'Rol ortalamasının altında',
+                label: 'Ortalamanın altında',
               ),
               _LegendItem(
                 color: scheme.surface,
