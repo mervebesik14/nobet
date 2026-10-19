@@ -386,4 +386,40 @@ void main() {
       isEmpty,
     );
   });
+
+  test('5 günlük boşluk herkese eşit düşmezse uyarı', () {
+    List<RuleViolation> uneven(Map<int, DayAssignment> a) => [
+      for (final v in validator.validate(
+        year: 2027,
+        month: 2,
+        assignments: a,
+        people: const [
+          Person(id: 'a', name: 'Ayşe', role: Role.nurse),
+          Person(id: 'b', name: 'Banu', role: Role.nurse),
+        ],
+      ))
+        if (v.kind == ViolationKind.unevenFiveGaps) v,
+    ];
+    // Ayşe 1 → 7 (5 gün boş), Banu 2 → 6 (3 gün): eşit değil.
+    final v = uneven({
+      1: const DayAssignment(day: 1, nurseIds: ['a']),
+      2: const DayAssignment(day: 2, nurseIds: ['b']),
+      6: const DayAssignment(day: 6, nurseIds: ['b']),
+      7: const DayAssignment(day: 7, nurseIds: ['a']),
+    });
+    expect(
+      v.single.message,
+      'Hemşireler: 5 günlük boşluk herkese eşit düşmedi (Ayşe 1; diğerleri 0).',
+    );
+    // İkisinde de birer 5 gün: eşit, uyarı yok.
+    expect(
+      uneven({
+        1: const DayAssignment(day: 1, nurseIds: ['a']),
+        2: const DayAssignment(day: 2, nurseIds: ['b']),
+        7: const DayAssignment(day: 7, nurseIds: ['a']),
+        8: const DayAssignment(day: 8, nurseIds: ['b']),
+      }),
+      isEmpty,
+    );
+  });
 }

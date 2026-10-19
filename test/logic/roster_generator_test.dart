@@ -379,7 +379,8 @@ void main() {
     test('6 ay art arda: yıl toplamları eşitlenir, ay içi fark ≤ 1', () {
       // Ay içi denge (fark ≤ 1) önceliklidir; yıllık denge fazlalığın kime
       // gideceğini seçer. Toplam nöbet yıl sonunda da ≤ 1 farkla eşitlenir;
-      // hafta sonu ve gün aşırı çiftte ay içi kısıtlar yüzünden ≤ 2 kalabilir.
+      // hafta sonu ve gün aşırı çiftte ay içi ve boşluk kuralları yüzünden
+      // ≤ 3 kalabilir.
       final people = team(7, 4);
       final plans = <MonthPlan>[];
       for (var month = 1; month <= 6; month++) {
@@ -450,14 +451,16 @@ void main() {
           lessThanOrEqualTo(1),
           reason: '$role yıllık toplam',
         );
+        // Boşluk kuralları (en fazla 5 gün, 5 günler eşit) yıllık dengeden
+        // önce gelir; hafta sonu ve gün aşırıda yıllık fark 3'e çıkabilir.
         expect(
           spread(rows.map((r) => r.totals.weekendShifts)),
-          lessThanOrEqualTo(2),
+          lessThanOrEqualTo(3),
           reason: '$role yıllık hafta sonu',
         );
         expect(
           spread(rows.map((r) => r.totals.everyOtherDayPairs)),
-          lessThanOrEqualTo(2),
+          lessThanOrEqualTo(3),
           reason: '$role yıllık gün aşırı',
         );
       }
@@ -847,6 +850,9 @@ void main() {
           ),
       };
       final weekend = RosterGenerator.weekendDays(2026, 10, holidays, settings);
+      // Yıl içi denge en düşük öncelik (ay içi denge ve boşluk kurallarından
+      // sonra): tohumların çoğunda 8 tutan n1–n3'ten biri olmalı.
+      var favoured = 0;
       for (final seed in [1, 2, 3]) {
         final r = RosterGenerator(
           year: 2026,
@@ -878,8 +884,19 @@ void main() {
             if ((w['n$i'] ?? const <int>{}).length == 8) i,
         ];
         expect(eight, hasLength(1), reason: 'seed $seed');
-        expect(eight.single, lessThanOrEqualTo(3), reason: 'seed $seed');
+        if (eight.single <= 3) favoured++;
       }
+      expect(favoured, greaterThanOrEqualTo(2));
     },
   );
+
+  test('7 hemşirede 5 günlük boşluklar herkese eşit (ya da hiç yok)', () {
+    for (final seed in [1, 2, 3]) {
+      final w = workedDays(generator(seed: seed).generate());
+      final fives = [
+        for (var i = 1; i <= 7; i++) ShiftGaps.maxGapCount(w['n$i']!),
+      ];
+      expect(spread(fives), 0, reason: 'seed $seed: $fives');
+    }
+  });
 }

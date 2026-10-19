@@ -4,6 +4,7 @@ import '../models/role.dart';
 import '../models/roster_settings.dart';
 import 'roster_editor.dart';
 import 'roster_validator.dart';
+import 'shift_gaps.dart';
 
 /// Liste onarımının sonucu.
 class RosterRepairResult {
@@ -55,6 +56,7 @@ class RosterRepair {
     Set<String> overtimeRequests = const {},
     int overtimeAllowance = 2,
     Map<String, List<int>> requestedShifts = const {},
+    Map<String, List<int>> absentDays = const {},
   }) {
     final validator = RosterValidator(settings);
     final daysInMonth = DateTime(year, month + 1, 0).day;
@@ -81,6 +83,7 @@ class RosterRepair {
         // Boşluk uyarısı öneri niteliğinde; aday seçimini engellemez.
         if (v.kind == ViolationKind.missing ||
             v.kind == ViolationKind.longGap ||
+            v.kind == ViolationKind.unevenFiveGaps ||
             v.personId == null) {
           continue;
         }
@@ -118,6 +121,27 @@ class RosterRepair {
           .where((a) => weekendDays.contains(a.day) && a.includes(id))
           .length;
 
+      // Boşluk durumu: rol grubunda 5 günü aşan toplam boşluk ve 5 günlük
+      // boşlukların eşitsizliği (pasife alınan ve sorumlu hemşire hariç).
+      (int, int) gapState(Map<int, DayAssignment> a) {
+        var excess = 0;
+        final fives = <int>[];
+        for (final p in candidates) {
+          if (p.role != role) continue;
+          final days = <int>{
+            for (var i = 0; i < previousMonthTail.length; i++)
+              if (previousMonthTail[i].contains(p.id))
+                i - (previousMonthTail.length - 1),
+            for (final x in a.values)
+              if (x.includes(p.id)) x.day,
+          };
+          final off = {...?absentDays[p.id], ...p.inactiveDaysIn(year, month)};
+          excess += ShiftGaps.excess(days, absent: off);
+          fives.add(ShiftGaps.maxGapCount(days, absent: off));
+        }
+        return (excess, ShiftGaps.unevenMaxGaps(fives));
+      }
+
       Person? best;
       Map<int, DayAssignment>? bestResult;
       List<num>? bestRank;
@@ -137,7 +161,12 @@ class RosterRepair {
         if (!after.every((m) => before[c.id]?.contains(m) ?? false)) {
           continue;
         }
+        // Önce 5 günü aşan boşluk, sonra 5 günlük boşluk eşitliği, sonra
+        // nöbet ve hafta sonu sayısı.
+        final (excess, uneven) = gapState(trial);
         final rank = <num>[
+          excess,
+          uneven,
           shiftsOf(c.id) -
               (overtimeRequests.contains(c.id) ? overtimeAllowance : 0),
           weekendDays.contains(d) ? weekendShiftsOf(c.id) : 0,

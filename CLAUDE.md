@@ -5,7 +5,7 @@
 - Kişi istemediği günde asla nöbet tutmaz.
 - Aynı kişi art arda iki gün nöbet tutmaz (ayarla kapatılabilir).
 - Gün aşırı zincir en fazla 2 nöbet: 3-5 olur, 3-5-7 olmaz (d, d+2, d+4 üçünde birden nöbet yasak). Ayrı gün aşırı çiftlerin sayısı sınırsız (ayarlanabilir).
-- Nöbetler arası boşluk (aradaki boş gün) mümkünse en fazla 5; aşılırsa uyarı. Araya izin/pasif gün girerse sayılmaz. 4–5 günlük boşluk sayısı rol grubu içinde dengelenir.
+- Nöbetler arası boşluk (aradaki boş gün) en fazla 5: neredeyse kesin kural, yalnız başka türlü koltuk boş kalacaksa aşılır (uyarı). Ay geçişinde de (önceki ayın son 6 günü) denetlenir. Araya izin/pasif gün girerse sayılmaz. 5 günlük boşluk herkese eşit sayıda düşer, eşitlenemiyorsa kimseye verilmez (uyarı). 4–5 günlük boşluk sayısı rol grubu içinde dengelenir. Pasife almada nöbeti devralan da önce bu kurallara göre seçilir.
 - (İsteğe bağlı, varsayılan kapalı) Kişi, rol grubunun ortalamasından en fazla N fazla nöbet tutabilir.
 - Toplam nöbet, hafta sonu nöbeti ve gün aşırı çift sayısı rol grubu içinde eşit dağıtılır (fark ≤ 1 hedef). Öncelik adalet: önce o ayın içindeki denge, ay içi denge sağlandıktan sonra yıl içi toplam (ay içi eşitken fazla nöbet yıl içinde az tutana).
 - Hafta sonu = Cumartesi + Pazar (+ resmi tatiller, ayarla).

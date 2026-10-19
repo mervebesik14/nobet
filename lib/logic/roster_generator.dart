@@ -161,8 +161,14 @@ class RosterGenerator {
   static const spreadPenalty = 30.0;
 
   /// Nöbetler arası boşluk [ShiftGaps.maxGap]'i aştığında fazla her gün için
-  /// ceza: adalet dengesinden ağır, boş koltuktan çok hafif (mümkünse uyulur).
-  static const gapExcessPenalty = 8.0;
+  /// ceza. Neredeyse kesin kural: hiçbir adalet hedefi için aşılmaz, yalnız
+  /// başka türlü bir koltuk boş kalacaksa ([emptySlotPenalty]) aşılabilir.
+  static const gapExcessPenalty = 150.0;
+
+  /// 5 günlük boşluklar herkese eşit sayıda düşmezse (biri 1, diğerleri 0
+  /// gibi) farkın her birimi için ceza; eşitlenemiyorsa 5 gün kimseye
+  /// verilmez.
+  static const unevenFivePenalty = 15.0;
 
   /// Yerel iyileştirmeye alınan en iyi deneme sayısı.
   static const _polishCount = 3;
@@ -674,9 +680,10 @@ class _RoleSolver {
     // boşluk sayısı kişiler arasında dengelenir.
     var gapExcess = 0;
     final longGaps = <int>[];
+    final fives = <int>[];
     for (final id in ids) {
       final off = absent[id];
-      final (excess, long) = ShiftGaps.scan(
+      final (excess, long, five) = ShiftGaps.scan(
         from: _tailStart,
         to: days,
         works: (d) => _works(id, d),
@@ -684,6 +691,7 @@ class _RoleSolver {
       );
       gapExcess += excess;
       longGaps.add(long);
+      fives.add(five);
     }
     // Ay içi fark 1'i aşarsa güçlü ceza: ay içi adalet her zaman yıl içi
     // dengeden önce gelir.
@@ -708,6 +716,7 @@ class _RoleSolver {
                 over(pairs) +
                 over(longGaps)) +
         RosterGenerator.gapExcessPenalty * gapExcess +
+        RosterGenerator.unevenFivePenalty * ShiftGaps.unevenMaxGaps(fives) +
         yearly(counts, ytdShifts) +
         yearly(weekends, ytdWeekend) +
         yearly(nationals, ytdNational) * _ytdHolidayScale +
@@ -1229,10 +1238,11 @@ class _TechSolver {
     final totalPairs = ids.fold(0, (a, id) => a + _pairs24(id));
     var gapExcess = 0;
     final longById = <String, int>{};
+    final fives = <int>[];
     for (final id in ids) {
       final off = absent[id];
       final t = tail[id];
-      final (excess, long) = ShiftGaps.scan(
+      final (excess, long, five) = ShiftGaps.scan(
         from: _tailStart,
         to: days,
         works: (d) => d <= 0
@@ -1242,10 +1252,12 @@ class _TechSolver {
       );
       gapExcess += excess;
       longById[id] = long;
+      fives.add(five);
     }
     int longGaps(String id) => longById[id]!;
     const balance = 3.0;
     return RosterGenerator.gapExcessPenalty * gapExcess +
+        RosterGenerator.unevenFivePenalty * ShiftGaps.unevenMaxGaps(fives) +
         balance * sq(longGaps) +
         balance *
             (sq((id) => _w24[id]!.length - _allow(id)) +

@@ -45,9 +45,19 @@ void main() {
         (
           ShiftGaps.excess(days, absent: absent),
           ShiftGaps.longCount(days, absent: absent),
+          ShiftGaps.maxGapCount(days, absent: absent),
         ),
         reason: '$days $absent',
       );
     }
+  });
+
+  test('5 günlük boşluk sayısı ve eşitsizlik', () {
+    // 1→7 (5 gün), 7→13 (5 gün), 13→16 (2 gün).
+    expect(ShiftGaps.maxGapCount([1, 7, 13, 16]), 2);
+    expect(ShiftGaps.maxGapCount([1, 7, 13, 16], absent: {3}), 1);
+    expect(ShiftGaps.unevenMaxGaps([1, 0, 0]), 1);
+    expect(ShiftGaps.unevenMaxGaps([1, 1, 1]), 0);
+    expect(ShiftGaps.unevenMaxGaps([]), 0);
   });
 }

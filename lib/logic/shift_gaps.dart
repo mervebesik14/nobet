@@ -48,10 +48,27 @@ class ShiftGaps {
         days,
       ).where((g) => g.$3 >= longGapMin && g.$3 <= longGapMax).length;
 
+  /// Tam [maxGap] (5) günlük boşluk sayısı. 5 günlük boşluk ya herkese eşit
+  /// sayıda düşer ya da hiç kimseye.
+  static int maxGapCount(Iterable<int> days, {Set<int> absent = const {}}) =>
+      gaps(days, absent: absent).where((g) => g.$3 == maxGap).length;
+
+  /// 5 günlük boşluk sayıları eşit değilse farkın büyüklüğü (eşitse 0).
+  static int unevenMaxGaps(Iterable<int> counts) {
+    if (counts.isEmpty) return 0;
+    var lo = counts.first;
+    var hi = counts.first;
+    for (final c in counts) {
+      if (c < lo) lo = c;
+      if (c > hi) hi = c;
+    }
+    return hi - lo;
+  }
+
   /// Hızlı tarama (algoritmanın puan hesabı için): [from]..[to] günlerini
-  /// sırayla gezer, liste kopyalamaz / sıralamaz. ([excess], [longCount])
-  /// ile aynı sonucu verir.
-  static (int excess, int long) scan({
+  /// sırayla gezer, liste kopyalamaz / sıralamaz. ([excess], [longCount],
+  /// [maxGapCount]) ile aynı sonucu verir.
+  static (int excess, int long, int five) scan({
     required int from,
     required int to,
     required bool Function(int day) works,
@@ -59,6 +76,7 @@ class ShiftGaps {
   }) {
     var excess = 0;
     var long = 0;
+    var five = 0;
     int? last;
     for (var d = from; d <= to; d++) {
       if (works(d)) {
@@ -66,6 +84,7 @@ class ShiftGaps {
           final gap = d - last - 1;
           if (gap > maxGap) excess += gap - maxGap;
           if (gap >= longGapMin && gap <= longGapMax) long++;
+          if (gap == maxGap) five++;
         }
         last = d;
       } else if (isAbsent != null && isAbsent(d)) {
@@ -73,6 +92,6 @@ class ShiftGaps {
         last = null;
       }
     }
-    return (excess, long);
+    return (excess, long, five);
   }
 }

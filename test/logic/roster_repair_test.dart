@@ -185,4 +185,40 @@ void main() {
       expect(back.assignments[day]!.includes('n0'), isFalse);
     });
   });
+
+  test('yerine geçen seçilirken önce 5 günü aşan boşluk kapatılır', () {
+    // P'nin 10 Ekim nöbeti dağıtılacak. A 3 ile 16 arasında 12 gün boş
+    // (çok nöbeti var); B'nin nöbeti az ama boşluğu yok. Eski kural az
+    // nöbetliyi (B) seçerdi; şimdi A'nın 12 günlük boşluğu kapatılır.
+    const team = [
+      Person(id: 'p', name: 'P', role: Role.nurse),
+      Person(id: 'a', name: 'A', role: Role.nurse),
+      Person(id: 'b', name: 'B', role: Role.nurse),
+    ];
+    final assignments = <int, DayAssignment>{
+      for (final (d, ids) in [
+        (1, ['a']),
+        (3, ['a']),
+        (7, ['b']),
+        (10, ['p']),
+        (13, ['b']),
+        (16, ['a']),
+        (18, ['a']),
+        (22, ['b']),
+        (23, ['a']),
+        (25, ['a']),
+      ])
+        d: DayAssignment(day: d, nurseIds: ids),
+    };
+    final r = RosterRepair.removePerson(
+      year: 2026,
+      month: 10,
+      assignments: assignments,
+      personId: 'p',
+      fromDay: 1,
+      people: team,
+      settings: settings.copyWith(techsPerDay: 0),
+    );
+    expect(r.replacements, {10: 'a'});
+  });
 }

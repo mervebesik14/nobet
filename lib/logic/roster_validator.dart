@@ -35,6 +35,9 @@ enum ViolationKind {
 
   /// İki nöbet arasındaki boşluk önerilen en fazla günü aşıyor.
   longGap,
+
+  /// 5 günlük boşluklar rol grubunda herkese eşit sayıda düşmemiş.
+  unevenFiveGaps,
 }
 
 /// Bir kural ihlali.
@@ -353,6 +356,44 @@ class RosterValidator {
           ),
         );
       }
+    }
+
+    // 5 günlük boşluk ya herkese eşit sayıda düşer ya da hiç kimseye.
+    for (final role in Role.values) {
+      final members =
+          byId.values
+              .where(
+                (p) =>
+                    p.role == role &&
+                    !p.isChargeNurse &&
+                    p.worksInMonth(year, month),
+              )
+              .toList()
+            ..sort((a, b) => compareTurkish(a.name, b.name));
+      if (members.length < 2) continue;
+      final fives = {
+        for (final p in members)
+          p.id: ShiftGaps.maxGapCount(
+            worked[p.id] ?? const <int>{},
+            absent: {...?absentDays[p.id], ...p.inactiveDaysIn(year, month)},
+          ),
+      };
+      if (ShiftGaps.unevenMaxGaps(fives.values) == 0) continue;
+      final low = fives.values.reduce(min);
+      final more = [
+        for (final p in members)
+          if (fives[p.id]! > low) '${p.name} ${fives[p.id]}',
+      ];
+      violations.add(
+        RuleViolation(
+          kind: ViolationKind.unevenFiveGaps,
+          days: const [],
+          role: role,
+          message:
+              '${role.pluralLabel}: 5 günlük boşluk herkese eşit düşmedi '
+              '(${more.join(', ')}; diğerleri $low).',
+        ),
+      );
     }
 
     final extra = settings.maxExtraOverAverage;

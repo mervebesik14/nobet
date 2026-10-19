@@ -196,6 +196,7 @@ class PeopleController extends Notifier<List<Person>> {
         previousMonthTail: previousMonthTailOf(plans, plan),
         overtimeRequests: plan.overtimeRequests,
         requestedShifts: plan.requestedShifts,
+        absentDays: plan.leaveDays,
       );
       await _recordHistory(
         plan,

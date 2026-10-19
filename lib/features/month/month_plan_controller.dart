@@ -434,13 +434,13 @@ class MonthPlanController extends Notifier<MonthPlan> {
     await ref.read(monthPlanRepositoryProvider).save(state);
   }
 
-  /// Önceki ayın son 4 gününün nöbetçileri (ay sınırında art arda gün ve
+  /// Önceki ayın son 6 gününün nöbetçileri (ay sınırında art arda gün ve
   /// gün aşırı zincir kuralları için).
   List<Set<String>> previousMonthTail() =>
       previousMonthTailOf(ref.read(monthPlanRepositoryProvider), state);
 }
 
-/// [plan]dan önceki ayın son 4 gününün nöbetçileri, eskiden yeniye.
+/// [plan]dan önceki ayın son 6 gününün nöbetçileri, eskiden yeniye.
 List<Set<String>> previousMonthTailOf(
   MonthPlanRepository repository,
   MonthPlan plan,
@@ -450,7 +450,9 @@ List<Set<String>> previousMonthTailOf(
   if (previous == null || !previous.hasRoster) return const [];
   final last = previous.daysInMonth;
   return [
-    for (var d = last - 3; d <= last; d++)
+    // Son 6 gün: 5 günlük boşluk sınırı ay geçişinde de denetlensin
+    // (art arda gün ve gün aşırı zincir için son 4 gün yeterdi).
+    for (var d = last - 5; d <= last; d++)
       {...?previous.assignments[d]?.personIds},
   ];
 }
