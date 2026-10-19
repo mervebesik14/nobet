@@ -78,7 +78,12 @@ class RosterRepair {
         overtimeAllowance: overtimeAllowance,
         requestedShifts: requestedShifts,
       )) {
-        if (v.kind == ViolationKind.missing || v.personId == null) continue;
+        // Boşluk uyarısı öneri niteliğinde; aday seçimini engellemez.
+        if (v.kind == ViolationKind.missing ||
+            v.kind == ViolationKind.longGap ||
+            v.personId == null) {
+          continue;
+        }
         (result[v.personId!] ??= {}).add(v.message);
       }
       return result;
@@ -219,7 +224,9 @@ class RosterRestore {
         overtimeRequests: overtimeRequests,
         requestedShifts: requestedShifts,
       ))
-        if (v.personId == personId && v.kind != ViolationKind.missing)
+        if (v.personId == personId &&
+            v.kind != ViolationKind.missing &&
+            v.kind != ViolationKind.longGap)
           v.message,
     };
 

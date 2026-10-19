@@ -2,6 +2,7 @@ import 'dart:math';
 
 import '../models/day_assignment.dart';
 import 'block_reason.dart';
+import 'shift_gaps.dart';
 import '../models/person.dart';
 import '../models/role.dart';
 import '../models/roster_settings.dart';
@@ -31,6 +32,9 @@ enum ViolationKind {
 
   /// Sorumlu hemşire seçmediği bir güne nöbete yazılmış.
   chargeNurseUnrequested,
+
+  /// İki nöbet arasındaki boşluk önerilen en fazla günü aşıyor.
+  longGap,
 }
 
 /// Bir kural ihlali.
@@ -83,6 +87,7 @@ class RosterValidator {
     Set<String> overtimeRequests = const {},
     int overtimeAllowance = 2,
     Map<String, List<int>> requestedShifts = const {},
+    Map<String, List<int>> absentDays = const {},
   }) {
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final byId = {for (final p in people) p.id: p};
@@ -296,6 +301,29 @@ class RosterValidator {
             ),
           );
         }
+      }
+
+      // Nöbetler arası boşluk (araya izin / pasif gün girmeyenler).
+      final off = {
+        ...?absentDays[id],
+        ...?byId[id]?.inactiveDaysIn(year, month),
+      };
+      for (final (a, b, gap) in ShiftGaps.gaps(days, absent: off)) {
+        if (gap <= ShiftGaps.maxGap || (byId[id]?.isChargeNurse ?? false)) {
+          continue;
+        }
+        violations.add(
+          RuleViolation(
+            kind: ViolationKind.longGap,
+            days: [if (a >= 1) a, b],
+            personId: id,
+            role: role,
+            message:
+                '${name(id)} ${a >= 1 ? '$a' : date(a)} ve '
+                '${formatDayMonth(b, month)} arasında $gap gün boş '
+                '(en fazla ${ShiftGaps.maxGap}).',
+          ),
+        );
       }
 
       // Gün aşırı zincirler yalnız 24 vardiyalarında: d, d+2, d+4, ...

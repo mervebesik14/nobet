@@ -5,6 +5,7 @@ import '../models/person.dart';
 import '../models/role.dart';
 import '../models/roster_settings.dart';
 import 'roster_generator.dart';
+import 'shift_gaps.dart';
 import 'turkish_collation.dart';
 import 'work_hours_calculator.dart';
 
@@ -24,6 +25,7 @@ class PersonSummary {
     this.secondaryShifts = 0,
     this.dayShifts = 0,
     this.isChargeNurse = false,
+    this.longGaps = 0,
   });
 
   final String personId;
@@ -48,6 +50,9 @@ class PersonSummary {
 
   /// Sorumlu hemşire: rol ortalamasına girmez.
   final bool isChargeNurse;
+
+  /// Nöbetler arası 4–5 günlük boşluk sayısı (bkz. [ShiftGaps]).
+  final int longGaps;
 
   /// Bunların kaçı 16B (hafif) vardiyası; teknikerler için anlamlıdır.
   final int secondaryShifts;
@@ -218,6 +223,10 @@ class RosterSummary {
           requiredHours: personRequired,
           dayShifts: dayCount[id] ?? 0,
           isChargeNurse: person?.isChargeNurse ?? false,
+          longGaps: ShiftGaps.longCount(
+            days,
+            absent: {...leave, ...?person?.inactiveDaysIn(year, month)},
+          ),
         ),
       );
     }

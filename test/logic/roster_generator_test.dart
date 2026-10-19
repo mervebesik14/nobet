@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nobet_listesi/data/turkish_holidays.dart';
 import 'package:nobet_listesi/logic/person_totals.dart';
 import 'package:nobet_listesi/logic/roster_generator.dart';
+import 'package:nobet_listesi/logic/shift_gaps.dart';
 import 'package:nobet_listesi/logic/yearly_summary.dart';
 import 'package:nobet_listesi/models/models.dart';
 
@@ -787,6 +788,49 @@ void main() {
         lessThanOrEqualTo(1),
         reason: 'seed $seed: $counts',
       );
+    }
+  });
+
+  test('nöbetler arası boşluk en fazla 5; 4–5 günlük boşluklar dengeli', () {
+    final people = team(7, 4);
+    for (final seed in [1, 2, 3]) {
+      final r = generator(seed: seed).generate();
+      expectHardRules(r, people, const {}, settings);
+      final w = workedDays(r);
+      for (var i = 1; i <= 7; i++) {
+        expect(
+          ShiftGaps.excess(w['n$i']!),
+          0,
+          reason: 'n$i seed $seed: ${w['n$i']!.toList()..sort()}',
+        );
+      }
+      expect(
+        spread([for (var i = 1; i <= 7; i++) ShiftGaps.longCount(w['n$i']!)]),
+        lessThanOrEqualTo(1),
+        reason: 'seed $seed',
+      );
+    }
+  });
+
+  test('araya izin giren boşluk sınıra takılmaz', () {
+    // n1 10–20 izinli: izinden önceki ve sonraki nöbet arası uzun olabilir;
+    // diğerlerinde yine en fazla 5 gün boşluk.
+    final leave = [for (var d = 10; d <= 20; d++) d];
+    final r = RosterGenerator(
+      year: 2026,
+      month: 10,
+      people: team(7, 4),
+      holidays: holidays,
+      settings: settings,
+      seed: 1,
+      attempts: 150,
+      unavailableDays: {'n1': leave},
+      absentDays: {'n1': leave},
+    ).generate();
+    final w = workedDays(r);
+    expect(ShiftGaps.excess(w['n1']!, absent: leave.toSet()), 0);
+    for (var i = 2; i <= 7; i++) {
+      expect(ShiftGaps.excess(w['n$i']!), 0, reason: 'n$i');
     }
   });
 }

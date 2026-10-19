@@ -295,6 +295,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       previousMonthTail: previousMonthTail(),
       overtimeRequests: plan.overtimeRequests,
       requestedShifts: plan.requestedShifts,
+      absentDays: plan.leaveDays,
       yearToDate: YearlySummary.build(
         year: plan.year,
         plans: ref.read(monthPlanRepositoryProvider).getAll(),
@@ -398,6 +399,7 @@ final rosterViolationsProvider = Provider<List<RuleViolation>>((ref) {
     previousMonthTail: ref.read(monthPlanProvider.notifier).previousMonthTail(),
     overtimeRequests: plan.overtimeRequests,
     requestedShifts: plan.requestedShifts,
+    absentDays: plan.leaveDays,
   );
 });
 

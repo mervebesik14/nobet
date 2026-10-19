@@ -156,8 +156,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(saved().assignments[7]!.nurseIds, ['n3', 'n1']);
-    expect(find.text('Diğer kural ihlalleri (1)'), findsOneWidget);
+    expect(find.text('Diğer kural ihlalleri (2)'), findsOneWidget);
     expect(find.text('• Derya 7 ve 8 Ekim art arda nöbette.'), findsOneWidget);
+    // Ayşe'nin 7 Ekim nöbeti kalkınca 3 ile 10 arası 6 gün boş kalır.
+    expect(
+      find.text('• Ayşe 3 ve 10 Ekim arasında 6 gün boş (en fazla 5).'),
+      findsOneWidget,
+    );
     expect(cellColor(tester, 'n3', 8), isNot(normal));
     expect(cellColor(tester, 'n3', 7), cellColor(tester, 'n3', 8));
   });
@@ -442,6 +447,6 @@ void main() {
       (r) => (r.cells.first.child as Text).data == 'Hale',
     );
     expect((hale.cells[2].child as Text).data, '1'); // toplam nöbet
-    expect((hale.cells[6].child as Text).data, '24'); // çalışılan saat
+    expect((hale.cells[7].child as Text).data, '24'); // çalışılan saat
   });
 }

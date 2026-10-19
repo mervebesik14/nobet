@@ -194,4 +194,31 @@ void main() {
     expect(zeynep.religiousHolidayShifts, 2);
     expect(s.averages[Role.radiologyTech]!.religiousHolidayShifts, 2);
   });
+
+  test('4–5 günlük boşluk sayısı; araya izin girerse sayılmaz', () {
+    RosterSummary build(Map<String, List<int>> leave) => RosterSummary.build(
+      year: 2026,
+      month: 10,
+      assignments: {
+        // Zeynep: 1→6 (4 gün), 6→12 (5 gün), 12→14 (1 gün).
+        for (final d in [1, 6, 12, 14])
+          d: DayAssignment(day: d, nurseIds: const ['a', 'b'], techId: 't'),
+      },
+      people: people,
+      holidays: holidays,
+      settings: settings,
+      leaveDays: leave,
+    );
+    PersonSummary zeynep(RosterSummary s) =>
+        s.people.firstWhere((r) => r.personId == 'a');
+    expect(zeynep(build(const {})).longGaps, 2);
+    expect(
+      zeynep(
+        build(const {
+          'a': [8],
+        }),
+      ).longGaps,
+      1,
+    );
+  });
 }

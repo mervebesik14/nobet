@@ -6,6 +6,7 @@ import '../models/person.dart';
 import '../models/role.dart';
 import '../models/roster_settings.dart';
 import 'person_totals.dart';
+import 'shift_gaps.dart';
 import 'turkish_collation.dart';
 import 'turkish_dates.dart';
 
@@ -91,6 +92,7 @@ class RosterGenerator {
     this.overtimeRequests = const {},
     this.overtimeAllowance = 2,
     this.requestedShifts = const {},
+    this.absentDays = const {},
     this.attempts = 400,
   }) : people = people.where((p) => p.worksInMonth(year, month)).toList()
          ..sort((a, b) => a.id.compareTo(b.id));
@@ -130,6 +132,16 @@ class RosterGenerator {
   /// o gün uygun olmadığı (istemediği / izinli) günler yok sayılır.
   final Map<String, List<int>> requestedShifts;
 
+  /// Kişi → izinli (yıllık / şua / rapor) günler. Araya izin giren
+  /// nöbetler arası boşluk, boşluk sınırına ve dengesine sayılmaz. Pasif
+  /// günler kişiden ayrıca eklenir.
+  final Map<String, List<int>> absentDays;
+
+  Map<String, Set<int>> _absentFor(List<Person> members) => {
+    for (final p in members)
+      p.id: {...?absentDays[p.id], ...p.inactiveDaysIn(year, month)},
+  };
+
   /// Kişi → fazla mesai payı (fazla mesai isteyene [overtimeAllowance], yoksa
   /// 0). Adalet puanında ve açgözlü seçimde kişinin sayısından düşülür.
   Map<String, int> _allowanceFor(List<Person> members) => {
@@ -142,6 +154,10 @@ class RosterGenerator {
 
   /// Boş kalan her koltuk için puana eklenen ceza.
   static const emptySlotPenalty = 1000.0;
+
+  /// Nöbetler arası boşluk [ShiftGaps.maxGap]'i aştığında fazla her gün için
+  /// ceza: adalet dengesinden ağır, boş koltuktan çok hafif (mümkünse uyulur).
+  static const gapExcessPenalty = 8.0;
 
   /// Yerel iyileştirmeye alınan en iyi deneme sayısı.
   static const _polishCount = 3;
@@ -218,6 +234,7 @@ class RosterGenerator {
       national: national,
       religious: religious,
       tail: _tailFor(nurseMembers),
+      absent: _absentFor(nurseMembers),
       yearToDate: yearToDate,
       allowance: _allowanceFor(nurseMembers),
       reserve: {
@@ -258,6 +275,7 @@ class RosterGenerator {
         national: national,
         religious: religious,
         tail: techTail,
+        absent: _absentFor(techMembers),
         yearToDate: yearToDate,
         allowance: _allowanceFor(techMembers),
         settings: settings,
@@ -283,6 +301,7 @@ class RosterGenerator {
         national: national,
         religious: religious,
         tail: techTail,
+        absent: _absentFor(techMembers),
         yearToDate: yearToDate,
         allowance: _allowanceFor(techMembers),
         settings: settings,
@@ -354,6 +373,7 @@ class _RoleSolver {
     this.national = const {},
     this.religious = const {},
     required this.tail,
+    this.absent = const {},
     required Map<String, PersonTotals> yearToDate,
     this.allowance = const {},
     this.reserve = const {},
@@ -446,6 +466,9 @@ class _RoleSolver {
   /// Tam gün dini bayramlar; nöbetleri resmi tatillerden ayrı dengelenir.
   final Set<int> religious;
   final Map<String, Set<int>> tail;
+
+  /// Kişi → izinli / pasif günler (boşluk hesabında aralığı keser).
+  final Map<String, Set<int>> absent;
   final bool forbidConsecutive;
   final int maxChain;
   final int? cap;
@@ -613,12 +636,24 @@ class _RoleSolver {
     }
 
     final totalPairs = pairs.fold(0, (a, b) => a + b);
+    // Nöbetler arası boşluk: 5 günü aşan her gün cezalı; 4–5 günlük
+    // boşluk sayısı kişiler arasında dengelenir.
+    var gapExcess = 0;
+    final longGaps = <int>[];
+    for (final id in ids) {
+      final all = [...?tail[id], ..._worked[id]!];
+      final off = absent[id] ?? const <int>{};
+      gapExcess += ShiftGaps.excess(all, absent: off);
+      longGaps.add(ShiftGaps.longCount(all, absent: off));
+    }
     return _balanceWeight *
             (sq(counts) +
                 sq(weekends) +
                 sq(nationals) +
                 sq(religiouses) +
-                sq(pairs)) +
+                sq(pairs) +
+                sq(longGaps)) +
+        RosterGenerator.gapExcessPenalty * gapExcess +
         yearly(counts, ytdShifts) +
         yearly(weekends, ytdWeekend) +
         yearly(nationals, ytdNational) * _ytdHolidayScale +
@@ -939,6 +974,7 @@ class _TechSolver {
     this.national = const {},
     this.religious = const {},
     required this.tail,
+    this.absent = const {},
     required Map<String, PersonTotals> yearToDate,
     this.allowance = const {},
     required RosterSettings settings,
@@ -980,6 +1016,9 @@ class _TechSolver {
   /// Kişi → önceki aya ait çalıştığı günler (offset ≤ 0). Hepsi 24 (bloklayan)
   /// kabul edilir.
   final Map<String, Set<int>> tail;
+
+  /// Kişi → izinli / pasif günler (boşluk hesabında aralığı keser).
+  final Map<String, Set<int>> absent;
   final int maxChain;
   final int? cap;
   final Map<String, double> ytd;
@@ -1123,8 +1162,20 @@ class _TechSolver {
     }
 
     final totalPairs = ids.fold(0, (a, id) => a + _pairs24(id));
+    List<int> allDays(String id) => [...?tail[id], ..._w24[id]!, ..._w16[id]!];
+    var gapExcess = 0;
+    for (final id in ids) {
+      gapExcess += ShiftGaps.excess(
+        allDays(id),
+        absent: absent[id] ?? const {},
+      );
+    }
+    int longGaps(String id) =>
+        ShiftGaps.longCount(allDays(id), absent: absent[id] ?? const {});
     const balance = 3.0;
-    return balance *
+    return RosterGenerator.gapExcessPenalty * gapExcess +
+        balance * sq(longGaps) +
+        balance *
             (sq((id) => _w24[id]!.length - _allow(id)) +
                 sq((id) => _w16[id]!.length) +
                 sq(_weekendCount) +

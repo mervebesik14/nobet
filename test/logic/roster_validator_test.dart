@@ -353,4 +353,37 @@ void main() {
     );
     expect(gap.detail, 'Sena: sorumlu hemşire, bu günü seçmedi');
   });
+
+  test('5 günden uzun boşluk uyarı verir; araya izin girerse vermez', () {
+    final assignments = {
+      1: const DayAssignment(day: 1, nurseIds: ['a', 'b'], techId: 'm'),
+      8: const DayAssignment(day: 8, nurseIds: ['a', 'c'], techId: 'z'),
+    };
+    List<RuleViolation> gaps({Map<String, List<int>> absent = const {}}) => [
+      for (final v in validator.validate(
+        year: 2027,
+        month: 2,
+        assignments: assignments,
+        people: people,
+        absentDays: absent,
+      ))
+        if (v.kind == ViolationKind.longGap) v,
+    ];
+
+    final v = gaps();
+    expect(v.single.personId, 'a');
+    expect(v.single.days, [1, 8]);
+    expect(
+      v.single.message,
+      'Ayşe 1 ve 8 Şubat arasında 6 gün boş (en fazla 5).',
+    );
+    expect(
+      gaps(
+        absent: {
+          'a': [4],
+        },
+      ),
+      isEmpty,
+    );
+  });
 }

@@ -77,6 +77,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
           .previousMonthTail(),
       overtimeRequests: plan.overtimeRequests,
       requestedShifts: plan.requestedShifts,
+      absentDays: plan.leaveDays,
     );
   }
 
