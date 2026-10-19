@@ -1,3 +1,6 @@
+import 'dart:convert';
+
+import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -58,12 +61,32 @@ void main() {
     );
   }
 
-  Future<void> choose(WidgetTester tester, String item) async {
+  /// Paylaş menüsünden [item]; tüm liste için açılan pencerede [details]
+  /// true → "Liste ve ayrıntılar", false → "Yalnız liste".
+  Future<void> choose(WidgetTester tester, String item, {bool? details}) async {
     await tester.tap(find.byTooltip('Paylaş'));
     await tester.pumpAndSettle();
     await tester.tap(find.text(item));
+    await tester.pumpAndSettle();
+    if (details != null) {
+      await tester.tap(
+        find.byKey(
+          ValueKey(details ? 'share-with-details' : 'share-list-only'),
+        ),
+      );
+    }
     await tester.runAsync(() => Future<void>.delayed(Duration.zero));
     await tester.pumpAndSettle();
+  }
+
+  /// Excel dosyasındaki sayfa adları.
+  List<String> sheetNames(List<int> xlsx) {
+    final workbook = ZipDecoder()
+        .decodeBytes(xlsx)
+        .firstWhere((f) => f.name == 'xl/workbook.xml');
+    return RegExp(
+      r'<sheet name="([^"]+)"',
+    ).allMatches(utf8.decode(workbook.content)).map((m) => m[1]!).toList();
   }
 
   bool isPdf(List<int>? bytes) =>
@@ -71,14 +94,41 @@ void main() {
 
   testWidgets('PDF olarak paylaş', (tester) async {
     await pump(tester);
-    await choose(tester, 'PDF olarak paylaş');
+    await choose(tester, 'PDF olarak paylaş', details: true);
     expect(services.calls, ['sharePdf:nobet-listesi-2026-10.pdf']);
     expect(isPdf(services.lastPdf), isTrue);
   });
 
+  testWidgets('tüm liste: önce ne paylaşılacağı sorulur', (tester) async {
+    await pump(tester);
+    await choose(tester, 'PDF olarak paylaş');
+    expect(find.text('Ne paylaşılsın?'), findsOneWidget);
+    expect(find.text('Yalnız liste'), findsOneWidget);
+    expect(find.text('Liste ve ayrıntılar'), findsOneWidget);
+    // Vazgeçilirse hiçbir şey paylaşılmaz.
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pumpAndSettle();
+    expect(find.text('Ne paylaşılsın?'), findsNothing);
+    expect(services.calls, isEmpty);
+  });
+
+  testWidgets('yalnız liste PDF\'i ayrıntılısından küçüktür', (tester) async {
+    await pump(tester);
+    await choose(tester, 'PDF olarak paylaş', details: false);
+    final listOnly = services.lastPdf!;
+    await choose(tester, 'PDF olarak paylaş', details: true);
+    final withDetails = services.lastPdf!;
+    expect(services.calls, [
+      'sharePdf:nobet-listesi-2026-10.pdf',
+      'sharePdf:nobet-listesi-2026-10.pdf',
+    ]);
+    expect(isPdf(listOnly), isTrue);
+    expect(listOnly.length, lessThan(withDetails.length));
+  });
+
   testWidgets('Görsel (PNG) olarak paylaş', (tester) async {
     await pump(tester);
-    await choose(tester, 'Görsel (PNG) olarak paylaş');
+    await choose(tester, 'Görsel (PNG) olarak paylaş', details: false);
     expect(services.calls, ['pdfToPng', 'shareFile:nobet-listesi-2026-10.png']);
     expect(services.sharedFiles.single.mime, 'image/png');
     expect(isPdf(services.lastPdf), isTrue);
@@ -86,17 +136,28 @@ void main() {
 
   testWidgets('Excel olarak paylaş', (tester) async {
     await pump(tester);
-    await choose(tester, 'Excel olarak paylaş');
+    await choose(tester, 'Excel olarak paylaş', details: true);
     expect(services.calls, ['shareFile:nobet-listesi-2026-10.xlsx']);
     final file = services.sharedFiles.single;
     expect(file.mime, XlsxWriter.mimeType);
     // xlsx bir zip dosyasıdır: "PK" ile başlar.
     expect(String.fromCharCodes(file.bytes.take(2)), 'PK');
+    expect(sheetNames(file.bytes), ['Nöbet Listesi', 'Mesai Özeti']);
+  });
+
+  testWidgets('Excel yalnız liste: tek sayfa', (tester) async {
+    await pump(tester);
+    await choose(tester, 'Excel olarak paylaş', details: false);
+    expect(sheetNames(services.sharedFiles.single.bytes), ['Nöbet Listesi']);
   });
 
   testWidgets('Yazdır', (tester) async {
     await pump(tester);
     await choose(tester, 'Yazdır');
+    expect(find.text('Ne yazdırılsın?'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('share-with-details')));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
     expect(services.calls, ['printPdf:Ekim 2026 Nöbet Listesi']);
   });
 

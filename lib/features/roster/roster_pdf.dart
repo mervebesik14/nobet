@@ -10,8 +10,8 @@ import '../../models/models.dart';
 import 'roster_table.dart';
 
 /// Nöbet listesini PDF'e çevirir: başlıkta ay/yıl, nöbet tablosu (satırlarda
-/// kişiler, nöbet günlerinde nöbet süresi) ve özet tablo. Türkçe karakterler
-/// için [font] / [boldFont] gömülür.
+/// kişiler, nöbet günlerinde nöbet süresi) ve [includeSummary] ise özet
+/// tablo. Türkçe karakterler için [font] / [boldFont] gömülür.
 ///
 /// [singlePage] true ise içerik tek, içeriğe göre uzayan bir sayfaya dizilir
 /// (PNG görsel üretmek için); değilse A4 yatay, gerekirse çok sayfa.
@@ -27,6 +27,7 @@ Future<Uint8List> buildRosterPdf({
   Map<int, int> missingByDay = const {},
   Map<int, DayShift> dayShifts = const {},
   bool singlePage = false,
+  bool includeSummary = true,
 }) async {
   final title =
       '${DateFormat.yMMMM('tr_TR').format(DateTime(plan.year, plan.month))} '
@@ -63,10 +64,13 @@ Future<Uint8List> buildRosterPdf({
         ],
       ],
     ),
-    pw.SizedBox(height: 14),
-    pw.Text('Özet', style: pw.TextStyle(font: boldFont, fontSize: 12)),
-    pw.SizedBox(height: 4),
-    _summaryTable(summary, boldFont),
+    // Ayrıntılar: kişi başı özet tablosu (isteğe bağlı).
+    if (includeSummary) ...[
+      pw.SizedBox(height: 14),
+      pw.Text('Özet', style: pw.TextStyle(font: boldFont, fontSize: 12)),
+      pw.SizedBox(height: 4),
+      _summaryTable(summary, boldFont),
+    ],
   ];
 
   final doc = pw.Document(title: title, theme: theme);

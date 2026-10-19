@@ -8,8 +8,8 @@ import 'xlsx_writer.dart';
 
 /// Nöbet listesini Excel'e döker (saf Dart): "Nöbet Listesi" sayfası PDF'teki
 /// tablonun aynısı (renkli hafta sonu, tatil, izin), "Mesai Özeti" sayfası
-/// kişi başı sayılar. Sayılar gerçek sayı hücresidir; idare ya da bordro
-/// için toplanabilir.
+/// kişi başı sayılar ([includeSummary] false ise yalnız liste). Sayılar
+/// gerçek sayı hücresidir; idare ya da bordro için toplanabilir.
 class RosterExcel {
   const RosterExcel._();
 
@@ -36,6 +36,7 @@ class RosterExcel {
     required int shiftHours,
     Map<int, int> missingByDay = const {},
     Map<int, DayShift> dayShifts = const {},
+    bool includeSummary = true,
   }) => XlsxWriter.build([
     _rosterSheet(
       plan: plan,
@@ -46,7 +47,7 @@ class RosterExcel {
       missingByDay: missingByDay,
       dayShifts: dayShifts,
     ),
-    _summarySheet(plan, summary),
+    if (includeSummary) _summarySheet(plan, summary),
   ]);
 
   static String title(MonthPlan plan) =>

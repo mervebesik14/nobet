@@ -784,6 +784,40 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     }
   }
 
+  /// Tüm listeyi paylaşırken ne gönderileceğini sorar: yalnız nöbet tablosu
+  /// (false) ya da altında kişi başı özetle (true). Vazgeçilirse null.
+  Future<bool?> _askDetails(_ShareAction action) => showDialog<bool>(
+    context: context,
+    builder: (context) => SimpleDialog(
+      title: Text(
+        action == _ShareAction.print ? 'Ne yazdırılsın?' : 'Ne paylaşılsın?',
+      ),
+      children: [
+        SimpleDialogOption(
+          key: const ValueKey('share-list-only'),
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const ListTile(
+            leading: Icon(Icons.table_chart_outlined),
+            title: Text('Yalnız liste'),
+            subtitle: Text('Nöbet tablosu'),
+          ),
+        ),
+        SimpleDialogOption(
+          key: const ValueKey('share-with-details'),
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const ListTile(
+            leading: Icon(Icons.summarize_outlined),
+            title: Text('Liste ve ayrıntılar'),
+            subtitle: Text(
+              'Altında kişi başı özet: nöbet, hafta sonu, saatler, '
+              'fazla mesai',
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
   Future<void> _share(
     _ShareAction action, {
     required MonthPlan plan,
@@ -801,6 +835,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     final title =
         '${DateFormat.yMMMM('tr_TR').format(DateTime(plan.year, plan.month))} '
         'Nöbet Listesi';
+    final details = await _askDetails(action);
+    if (details == null || !mounted) return;
     try {
       if (action == _ShareAction.excel) {
         final xlsx = RosterExcel.build(
@@ -812,6 +848,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
           shiftHours: shiftHours,
           missingByDay: missingByDay,
           dayShifts: dayShifts,
+          includeSummary: details,
         );
         await services.shareFile(xlsx, '$fileBase.xlsx', XlsxWriter.mimeType);
         return;
@@ -829,6 +866,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         font: fonts.regular,
         boldFont: fonts.bold,
         singlePage: action == _ShareAction.png,
+        includeSummary: details,
       );
       switch (action) {
         case _ShareAction.personal ||
