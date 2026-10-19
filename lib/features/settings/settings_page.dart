@@ -8,9 +8,7 @@ import '../../data/backup_service.dart';
 import '../../data/providers.dart';
 import '../../models/models.dart';
 import '../../shared/platform_services.dart';
-import '../holidays/holidays_controller.dart';
-import '../month/month_plan_controller.dart';
-import '../people/people_controller.dart';
+import 'auto_backups_page.dart';
 import 'backup_actions.dart';
 
 /// Ayarlar sekmesi: nöbet kuralları, mesai hesabı, tema ve yedekleme.
@@ -211,6 +209,18 @@ class SettingsPage extends ConsumerWidget {
             subtitle: const Text('Mevcut verilerin üzerine yazar.'),
             onTap: () => _restore(context, ref),
           ),
+          ListTile(
+            leading: const Icon(Icons.history_toggle_off),
+            title: const Text('Otomatik yedekler'),
+            subtitle: const Text(
+              'Her değişiklikte telefona kendiliğinden alınır; yanlışlıkla '
+              'silinen ya da bozulan veriyi geri getirir.',
+            ),
+            isThreeLine: true,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const AutoBackupsPage()),
+            ),
+          ),
         ],
       ),
     );
@@ -241,47 +251,7 @@ class SettingsPage extends ConsumerWidget {
       return;
     }
 
-    final info = BackupService.info(backup);
-    final date = info.exportedAt == null
-        ? ''
-        : '${DateFormat('d MMMM y HH:mm', 'tr_TR').format(info.exportedAt!)}\n';
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Yedekten geri yüklensin mi?'),
-        content: Text(
-          '${date}Yedekte ${info.people} kişi, ${info.monthPlans} ay planı ve '
-          '${info.holidays} tatil var.\n\n'
-          'Bu telefondaki tüm veriler silinip yedektekiyle değiştirilecek.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Vazgeç'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Geri yükle'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    try {
-      await BackupService(ref.read(hiveBoxesProvider)).restore(backup);
-    } on BackupFormatException catch (e) {
-      if (context.mounted) _notify(context, e.message);
-      return;
-    }
-    // Ekranlar yeni veriyi okusun.
-    ref
-      ..invalidate(peopleProvider)
-      ..invalidate(holidaysProvider)
-      ..invalidate(monthPlanProvider)
-      ..invalidate(rosterSettingsProvider)
-      ..invalidate(themeModeProvider);
-    if (context.mounted) _notify(context, 'Yedek geri yüklendi.');
+    await confirmAndRestore(context, ref, backup);
   }
 }
 

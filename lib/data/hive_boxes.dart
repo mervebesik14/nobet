@@ -15,6 +15,7 @@ class HiveBoxes {
     required this.settings,
     required this.meta,
     required this.history,
+    required this.autoBackups,
   });
 
   static const peopleBox = 'people';
@@ -23,6 +24,7 @@ class HiveBoxes {
   static const settingsBox = 'settings';
   static const metaBox = 'app_meta';
   static const historyBox = 'roster_history';
+  static const autoBackupsBox = 'auto_backups';
 
   final Box<Person> people;
   final Box<Holiday> holidays;
@@ -35,6 +37,10 @@ class HiveBoxes {
   /// Ay anahtarı (`yyyy-MM`) → liste değişiklik geçmişi (JSON metinleri).
   /// Cihaza özeldir, yedeğe girmez.
   final Box<dynamic> history;
+
+  /// Otomatik yedekler: zaman (ISO 8601) → yedek JSON metni. Cihaza özeldir,
+  /// yedeğe girmez ve geri yüklemede silinmez.
+  final Box<dynamic> autoBackups;
 
   static bool _adaptersRegistered = false;
 
@@ -52,6 +58,7 @@ class HiveBoxes {
       settings: await Hive.openBox<RosterSettings>(settingsBox, bytes: bytes()),
       meta: await Hive.openBox<dynamic>(metaBox, bytes: bytes()),
       history: await Hive.openBox<dynamic>(historyBox, bytes: bytes()),
+      autoBackups: await Hive.openBox<dynamic>(autoBackupsBox, bytes: bytes()),
     );
   }
 
@@ -62,5 +69,6 @@ class HiveBoxes {
     await settings.close();
     await meta.close();
     await history.close();
+    await autoBackups.close();
   }
 }

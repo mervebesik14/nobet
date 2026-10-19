@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'data/auto_backup_service.dart';
 import 'data/providers.dart';
 
 import 'features/shell/main_shell.dart';
@@ -14,6 +15,8 @@ class NobetApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Veri değiştikçe telefona sessizce yedek alınır.
+    ref.watch(autoBackupWatcherProvider);
     return MaterialApp(
       themeMode: ref.watch(themeModeProvider),
       title: 'Nöbetçi',

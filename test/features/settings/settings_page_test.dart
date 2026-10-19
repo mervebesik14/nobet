@@ -6,8 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive_ce.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:nobet_listesi/app.dart';
+import 'package:nobet_listesi/data/auto_backup_service.dart';
 import 'package:nobet_listesi/data/backup_service.dart';
 import 'package:nobet_listesi/data/hive_boxes.dart';
+import 'package:nobet_listesi/features/settings/auto_backups_page.dart';
 import 'package:nobet_listesi/features/settings/settings_page.dart';
 import 'package:nobet_listesi/models/models.dart';
 import 'package:nobet_listesi/shared/platform_services.dart';
@@ -205,5 +207,69 @@ void main() {
     await tester.pumpAndSettle();
     expect(services.calls, ['pickJsonFile']);
     expect(find.byType(AlertDialog), findsNothing);
+  });
+
+  testWidgets('otomatik yedekler: listelenir, paylaşılır, geri yüklenir', (
+    tester,
+  ) async {
+    final auto = AutoBackupService(boxes);
+    await tester.runAsync(() async {
+      await boxes.people.put(
+        'a',
+        const Person(id: 'a', name: 'Ayşe', role: Role.nurse),
+      );
+      await auto.snapshot(DateTime(2026, 10, 18, 9, 5));
+      await boxes.people.put(
+        'b',
+        const Person(id: 'b', name: 'Banu', role: Role.nurse),
+      );
+      await auto.snapshot(DateTime(2026, 10, 19, 14, 30));
+    });
+    await pump(tester, home: const MaterialApp(home: AutoBackupsPage()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('19 Ekim 2026, 14:30'), findsOneWidget);
+    expect(find.text('2 kişi, 0 ay planı'), findsOneWidget);
+    expect(find.text('18 Ekim 2026, 09:05'), findsOneWidget);
+    expect(find.text('1 kişi, 0 ay planı'), findsOneWidget);
+
+    Future<void> choose(String time, String action) async {
+      await tester.tap(
+        find.descendant(
+          of: find.ancestor(
+            of: find.text(time),
+            matching: find.byType(ListTile),
+          ),
+          matching: find.byTooltip('Seçenekler'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(action));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+    }
+
+    await choose('19 Ekim 2026, 14:30', 'Paylaş');
+    expect(services.calls, ['shareFile:nobet-yedek-2026-10-19-1430.json']);
+    final shared = BackupService.parse(
+      utf8.decode(services.sharedFiles.single.bytes),
+    );
+    expect(BackupService.info(shared).people, 2);
+
+    await choose('18 Ekim 2026, 09:05', 'Geri yükle');
+    expect(find.text('Yedekten geri yüklensin mi?'), findsOneWidget);
+    await tester.tap(find.text('Geri yükle'));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(boxes.people.keys, ['a']);
+    expect(find.text('Yedek geri yüklendi.'), findsOneWidget);
+  });
+
+  testWidgets('ayarlarda otomatik yedekler sayfası açılır', (tester) async {
+    await pump(tester);
+    await tester.scrollUntilVisible(find.text('Otomatik yedekler'), 200);
+    await tester.tap(find.text('Otomatik yedekler'));
+    await tester.pumpAndSettle();
+    expect(find.text('Henüz otomatik yedek yok.'), findsOneWidget);
   });
 }
