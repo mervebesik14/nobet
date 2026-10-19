@@ -155,6 +155,26 @@ class MonthPlan {
   /// Nöbet listesi oluşturulmuş mu?
   bool get hasRoster => assignments.isNotEmpty;
 
+  /// Kişinin [type] türündeki izin günleri [days] olan kopya (boşsa kayıt
+  /// kaldırılır).
+  MonthPlan withLeave(String personId, LeaveType type, Iterable<int> days) {
+    final map = {...leaveMap(type)};
+    final valid = {
+      for (final d in days)
+        if (d >= 1 && d <= daysInMonth) d,
+    };
+    if (valid.isEmpty) {
+      map.remove(personId);
+    } else {
+      map[personId] = valid.toList()..sort();
+    }
+    return switch (type) {
+      LeaveType.annual => copyWith(annualLeave: map),
+      LeaveType.radiation => copyWith(radiationLeave: map),
+      LeaveType.sick => copyWith(sickLeave: map),
+    };
+  }
+
   /// Kişi istekleri (istenmeyen günler, istenen nöbet günleri, fazla mesai)
   /// girilmiş mi? İzinler istek sayılmaz.
   bool get hasPersonRequests =>

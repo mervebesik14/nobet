@@ -134,6 +134,48 @@ class MonthPlanController extends Notifier<MonthPlan> {
     return _setLeaveDays(personId, type, days);
   }
 
+  /// [start]–[end] (dahil) tarih aralığını verilen türde izne ekler; aralık
+  /// ay sınırını aşabilir (ör. 26 Ekim–6 Kasım). Her ayın günleri o ayın
+  /// planına yazılır (plan yoksa oluşturulur). Kilitli aylar atlanır ve
+  /// (ayın 1'i olarak) döner; hepsi yazıldıysa boş liste.
+  Future<List<DateTime>> addLeaveDates(
+    String personId,
+    LeaveType type,
+    DateTime start,
+    DateTime end,
+  ) async {
+    var lo = DateTime(start.year, start.month, start.day);
+    var hi = DateTime(end.year, end.month, end.day);
+    if (hi.isBefore(lo)) (lo, hi) = (hi, lo);
+    final repo = ref.read(monthPlanRepositoryProvider);
+    final skipped = <DateTime>[];
+    for (
+      var m = DateTime(lo.year, lo.month);
+      !m.isAfter(DateTime(hi.year, hi.month));
+      m = DateTime(m.year, m.month + 1)
+    ) {
+      final last = DateTime(m.year, m.month + 1, 0).day;
+      final from = m.year == lo.year && m.month == lo.month ? lo.day : 1;
+      final to = m.year == hi.year && m.month == hi.month ? hi.day : last;
+      if (m.year == state.year && m.month == state.month) {
+        if (!await addLeaveRange(personId, type, from, to)) skipped.add(m);
+        continue;
+      }
+      final plan = await repo.getOrCreate(m.year, m.month);
+      if (plan.isLocked) {
+        skipped.add(m);
+        continue;
+      }
+      await repo.save(
+        plan.withLeave(personId, type, {
+          ...plan.leaveOf(personId, type),
+          for (var d = from; d <= to; d++) d,
+        }),
+      );
+    }
+    return skipped;
+  }
+
   /// [start]–[end] (dahil) gün aralığını verilen türdeki izinlerden çıkarır.
   Future<bool> removeLeaveRange(
     String personId,
@@ -204,25 +246,13 @@ class MonthPlanController extends Notifier<MonthPlan> {
     Set<int> days,
   ) async {
     if (state.isLocked) return false;
-    final map = {...state.leaveMap(type)};
-    if (days.isEmpty) {
-      map.remove(personId);
-    } else {
-      map[personId] = days.toList()..sort();
-    }
-    state = switch (type) {
-      LeaveType.annual => state.copyWith(annualLeave: map),
-      LeaveType.radiation => state.copyWith(radiationLeave: map),
-      LeaveType.sick => state.copyWith(sickLeave: map),
-    };
+    state = state.withLeave(personId, type, days);
     await ref.read(monthPlanRepositoryProvider).save(state);
     return true;
   }
 
   /// Oluşturulmuş nöbet listesini sıfırlar (atamalar, tohum, oluşturma anı
-  /// silinir). İstenmeyen günler, yıllık izinler ve fazla mesai istekleri
-  /// korunur. Kilitli ayda sıfırlanmaz ve false döner.
-  /// Listeyi siler; izinler korunur. [clearRequests] true ise kişi
+  /// silinir); izinler korunur. Kilitli ayda sıfırlanmaz ve false döner. [clearRequests] true ise kişi
   /// istekleri (istenmeyen günler, istenen nöbet günleri, fazla mesai) de
   /// silinir.
   Future<bool> resetRoster({bool clearRequests = false}) async {

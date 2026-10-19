@@ -307,4 +307,15 @@ void main() {
       '• 1 kişi: fazla mesai isteği',
     );
   });
+
+  test('MonthPlan.withLeave ay dışını atar, boşsa kaydı kaldırır', () {
+    const plan = MonthPlan(year: 2026, month: 11);
+    final withLeave = plan.withLeave('a', LeaveType.annual, [3, 1, 31, 0]);
+    expect(withLeave.annualLeaveOf('a'), [1, 3]);
+    expect(withLeave.withLeave('a', LeaveType.annual, []).annualLeave, isEmpty);
+    expect(
+      plan.withLeave('b', LeaveType.sick, [2]).leaveOf('b', LeaveType.sick),
+      [2],
+    );
+  });
 }

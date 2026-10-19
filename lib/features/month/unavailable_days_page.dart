@@ -5,6 +5,7 @@ import 'package:table_calendar/table_calendar.dart';
 
 import '../../models/models.dart';
 import '../holidays/holidays_controller.dart';
+import '../../shared/widgets/month_selector.dart';
 import 'month_plan_controller.dart';
 import '../../shared/app_colors.dart';
 
@@ -107,21 +108,33 @@ class _UnavailableDaysPageState extends ConsumerState<UnavailableDaysPage>
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabs,
+      body: Column(
         children: [
-          for (final tab in _tabList)
-            switch (tab) {
-              _UnavailableTab() => _CalendarEditor(person: person),
-              _RequestedTab() => _CalendarEditor(
-                person: person,
-                requested: true,
-              ),
-              _LeaveTab(:final type) => _LeaveEditor(
-                person: person,
-                type: type,
-              ),
-            },
+          // Kişinin takviminde aylar arasında gezinme; Ay Planı'nın seçili
+          // ayı da değişir.
+          MonthSelector(
+            month: DateTime(plan.year, plan.month),
+            onChanged: ref.read(planMonthProvider.notifier).select,
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabs,
+              children: [
+                for (final tab in _tabList)
+                  switch (tab) {
+                    _UnavailableTab() => _CalendarEditor(person: person),
+                    _RequestedTab() => _CalendarEditor(
+                      person: person,
+                      requested: true,
+                    ),
+                    _LeaveTab(:final type) => _LeaveEditor(
+                      person: person,
+                      type: type,
+                    ),
+                  },
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -287,9 +300,43 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
     final locked = plan.isLocked;
     final start = _rangeStart;
     final canAdd = !locked && start != null;
+    final dayMonth = DateFormat('d MMMM', 'tr_TR');
 
     String rangeText(int a, int b) =>
         a == b ? '$a $monthName' : '$a–$b $monthName';
+
+    String selectionText(DateTime a, DateTime b) {
+      if (isSameDay(a, b)) return dayMonth.format(a);
+      if (a.year == b.year && a.month == b.month) {
+        return '${a.day}–${dayMonth.format(b)}';
+      }
+      return '${dayMonth.format(a)} – ${dayMonth.format(b)}';
+    }
+
+    Future<void> add() async {
+      final s = start!;
+      final e = _rangeEnd ?? s;
+      final skipped = await controller.addLeaveDates(person.id, type, s, e);
+      if (!context.mounted) return;
+      setState(() {
+        _rangeStart = null;
+        _rangeEnd = null;
+      });
+      final monthYear = DateFormat.yMMMM('tr_TR');
+      final multi = s.year != e.year || s.month != e.month;
+      final message = skipped.isNotEmpty
+          ? '${skipped.map(monthYear.format).join(', ')} kilitli olduğu için '
+                'o aya izin yazılamadı.'
+          : multi
+          ? '${type.label} eklendi: ${selectionText(s, e)}. Diğer ayın günleri '
+                'o ayın planına yazıldı.'
+          : null;
+      if (message != null) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(message)));
+      }
+    }
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -303,6 +350,8 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
           locked
               ? 'Bu ay kilitli; ${type.label.toLowerCase()} değiştirilemez.'
               : 'Başlangıç ve bitiş gününü seçin, sonra "İzin ekle"ye dokunun. '
+                    'İzin sonraki aya taşıyorsa başlangıcı seçip yukarıdan '
+                    'sonraki aya geçin ve bitişi orada seçin. '
                     'İzin günlerinde nöbet verilmez ve gereken saatten düşülür. '
                     '${switch (type) {
                       LeaveType.annual => 'İzinden önceki son nöbet, izinden önceki son iş '
@@ -319,11 +368,12 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
           locale: 'tr_TR',
           firstDay: firstDay,
           lastDay: lastDay,
-          focusedDay: start ?? firstDay,
+          focusedDay: firstDay,
           startingDayOfWeek: StartingDayOfWeek.monday,
           availableGestures: AvailableGestures.none,
           headerVisible: false,
-          rangeSelectionMode: RangeSelectionMode.toggledOn,
+          // Aralık elle tutulur; başlangıç önceki ayda kalabilir.
+          rangeSelectionMode: RangeSelectionMode.toggledOff,
           rangeStartDay: _rangeStart,
           rangeEndDay: _rangeEnd,
           calendarStyle: CalendarStyle(
@@ -339,11 +389,20 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
               shape: BoxShape.circle,
             ),
           ),
-          onRangeSelected: locked
+          onDaySelected: locked
               ? null
-              : (s, e, _) => setState(() {
-                  _rangeStart = s;
-                  _rangeEnd = e;
+              : (day, _) => setState(() {
+                  final d = DateTime(day.year, day.month, day.day);
+                  final s = _rangeStart;
+                  if (s == null || _rangeEnd != null) {
+                    _rangeStart = d;
+                    _rangeEnd = null;
+                  } else if (d.isBefore(s)) {
+                    _rangeStart = d;
+                    _rangeEnd = s;
+                  } else {
+                    _rangeEnd = d;
+                  }
                 }),
           calendarBuilders: CalendarBuilders(
             // Kayıtlı izin günleri her zaman izin renginde; seçim aralığı
@@ -368,22 +427,14 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
               child: Text(
                 start == null
                     ? 'Aralık seçilmedi'
-                    : 'Seçilen: ${rangeText(start.day, (_rangeEnd ?? start).day)}',
+                    : _rangeEnd == null
+                    ? 'Başlangıç: ${dayMonth.format(start)} · bitişi seçin'
+                    : 'Seçilen: ${selectionText(start, _rangeEnd!)}',
                 style: theme.textTheme.bodyMedium,
               ),
             ),
             FilledButton.icon(
-              onPressed: canAdd
-                  ? () {
-                      final s = start.day;
-                      final e = (_rangeEnd ?? start).day;
-                      controller.addLeaveRange(person.id, type, s, e);
-                      setState(() {
-                        _rangeStart = null;
-                        _rangeEnd = null;
-                      });
-                    }
-                  : null,
+              onPressed: canAdd ? add : null,
               icon: const Icon(Icons.add),
               label: const Text('İzin ekle'),
             ),

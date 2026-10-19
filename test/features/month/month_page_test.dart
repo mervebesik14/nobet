@@ -269,6 +269,51 @@ void main() {
     expect(find.text('2 gün rapor'), findsOneWidget);
   });
 
+  testWidgets('kişi takviminde ay değiştirilir; izin iki aya taşabilir', (
+    tester,
+  ) async {
+    await seed(_team);
+    await pumpPage(tester);
+
+    await tester.tap(find.text('Ali'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ekim 2026'), findsOneWidget);
+
+    // İstenmeyen günler sekmesinde Kasım'a geçilip gün seçilir.
+    await tester.tap(find.byTooltip('Sonraki ay'));
+    await tester.pumpAndSettle();
+    expect(find.text('Kasım 2026'), findsOneWidget);
+    await tester.tap(find.text('9'));
+    await tester.pumpAndSettle();
+    expect(boxes.monthPlans.get('2026-11')!.unavailableDaysOf('t1'), [9]);
+
+    // Yıllık izin: 26 Ekim'de başlar, Kasım'a geçilip 6 Kasım'da biter.
+    await tester.tap(find.byTooltip('Önceki ay'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Yıllık izin'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('26'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Başlangıç: 26 Ekim'), findsOneWidget);
+    await tester.tap(find.byTooltip('Sonraki ay'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('6'));
+    await tester.pumpAndSettle();
+    expect(find.text('Seçilen: 26 Ekim – 6 Kasım'), findsOneWidget);
+    await tester.tap(find.text('İzin ekle'));
+    await tester.pumpAndSettle();
+
+    expect(boxes.monthPlans.get('2026-10')!.annualLeaveOf('t1'), [
+      26, 27, 28, 29, 30, 31, //
+    ]);
+    expect(boxes.monthPlans.get('2026-11')!.annualLeaveOf('t1'), [
+      1, 2, 3, 4, 5, 6, //
+    ]);
+    // Kasım'ın istenmeyen günü korunur.
+    expect(boxes.monthPlans.get('2026-11')!.unavailableDaysOf('t1'), [9]);
+    expect(find.textContaining('Diğer ayın günleri'), findsOneWidget);
+  });
+
   testWidgets('İzin çipi silinince o aralık kaldırılır', (tester) async {
     await seed(
       _team,
