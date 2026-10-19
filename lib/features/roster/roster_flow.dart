@@ -130,8 +130,10 @@ Future<bool?> _chooseMode(BuildContext context) {
   );
 }
 
-/// Seçili ayın oluşturulmuş listesini onayla sıfırlar. İstenmeyen günler,
-/// izinler ve fazla mesai istekleri korunur. Liste kilitliyse kilit de
+/// Seçili ayın oluşturulmuş listesini onayla sıfırlar. İzinler (yıllık,
+/// şua, rapor) her zaman korunur. Kişi istekleri (istenmeyen günler,
+/// sorumlu hemşirenin nöbet günleri, fazla mesai) varsa ayrıca sorulur:
+/// korunabilir ya da birlikte sıfırlanabilir. Liste kilitliyse kilit de
 /// açılır (onay metninde söylenir). Sıfırlandıysa true döner.
 Future<bool> resetRosterFlow(BuildContext context, WidgetRef ref) async {
   final plan = ref.read(monthPlanProvider);
@@ -140,16 +142,47 @@ Future<bool> resetRosterFlow(BuildContext context, WidgetRef ref) async {
     context,
     title: 'Listeyi sıfırla',
     message:
-        'Bu ayın oluşturulan nöbet listesi silinecek. İstenmeyen günler, '
-        'izinler ve fazla mesai istekleri korunur.'
+        'Bu ayın oluşturulan nöbet listesi silinecek. İzinler (yıllık izin, '
+        'şua izni, rapor) korunur.'
         '${plan.isLocked ? '\n\nListe kilitli; sıfırlanınca kilidi de açılır.' : ''}'
         '\n\nDevam edilsin mi?',
     confirmLabel: 'Sıfırla',
   );
-  if (!ok) return false;
+  if (!ok || !context.mounted) return false;
+
+  var clearRequests = false;
+  if (plan.hasPersonRequests) {
+    final answer = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Kişi istekleri sıfırlansın mı?'),
+        content: Text(
+          'Bu ay girilen istekler:\n${plan.personRequestSummary}\n\n'
+          'Sıfırlanırsa bu istekler silinir; izinler yine korunur.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Vazgeç'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Hayır, koru'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Evet, sıfırla'),
+          ),
+        ],
+      ),
+    );
+    if (answer == null) return false;
+    clearRequests = answer;
+  }
+
   final controller = ref.read(monthPlanProvider.notifier);
   if (plan.isLocked) await controller.setLocked(false);
-  return controller.resetRoster();
+  return controller.resetRoster(clearRequests: clearRequests);
 }
 
 Future<bool> _confirm(

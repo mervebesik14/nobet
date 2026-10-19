@@ -222,17 +222,20 @@ class MonthPlanController extends Notifier<MonthPlan> {
   /// Oluşturulmuş nöbet listesini sıfırlar (atamalar, tohum, oluşturma anı
   /// silinir). İstenmeyen günler, yıllık izinler ve fazla mesai istekleri
   /// korunur. Kilitli ayda sıfırlanmaz ve false döner.
-  Future<bool> resetRoster() async {
+  /// Listeyi siler; izinler korunur. [clearRequests] true ise kişi
+  /// istekleri (istenmeyen günler, istenen nöbet günleri, fazla mesai) de
+  /// silinir.
+  Future<bool> resetRoster({bool clearRequests = false}) async {
     if (state.isLocked) return false;
     state = MonthPlan(
       year: state.year,
       month: state.month,
-      unavailableDays: state.unavailableDays,
+      unavailableDays: clearRequests ? const {} : state.unavailableDays,
       annualLeave: state.annualLeave,
       radiationLeave: state.radiationLeave,
       sickLeave: state.sickLeave,
-      requestedShifts: state.requestedShifts,
-      overtimeRequests: state.overtimeRequests,
+      requestedShifts: clearRequests ? const {} : state.requestedShifts,
+      overtimeRequests: clearRequests ? const {} : state.overtimeRequests,
       nurseOnly: state.nurseOnly,
     );
     await ref.read(monthPlanRepositoryProvider).save(state);

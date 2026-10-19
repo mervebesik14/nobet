@@ -274,4 +274,37 @@ void main() {
       expect(s.copyWith(techsPerDay: 2).maxExtraOverAverage, 2);
     });
   });
+
+  test('MonthPlan kişi istekleri dökümü (izinler istek sayılmaz)', () {
+    const empty = MonthPlan(
+      year: 2026,
+      month: 10,
+      unavailableDays: {'a': []},
+      annualLeave: {
+        'a': [3],
+      },
+    );
+    expect(empty.hasPersonRequests, isFalse);
+    expect(empty.personRequestSummary, '');
+
+    const plan = MonthPlan(
+      year: 2026,
+      month: 10,
+      unavailableDays: {
+        'a': [1, 2],
+        'b': [5],
+      },
+      requestedShifts: {
+        's': [7, 21],
+      },
+      overtimeRequests: {'t'},
+    );
+    expect(plan.hasPersonRequests, isTrue);
+    expect(
+      plan.personRequestSummary,
+      '• 2 kişi: 3 istenmeyen gün\n'
+      '• 1 kişi: 2 seçilen nöbet günü\n'
+      '• 1 kişi: fazla mesai isteği',
+    );
+  });
 }

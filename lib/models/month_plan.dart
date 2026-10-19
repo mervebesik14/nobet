@@ -155,6 +155,32 @@ class MonthPlan {
   /// Nöbet listesi oluşturulmuş mu?
   bool get hasRoster => assignments.isNotEmpty;
 
+  /// Kişi istekleri (istenmeyen günler, istenen nöbet günleri, fazla mesai)
+  /// girilmiş mi? İzinler istek sayılmaz.
+  bool get hasPersonRequests =>
+      unavailableDays.values.any((d) => d.isNotEmpty) ||
+      requestedShifts.values.any((d) => d.isNotEmpty) ||
+      overtimeRequests.isNotEmpty;
+
+  /// Kişi isteklerinin kısa dökümü, satır satır ("• 3 kişi: 7 istenmeyen
+  /// gün"); yoksa boş metin.
+  String get personRequestSummary {
+    String line(Map<String, List<int>> map, String what) {
+      final people = map.values.where((d) => d.isNotEmpty);
+      final days = people.fold(0, (s, d) => s + d.length);
+      return '• ${people.length} kişi: $days $what';
+    }
+
+    return [
+      if (unavailableDays.values.any((d) => d.isNotEmpty))
+        line(unavailableDays, 'istenmeyen gün'),
+      if (requestedShifts.values.any((d) => d.isNotEmpty))
+        line(requestedShifts, 'seçilen nöbet günü'),
+      if (overtimeRequests.isNotEmpty)
+        '• ${overtimeRequests.length} kişi: fazla mesai isteği',
+    ].join('\n');
+  }
+
   /// Saklama anahtarı: `yyyy-MM`.
   String get key => keyFor(year, month);
 
