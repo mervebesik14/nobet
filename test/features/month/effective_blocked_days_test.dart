@@ -38,9 +38,10 @@ void main() {
     return c;
   }
 
-  test('yıllık izin öncesi ve sonrası kapanır; şua izni kapanmaz', () {
+  test('yıllık izin öncesi/sonrası; şua izninden önceki iki gün kapanır', () {
     // n1 yıllık izin 8–9 (Per–Cum): öncesinde 7 Çar, sonrasında 10 Cmt ve
-    // 11 Paz da kapalı. n2 şua izni 8–9: yalnızca izin günleri kapalı.
+    // 11 Paz da kapalı. n2 şua izni 8–9: önceki iki gün (6, 7) ve izin
+    // günleri kapalı; sonrası açık.
     boxes.monthPlans.put(
       '2026-10',
       const MonthPlan(
@@ -54,9 +55,17 @@ void main() {
         },
       ),
     );
-    final blocked = container().read(effectiveBlockedDaysProvider);
+    final c = container();
+    final blocked = c.read(effectiveBlockedDaysProvider);
     expect(blocked['n1'], [7, 8, 9, 10, 11]);
-    expect(blocked['n2'], [8, 9]);
+    // Şua: izinden önceki iki gün (6, 7) ve izin günleri kapalı.
+    expect(blocked['n2'], [6, 7, 8, 9]);
+    expect(c.read(blockReasonsProvider)['n2'], {
+      6: BlockReason.beforeRadiationLeave,
+      7: BlockReason.beforeRadiationLeave,
+      8: BlockReason.radiationLeave,
+      9: BlockReason.radiationLeave,
+    });
   });
 
   test('istenmeyen günler ve izinler birlikte engellenir', () {

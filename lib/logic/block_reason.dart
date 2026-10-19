@@ -12,6 +12,10 @@ enum BlockReason {
   afterAnnualLeave(
     'yıllık izin dönüşü',
     'yıllık izin dönüşü ilk iş gününden önceki güne',
+  ),
+  beforeRadiationLeave(
+    'şua izni öncesi',
+    'şua izninden önceki iki günden birine',
   );
 
   const BlockReason(this.label, this.target);
@@ -31,6 +35,9 @@ enum BlockReason {
     afterAnnualLeave =>
       '$name $target ($date) atandı. Yıllık izinden sonra ilk nöbet ilk '
           'iş gününde olabilir.',
+    beforeRadiationLeave =>
+      '$name $target ($date) atandı. Şua izninden önceki iki gün nöbet '
+          'tutulmaz.',
     _ => '$name $target ($date) atandı.',
   };
 

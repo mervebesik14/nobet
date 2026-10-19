@@ -358,7 +358,9 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
                           'gününden bir önceki gündür (izin Pazartesi '
                           'başlıyorsa Perşembe). İzinden sonra ilk iş günü '
                           'nöbete girebilir.',
-                      LeaveType.radiation => 'Kişi iznin bittiği günden sonra nöbete girebilir.',
+                      LeaveType.radiation => 'İzin başlangıcından önceki iki gün nöbet '
+                          'tutulmaz. Kişi iznin bittiği günden sonra nöbete '
+                          'girebilir.',
                       LeaveType.sick => 'Kişi raporun bittiği günden sonra nöbete girebilir.',
                     }}',
           style: theme.textTheme.bodyMedium,

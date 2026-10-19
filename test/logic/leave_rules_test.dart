@@ -137,4 +137,55 @@ void main() {
       expect(inMonth(2027, 1, leave), {1, 2, 3, 9, 10});
     });
   });
+
+  group('şua izni öncesi', () {
+    test('başlangıçtan önceki iki takvim günü kapanır', () {
+      // 10–12 Ekim şua: 8 ve 9 kapalı (hafta sonu fark etmez).
+      expect(
+        LeaveRules.radiationBlockedDaysInMonth(
+          year: 2026,
+          month: 10,
+          radiationLeave: [
+            for (var d = 10; d <= 12; d++) DateTime(2026, 10, d),
+          ],
+        ),
+        {8, 9},
+      );
+    });
+
+    test('iki ayrı aralık; izin günleri kapalı sayılmaz', () {
+      // 5–6 ve 8–9: 3, 4 ve (8'in öncesi) 7 kapalı; 6 izin günü.
+      expect(
+        LeaveRules.radiationBlockedDaysInMonth(
+          year: 2026,
+          month: 10,
+          radiationLeave: [
+            for (final d in [5, 6, 8, 9]) DateTime(2026, 10, d),
+          ],
+        ),
+        {3, 4, 7},
+      );
+    });
+
+    test('ay sınırını aşar', () {
+      // 1 Kasım başlayan şua Ekim'in 30 ve 31'ini kapatır.
+      final leave = [DateTime(2026, 11, 1), DateTime(2026, 11, 2)];
+      expect(
+        LeaveRules.radiationBlockedDaysInMonth(
+          year: 2026,
+          month: 10,
+          radiationLeave: leave,
+        ),
+        {30, 31},
+      );
+      expect(
+        LeaveRules.radiationBlockedDaysInMonth(
+          year: 2026,
+          month: 11,
+          radiationLeave: leave,
+        ),
+        isEmpty,
+      );
+    });
+  });
 }

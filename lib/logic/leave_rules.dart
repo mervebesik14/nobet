@@ -17,6 +17,10 @@ import '../models/holiday.dart';
 /// başlayan izin Ekim'in son günlerini, 30 Ekim Cuma biten izin Kasım'ın ilk
 /// günlerini kapatabilir. Şua izni için bu kurallar uygulanmaz.
 ///
+/// **Şua izninden önce:** İzin başlangıcından önceki [radiationGapDays] (2)
+/// takvim gününde nöbet tutulmaz (hafta sonu / tatil fark etmez). Örneğin
+/// şua izni 10'unda başlıyorsa 8 ve 9'unda nöbet yazılmaz.
+///
 /// İş günü = hafta içi (Pazartesi–Cuma) ve tam gün resmi tatil olmayan gün.
 /// Arife (yarım gün tatil) iş günü sayılır.
 class LeaveRules {
@@ -111,6 +115,29 @@ class LeaveRules {
     holidays: holidays,
     before: false,
   );
+
+  /// Şua izninden önce nöbet tutulmayan gün sayısı.
+  static const radiationGapDays = 2;
+
+  /// [radiationLeave] şua izni tarihlerine (her aydan olabilir) göre,
+  /// [year]/[month] ayında izin başlangıcından önceki [radiationGapDays]
+  /// günden bu aya düşenler. İzin günlerinin kendisi dahil değildir.
+  static Set<int> radiationBlockedDaysInMonth({
+    required int year,
+    required int month,
+    required Iterable<DateTime> radiationLeave,
+  }) {
+    final leave = {for (final d in radiationLeave) _day(d)};
+    final blocked = <DateTime>{
+      for (final day in leave)
+        if (!leave.contains(_shift(day, -1)))
+          for (var i = 1; i <= radiationGapDays; i++) _shift(day, -i),
+    };
+    return {
+      for (final d in blocked.difference(leave))
+        if (d.year == year && d.month == month) d.day,
+    };
+  }
 
   /// Bayram + hafta sonu gibi uzun ardışık tatillerde bile yeter.
   static const _maxGap = 14;

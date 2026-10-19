@@ -312,7 +312,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   Future<void> _chooseDayShift(int day) async {
     final plan = _plan;
     final current = ref.read(dayShiftsProvider)[day]?.personId;
-    // Yıllık izin öncesi/sonrası kuralı yalnız 24 nöbeti kapatır, 7A'yı değil.
+    // İzin öncesi/sonrası kuralları yalnız 24 nöbeti kapatır, 7A'yı değil.
     final blocked = ref.read(blockReasonsProvider);
     final tail = ref.read(monthPlanProvider.notifier).previousMonthTail();
     bool onDuty(String id, int d) => d < 1
@@ -329,7 +329,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
               if (onDuty(p.id, day - 1)) 'nöbet ertesi',
               if (blocked[p.id]?[day] case final reason?
                   when reason != BlockReason.beforeAnnualLeave &&
-                      reason != BlockReason.afterAnnualLeave)
+                      reason != BlockReason.afterAnnualLeave &&
+                      reason != BlockReason.beforeRadiationLeave)
                 reason.label,
             ],
           ),

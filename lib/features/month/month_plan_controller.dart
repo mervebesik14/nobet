@@ -467,6 +467,18 @@ Map<String, Map<int, BlockReason>> computeBlockReasons(
     BlockReason.unavailable: plan.unavailableDays,
     BlockReason.beforeAnnualLeave: annualRule(before: true),
     BlockReason.afterAnnualLeave: annualRule(before: false),
+    BlockReason.beforeRadiationLeave: {
+      for (final id in {for (final p in plans) ...p.radiationLeave.keys})
+        id: LeaveRules.radiationBlockedDaysInMonth(
+          year: plan.year,
+          month: plan.month,
+          radiationLeave: [
+            for (final p in plans)
+              for (final d in p.leaveOf(id, LeaveType.radiation))
+                DateTime(p.year, p.month, d),
+          ],
+        ),
+    },
   });
 }
 
