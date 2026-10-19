@@ -7,6 +7,7 @@ import '../../logic/yearly_summary.dart';
 import '../holidays/holidays_controller.dart';
 import '../people/people_controller.dart';
 import 'monthly_comparison.dart';
+import 'past_roster_page.dart';
 import 'summary_table.dart';
 
 /// Kişi başı yıl toplamları (nöbet, hafta sonu, tatil, gün aşırı çift,
@@ -36,7 +37,24 @@ class _YearlySummaryPageState extends ConsumerState<YearlySummaryPage> {
     String fmt(num v) => SummaryTable.fmt(v);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Yıllık Özet')),
+      appBar: AppBar(
+        title: const Text('Yıllık Özet'),
+        actions: [
+          IconButton(
+            tooltip: 'Eski listeleri gir',
+            icon: const Icon(Icons.edit_calendar_outlined),
+            onPressed: () async {
+              await Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => PastRosterPage(initialYear: _year),
+                ),
+              );
+              // Girilen aylar özete yansısın.
+              if (mounted) setState(() {});
+            },
+          ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
@@ -60,7 +78,8 @@ class _YearlySummaryPageState extends ConsumerState<YearlySummaryPage> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
               summary.months.isEmpty
-                  ? 'Bu yıl için oluşturulmuş liste yok.'
+                  ? 'Bu yıl için oluşturulmuş liste yok. Eski listeleri '
+                        'girmek için üstteki takvim simgesine dokunun.'
                   : 'Dahil aylar: '
                         '${summary.months.map((m) => turkishMonthNames[m - 1]).join(', ')}',
               style: theme.textTheme.bodyMedium,

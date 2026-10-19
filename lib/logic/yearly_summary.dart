@@ -120,6 +120,8 @@ class YearlySummary {
         settings: settings,
         leaveDays: plan.leaveDays,
         dayShifts: dayShifts,
+        // Yalnız hemşire listesinde teknikerler o ay sayılmaz.
+        onlyRoles: plan.nurseOnly ? const {Role.nurse} : null,
       );
       for (final r in summary.people) {
         info[r.personId] = (r.name, r.role);

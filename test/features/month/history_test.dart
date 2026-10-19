@@ -211,7 +211,76 @@ void main() {
 
     await tester.tap(find.byTooltip('Önceki yıl'));
     await tester.pumpAndSettle();
-    expect(find.text('Bu yıl için oluşturulmuş liste yok.'), findsOneWidget);
+    expect(
+      find.textContaining('Bu yıl için oluşturulmuş liste yok.'),
+      findsOneWidget,
+    );
     expect(find.byType(DataTable), findsNothing);
+  });
+
+  testWidgets('eski listeler kişi kişi girilir; yıllık özete yansır', (
+    tester,
+  ) async {
+    await pumpMonthPage(tester);
+    await tester.tap(find.byTooltip('Yıllık Özet'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Eski listeleri gir'));
+    await tester.pumpAndSettle();
+
+    // Ocak 2026 açılır; yalnız hemşireler listelenir.
+    expect(find.text('Ocak 2026'), findsOneWidget);
+    expect(find.text('Tekniker 1'), findsNothing);
+    await tester.tap(find.text('Hemşire 1'));
+    await tester.pumpAndSettle();
+    for (final d in [3, 4, 10]) {
+      await tester.tap(find.byKey(ValueKey('past-day-$d')));
+      await tester.pumpAndSettle();
+    }
+    // Yanlış gün işaretlenip kaldırılır.
+    await tester.tap(find.byKey(const ValueKey('past-day-12')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('past-day-12')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Seçili: 3 gün'), findsOneWidget);
+
+    final jan = boxes.monthPlans.get('2026-01')!;
+    expect(jan.nurseOnly, isTrue);
+    expect(jan.hasRoster, isTrue);
+    expect(
+      {for (final a in jan.assignments.values) a.day: a.nurseIds},
+      {
+        3: ['n1'],
+        4: ['n1'],
+        10: ['n1'],
+      },
+    );
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('past-n1')),
+        matching: find.text('3 nöbet'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Hemşire girilmiş gün: 3 / 31'), findsOneWidget);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    // Yıllık özet Ocak'ı içerir; teknikerler bu ayda sayılmaz.
+    expect(find.text('Dahil aylar: Ocak'), findsOneWidget);
+    final table = tester.widget<DataTable>(find.byType(DataTable));
+    final n1 = table.rows.firstWhere(
+      (r) => (r.cells.first.child as Text).data == 'Hemşire 1',
+    );
+    expect((n1.cells[3].child as Text).data, '3'); // toplam nöbet
+    expect((n1.cells[4].child as Text).data, '3'); // 3, 4, 10 Ocak hafta sonu
+    expect(
+      table.rows.where(
+        (r) => (r.cells.first.child as Text).data == 'Tekniker 1',
+      ),
+      isEmpty,
+    );
   });
 }
