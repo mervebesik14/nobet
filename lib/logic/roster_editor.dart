@@ -128,4 +128,48 @@ class RosterEditor {
       secondary: secondaryB,
     );
   }
+
+  /// Serbest düzenleme: kişi [day] gününde nöbetçiyse çıkarır, değilse
+  /// ekler. Koltuk sınırı ve kurallar uygulanmaz (ihlaller uyarı olarak
+  /// görünür): hemşire dolu güne de eklenir. Teknikerde 24 koltuğu boşsa
+  /// oraya, değilse ([twoTechs] ise) 16B koltuğuna yazılır; ikisi de doluysa
+  /// [RosterEditException].
+  static Map<int, DayAssignment> toggle(
+    Map<int, DayAssignment> assignments, {
+    required int day,
+    required String personId,
+    required Role role,
+    bool twoTechs = false,
+  }) {
+    final current = assignments[day] ?? DayAssignment(day: day);
+    final DayAssignment updated;
+    if (current.includes(personId)) {
+      updated = current.nurseIds.contains(personId)
+          ? current.copyWith(
+              nurseIds: [
+                for (final id in current.nurseIds)
+                  if (id != personId) id,
+              ],
+            )
+          : current.techId == personId
+          ? current.copyWith(clearTech: true)
+          : current.copyWith(clearTech16b: true);
+    } else {
+      switch (role) {
+        case Role.nurse:
+          updated = current.copyWith(nurseIds: [...current.nurseIds, personId]);
+        case Role.radiologyTech:
+          if (current.techId == null) {
+            updated = current.copyWith(techId: personId);
+          } else if (twoTechs && current.tech16bId == null) {
+            updated = current.copyWith(tech16bId: personId);
+          } else {
+            throw const RosterEditException(
+              'O gün tekniker koltuğu dolu; önce birini çıkarın.',
+            );
+          }
+      }
+    }
+    return {...assignments, day: updated};
+  }
 }

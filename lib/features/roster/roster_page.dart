@@ -48,6 +48,9 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   /// "Kurallara göre düzelt" çalışıyor mu?
   bool _fixing = false;
 
+  /// Serbest düzenleme: dokununca doğrudan ekle / sil.
+  bool _freeEdit = false;
+
   MonthPlan get _plan => ref.read(monthPlanProvider);
 
   void _notify(String message) {
@@ -83,6 +86,29 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       requestedShifts: plan.requestedShifts,
       absentDays: plan.leaveDays,
     );
+  }
+
+  /// Serbest düzenleme: kişiyi o güne doğrudan ekler ya da siler.
+  Future<void> _toggleCell(RosterCell cell, Role role) async {
+    final plan = _plan;
+    final had = plan.assignments[cell.day]?.includes(cell.personId) ?? false;
+    try {
+      final result = RosterEditor.toggle(
+        plan.assignments,
+        day: cell.day,
+        personId: cell.personId,
+        role: role,
+        twoTechs: ref.read(effectiveSettingsProvider).techsPerDay >= 2,
+      );
+      await _apply(
+        result,
+        message:
+            '${_name(cell.personId)} ${formatDayMonth(cell.day, plan.month)} '
+            '${had ? 'nöbetinden çıkarıldı' : 'nöbetine yazıldı'}.',
+      );
+    } on RosterEditException catch (e) {
+      _notify(e.message);
+    }
   }
 
   /// Listeyi baştan kurmadan kural bozan nöbetleri en az değişiklikle
@@ -186,6 +212,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   Future<void> _onCellTap(RosterCell cell, Role role) async {
     if (_swapFrom != null) return _completeSwap(cell, role);
     if (!_ensureUnlocked()) return;
+    if (_freeEdit) return _toggleCell(cell, role);
 
     // 7A yazan hücre: 7A'yı başkasına vermek ya da 24 nöbete yazmak.
     final dayShift = ref.read(dayShiftsProvider)[cell.day];
@@ -906,11 +933,27 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             )
           else
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Text(
-                'Düzenlemek için hücreye dokunun ya da basılı tutun; basılı '
-                'tutunca takas da seçilebilir.',
-                style: theme.textTheme.bodySmall,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FilterChip(
+                    avatar: const Icon(Icons.touch_app_outlined, size: 18),
+                    label: const Text('Serbest düzenleme'),
+                    selected: _freeEdit,
+                    onSelected: (v) => setState(() => _freeEdit = v),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _freeEdit
+                        ? 'Serbest düzenleme açık: boş hücreye dokununca kişi '
+                              'o güne yazılır, nöbete dokununca silinir. Kurallar '
+                              'engellemez; ihlaller aşağıda uyarı olarak görünür.'
+                        : 'Düzenlemek için hücreye dokunun ya da basılı tutun; '
+                              'basılı tutunca takas da seçilebilir.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
               ),
             ),
           if (plan.generatedAt != null)

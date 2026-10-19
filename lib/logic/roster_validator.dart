@@ -38,6 +38,9 @@ enum ViolationKind {
 
   /// 5 günlük boşluklar rol grubunda herkese eşit sayıda düşmemiş.
   unevenFiveGaps,
+
+  /// Güne gerekenden fazla hemşire yazılmış (serbest düzenleme).
+  overStaffed,
 }
 
 /// Bir kural ihlali.
@@ -181,6 +184,19 @@ class RosterValidator {
             role: Role.nurse,
             message:
                 '${date(d)}: $missingNurses ${turkishLowerCase(Role.nurse.label)} eksik.',
+          ),
+        );
+      }
+      final extraNurses = a.nurseIds.length - settings.nursesPerDay;
+      if (extraNurses > 0) {
+        violations.add(
+          RuleViolation(
+            kind: ViolationKind.overStaffed,
+            days: [d],
+            role: Role.nurse,
+            message:
+                '${date(d)}: $extraNurses fazla '
+                '${turkishLowerCase(Role.nurse.label)} yazılı.',
           ),
         );
       }

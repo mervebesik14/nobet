@@ -422,4 +422,19 @@ void main() {
       isEmpty,
     );
   });
+
+  test('güne fazla hemşire yazılınca uyarı', () {
+    final v = validator.validate(
+      year: 2027,
+      month: 2,
+      assignments: {
+        ...base(),
+        1: const DayAssignment(day: 1, nurseIds: ['a', 'b', 'c'], techId: 'm'),
+      },
+      people: people,
+    );
+    final over = v.where((x) => x.kind == ViolationKind.overStaffed).single;
+    expect(over.days, [1]);
+    expect(over.message, '1 Şubat: 1 fazla hemşire yazılı.');
+  });
 }

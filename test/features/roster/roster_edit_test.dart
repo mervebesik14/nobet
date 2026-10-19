@@ -567,4 +567,33 @@ void main() {
     await tester.pumpAndSettle();
     expect(saved().assignments, _rotation());
   });
+
+  testWidgets('serbest düzenleme: dokununca ekler / siler, kural engellemez', (
+    tester,
+  ) async {
+    await pumpRoster(tester);
+    await tester.tap(find.text('Serbest düzenleme'));
+    await tester.pumpAndSettle();
+
+    // 3 Ekim dolu (Gül, Ayşe); Hale üçüncü hemşire olarak eklenir.
+    await tester.tap(cell('n7', 3));
+    await tester.pumpAndSettle();
+    expect(sheet(), findsNothing);
+    expect(saved().assignments[3]!.nurseIds, ['n6', 'n0', 'n7']);
+    expect(find.text('Hale 3 Ekim nöbetine yazıldı.'), findsOneWidget);
+    expect(find.text('• 3 Ekim: 1 fazla hemşire yazılı.'), findsOneWidget);
+
+    // Ayşe'nin nöbetine dokununca silinir.
+    await tester.tap(cell('n0', 3));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.nurseIds, ['n6', 'n7']);
+    expect(find.text('Ayşe 3 Ekim nöbetinden çıkarıldı.'), findsOneWidget);
+
+    // Kapatınca dokunma yine seçenekleri açar.
+    await tester.tap(find.text('Serbest düzenleme'));
+    await tester.pumpAndSettle();
+    await tester.tap(cell('n0', 3));
+    await tester.pumpAndSettle();
+    expect(sheet(), findsOneWidget);
+  });
 }

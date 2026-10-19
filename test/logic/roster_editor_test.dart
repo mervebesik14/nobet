@@ -157,4 +157,75 @@ void main() {
       );
     });
   });
+
+  group('toggle (serbest düzenleme)', () {
+    const base = {
+      3: DayAssignment(day: 3, nurseIds: ['a', 'b'], techId: 't'),
+    };
+
+    test('dolu güne üçüncü hemşire eklenir, tekrar dokununca çıkar', () {
+      final added = RosterEditor.toggle(
+        base,
+        day: 3,
+        personId: 'c',
+        role: Role.nurse,
+      );
+      expect(added[3]!.nurseIds, ['a', 'b', 'c']);
+      final removed = RosterEditor.toggle(
+        added,
+        day: 3,
+        personId: 'a',
+        role: Role.nurse,
+      );
+      expect(removed[3]!.nurseIds, ['b', 'c']);
+      // Kayıt olmayan güne de eklenir.
+      expect(
+        RosterEditor.toggle(
+          base,
+          day: 9,
+          personId: 'a',
+          role: Role.nurse,
+        )[9]!.nurseIds,
+        ['a'],
+      );
+    });
+
+    test('tekniker: boş 24, sonra 16B; ikisi doluysa hata; çıkarma', () {
+      final second = RosterEditor.toggle(
+        base,
+        day: 3,
+        personId: 'u',
+        role: Role.radiologyTech,
+        twoTechs: true,
+      );
+      expect(second[3]!.tech16bId, 'u');
+      expect(
+        () => RosterEditor.toggle(
+          second,
+          day: 3,
+          personId: 'v',
+          role: Role.radiologyTech,
+          twoTechs: true,
+        ),
+        throwsA(isA<RosterEditException>()),
+      );
+      expect(
+        () => RosterEditor.toggle(
+          base,
+          day: 3,
+          personId: 'v',
+          role: Role.radiologyTech,
+        ),
+        throwsA(isA<RosterEditException>()),
+      );
+      final removed = RosterEditor.toggle(
+        second,
+        day: 3,
+        personId: 't',
+        role: Role.radiologyTech,
+      );
+      expect(removed[3]!.techId, isNull);
+      expect(removed[3]!.tech16bId, 'u');
+    });
+  });
 }
