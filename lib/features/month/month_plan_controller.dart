@@ -10,6 +10,7 @@ import '../../logic/block_reason.dart';
 import '../../logic/day_shift_planner.dart';
 import '../../logic/feasibility_checker.dart';
 import '../../logic/leave_rules.dart';
+import '../../logic/roster_diff.dart';
 import '../../logic/roster_generator.dart';
 import '../../logic/roster_validator.dart';
 import '../../logic/yearly_summary.dart';
@@ -252,11 +253,12 @@ class MonthPlanController extends Notifier<MonthPlan> {
   }
 
   /// Oluşturulmuş nöbet listesini sıfırlar (atamalar, tohum, oluşturma anı
-  /// silinir); izinler korunur. Kilitli ayda sıfırlanmaz ve false döner. [clearRequests] true ise kişi
-  /// istekleri (istenmeyen günler, istenen nöbet günleri, fazla mesai) de
-  /// silinir.
+  /// silinir); izinler korunur. [clearRequests] true ise kişi istekleri
+  /// (istenmeyen günler, istenen nöbet günleri, fazla mesai) de silinir.
+  /// Kilitli ayda sıfırlanmaz ve false döner. Geçmişten geri alınabilir.
   Future<bool> resetRoster({bool clearRequests = false}) async {
     if (state.isLocked) return false;
+    final before = state;
     state = MonthPlan(
       year: state.year,
       month: state.month,
@@ -269,6 +271,9 @@ class MonthPlanController extends Notifier<MonthPlan> {
       nurseOnly: state.nurseOnly,
     );
     await ref.read(monthPlanRepositoryProvider).save(state);
+    if (before.hasRoster) {
+      await _record('Liste sıfırlandı', before, details: false);
+    }
     return true;
   }
 
@@ -306,6 +311,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       ).byId,
     );
     final result = await ref.read(rosterRunnerProvider)(generator);
+    final before = state;
     state = state.copyWith(
       assignments: result.assignments,
       // Yeni listede eski 7A seçimleri ve nöbet devirleri geçersiz olur.
@@ -316,7 +322,79 @@ class MonthPlanController extends Notifier<MonthPlan> {
       nurseOnly: onlyNurses,
     );
     await ref.read(monthPlanRepositoryProvider).save(state);
+    await _record(
+      before.hasRoster ? 'Liste yeniden oluşturuldu' : 'Liste oluşturuldu',
+      before,
+      details: false,
+    );
     return result;
+  }
+
+  /// Değişikliği geçmişe yazar: [before] geri alma için saklanır. [details]
+  /// ise satır satır fark eklenir; fark yoksa kayıt yapılmaz.
+  Future<void> _record(
+    String title,
+    MonthPlan before, {
+    bool details = true,
+  }) async {
+    final names = {for (final p in ref.read(peopleProvider)) p.id: p.name};
+    final lines = details
+        ? RosterDiff.describe(
+            month: state.month,
+            before: before.assignments,
+            after: state.assignments,
+            overridesBefore: before.dayShiftOverrides,
+            overridesAfter: state.dayShiftOverrides,
+            name: (id) => names[id] ?? 'Silinmiş kişi',
+          )
+        : const <String>[];
+    if (details && lines.isEmpty) return;
+    await ref
+        .read(rosterHistoryRepositoryProvider)
+        .add(
+          state.year,
+          state.month,
+          RosterEdit(
+            at: DateTime.now(),
+            title: title,
+            lines: lines,
+            before: before.assignments,
+            beforeOverrides: before.dayShiftOverrides,
+            beforeGeneratedAt: before.generatedAt,
+            beforeSeed: before.seed,
+          ),
+        );
+    ref.read(rosterHistoryVersionProvider.notifier).bump();
+  }
+
+  /// Geçmişteki [index]. kaydı ve sonrasındakileri geri alır: liste o
+  /// değişiklikten önceki hâline döner. Kilitli ayda false.
+  Future<bool> undoTo(int index) async {
+    if (state.isLocked) return false;
+    final history = ref.read(rosterHistoryRepositoryProvider);
+    final edits = history.load(state.year, state.month);
+    if (index < 0 || index >= edits.length) return false;
+    final edit = edits[index];
+    state = state.copyWith(
+      assignments: edit.before,
+      dayShiftOverrides: edit.beforeOverrides,
+      generatedAt: edit.beforeGeneratedAt,
+      seed: edit.beforeSeed,
+      clearGenerated: edit.before.isEmpty,
+    );
+    await ref.read(monthPlanRepositoryProvider).save(state);
+    await history.truncate(state.year, state.month, index);
+    ref.read(rosterHistoryVersionProvider.notifier).bump();
+    return true;
+  }
+
+  /// En son değişikliği geri alır.
+  Future<bool> undoLast() async {
+    final count = ref
+        .read(rosterHistoryRepositoryProvider)
+        .load(state.year, state.month)
+        .length;
+    return count > 0 && await undoTo(count - 1);
   }
 
   /// [day] gününün 7A'sını elle [personId]'ye verir; null ise otomatik
@@ -329,17 +407,24 @@ class MonthPlanController extends Notifier<MonthPlan> {
     } else {
       overrides[day] = personId;
     }
+    final before = state;
     state = state.copyWith(dayShiftOverrides: overrides);
     await ref.read(monthPlanRepositoryProvider).save(state);
+    await _record('7A değişikliği', before);
     return true;
   }
 
   /// Elle düzenlenmiş atamaları kaydeder. Kilitli ayda değişiklik
   /// yapılmaz ve false döner.
-  Future<bool> setAssignments(Map<int, DayAssignment> assignments) async {
+  Future<bool> setAssignments(
+    Map<int, DayAssignment> assignments, {
+    String title = 'Elle değişiklik',
+  }) async {
     if (state.isLocked) return false;
+    final before = state;
     state = state.copyWith(assignments: assignments);
     await ref.read(monthPlanRepositoryProvider).save(state);
+    await _record(title, before);
     return true;
   }
 
@@ -527,6 +612,26 @@ final dayShiftsProvider = Provider<Map<int, DayShift>>((ref) {
     previousMonthLastDay: tail.isEmpty ? const {} : tail.last,
     overrides: plan.dayShiftOverrides,
   );
+});
+
+/// Geçmiş kutusu her yazıldığında artar; [rosterHistoryProvider] yeniden
+/// okunur. (Plan denetleyicisi geçmiş sağlayıcısını doğrudan yenileyemez:
+/// geçmiş plana bağlıdır.)
+class RosterHistoryVersion extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state++;
+}
+
+final rosterHistoryVersionProvider =
+    NotifierProvider<RosterHistoryVersion, int>(RosterHistoryVersion.new);
+
+/// Seçili ayın liste değişiklik geçmişi, eskiden yeniye.
+final rosterHistoryProvider = Provider<List<RosterEdit>>((ref) {
+  ref.watch(rosterHistoryVersionProvider);
+  final plan = ref.watch(monthPlanProvider);
+  return ref.watch(rosterHistoryRepositoryProvider).load(plan.year, plan.month);
 });
 
 /// Seçili ayın kapalı günleri ve nedenleri.

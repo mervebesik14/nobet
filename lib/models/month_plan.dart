@@ -237,15 +237,16 @@ class MonthPlan {
     Map<String, List<int>>? requestedShifts,
     Map<int, String>? dayShiftOverrides,
     Map<String, String>? handovers,
+    bool clearGenerated = false,
   }) {
     return MonthPlan(
       year: year,
       month: month,
       unavailableDays: unavailableDays ?? this.unavailableDays,
       assignments: assignments ?? this.assignments,
-      generatedAt: generatedAt ?? this.generatedAt,
+      generatedAt: clearGenerated ? null : (generatedAt ?? this.generatedAt),
       isLocked: isLocked ?? this.isLocked,
-      seed: seed ?? this.seed,
+      seed: clearGenerated ? null : (seed ?? this.seed),
       nurseOnly: nurseOnly ?? this.nurseOnly,
       overtimeRequests: overtimeRequests ?? this.overtimeRequests,
       annualLeave: annualLeave ?? this.annualLeave,

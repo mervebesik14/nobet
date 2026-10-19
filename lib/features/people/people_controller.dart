@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/providers.dart';
 import '../../logic/roster_generator.dart';
+import '../../logic/roster_diff.dart';
 import '../../logic/roster_repair.dart';
 import '../../logic/turkish_collation.dart';
 import '../../models/models.dart';
@@ -196,6 +197,11 @@ class PeopleController extends Notifier<List<Person>> {
         overtimeRequests: plan.overtimeRequests,
         requestedShifts: plan.requestedShifts,
       );
+      await _recordHistory(
+        plan,
+        result.assignments,
+        '${person.name} pasife alındı',
+      );
       // Kime devredildiği, dönem kısalırsa geri vermek için saklanır.
       await plans.save(
         plan.copyWith(
@@ -249,6 +255,39 @@ class PeopleController extends Notifier<List<Person>> {
     return const DeactivationReport().withRestore(restored, failed);
   }
 
+  /// Pasife alma / geri vermenin listede yaptığı değişikliği o ayın
+  /// geçmişine yazar (geri alınabilsin diye). Fark yoksa yazmaz.
+  Future<void> _recordHistory(
+    MonthPlan plan,
+    Map<int, DayAssignment> after,
+    String title,
+  ) async {
+    final names = {for (final p in state) p.id: p.name};
+    final lines = RosterDiff.describe(
+      month: plan.month,
+      before: plan.assignments,
+      after: after,
+      name: (id) => names[id] ?? 'Silinmiş kişi',
+    );
+    if (lines.isEmpty) return;
+    await ref
+        .read(rosterHistoryRepositoryProvider)
+        .add(
+          plan.year,
+          plan.month,
+          RosterEdit(
+            at: DateTime.now(),
+            title: title,
+            lines: lines,
+            before: plan.assignments,
+            beforeOverrides: plan.dayShiftOverrides,
+            beforeGeneratedAt: plan.generatedAt,
+            beforeSeed: plan.seed,
+          ),
+        );
+    ref.read(rosterHistoryVersionProvider.notifier).bump();
+  }
+
   /// Kişinin [shouldRestore] günlerindeki devredilmiş nöbetlerini, kurala
   /// uyuyorsa geri verir; işlenen devir kayıtları silinir. (geri verilen,
   /// verilemeyen) sayılarını döndürür.
@@ -290,6 +329,11 @@ class PeopleController extends Notifier<List<Person>> {
         previousMonthTail: previousMonthTailOf(plans, plan),
         overtimeRequests: plan.overtimeRequests,
         requestedShifts: plan.requestedShifts,
+      );
+      await _recordHistory(
+        plan,
+        result.assignments,
+        '${person.name} nöbetlerini geri aldı',
       );
       await plans.save(
         plan.copyWith(

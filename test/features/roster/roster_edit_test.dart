@@ -449,4 +449,89 @@ void main() {
     expect((hale.cells[2].child as Text).data, '1'); // toplam nöbet
     expect((hale.cells[7].child as Text).data, '24'); // çalışılan saat
   });
+
+  group('değişiklik geçmişi', () {
+    testWidgets('bildirimdeki "Geri al" son değişikliği geri alır', (
+      tester,
+    ) async {
+      await pumpRoster(tester);
+      await tester.tap(cell('n0', 3));
+      await tester.pumpAndSettle();
+      await tester.tap(inSheet('Hale'));
+      await tester.pumpAndSettle();
+      expect(saved().assignments[3]!.nurseIds, ['n6', 'n7']);
+      expect(find.text('Değişiklik kaydedildi.'), findsOneWidget);
+
+      await tester.tap(find.text('Geri al'));
+      await tester.pumpAndSettle();
+      expect(saved().assignments, _rotation());
+      expect(boxes.history.get('2026-10'), isNull);
+    });
+
+    testWidgets('geçmiş ekranı kayıtları gösterir; eskisine dönülür', (
+      tester,
+    ) async {
+      await pumpRoster(tester);
+      // 1) Ayşe yerine Hale (3 Ekim), 2) Banu'nun 4 Ekim nöbeti kaldırılır.
+      await tester.tap(cell('n0', 3));
+      await tester.pumpAndSettle();
+      await tester.tap(inSheet('Hale'));
+      await tester.pumpAndSettle();
+      await tester.tap(cell('n1', 4));
+      await tester.pumpAndSettle();
+      await tester.tap(inSheet('Nöbeti kaldır'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Değişiklik geçmişi'));
+      await tester.pumpAndSettle();
+      expect(find.text('• 3 Ekim: Ayşe yerine Hale'), findsOneWidget);
+      expect(find.text('• 4 Ekim: Banu çıkarıldı'), findsOneWidget);
+      // En yeni üstte.
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey('edit-1'))).dy,
+        lessThan(tester.getTopLeft(find.byKey(const ValueKey('edit-0'))).dy),
+      );
+
+      // İlk değişikliğe kadar geri: ikisi de geri alınır.
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const ValueKey('edit-0')),
+          matching: find.text('Geri al'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('sonraki 1 değişiklik'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, 'Geri al'));
+      await tester.pumpAndSettle();
+
+      expect(saved().assignments, _rotation());
+      expect(find.text('Bu ay için değişiklik kaydı yok.'), findsOneWidget);
+    });
+
+    testWidgets('kilitli ayda geri alınamaz', (tester) async {
+      await pumpRoster(tester);
+      await tester.tap(cell('n0', 3));
+      await tester.pumpAndSettle();
+      await tester.tap(inSheet('Hale'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Kilitle'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Değişiklik geçmişi'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Liste kilitli'), findsOneWidget);
+      final button = tester.widget<TextButton>(
+        find
+            .ancestor(
+              of: find.descendant(
+                of: find.byKey(const ValueKey('edit-0')),
+                matching: find.text('Geri al'),
+              ),
+              matching: find.byWidgetPredicate((w) => w is TextButton),
+            )
+            .first,
+      );
+      expect(button.onPressed, isNull);
+    });
+  });
 }

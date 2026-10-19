@@ -7,6 +7,7 @@ import 'hive_boxes.dart';
 import 'holiday_repository.dart';
 import 'month_plan_repository.dart';
 import 'people_repository.dart';
+import 'roster_history_repository.dart';
 import 'settings_repository.dart';
 
 /// Açılmış Hive kutuları. `main.dart` içinde [HiveBoxes.open] sonucu ile
@@ -28,6 +29,10 @@ final holidayRepositoryProvider = Provider<HolidayRepository>((ref) {
 
 final monthPlanRepositoryProvider = Provider<MonthPlanRepository>(
   (ref) => MonthPlanRepository(ref.watch(hiveBoxesProvider).monthPlans),
+);
+
+final rosterHistoryRepositoryProvider = Provider<RosterHistoryRepository>(
+  (ref) => RosterHistoryRepository(ref.watch(hiveBoxesProvider).history),
 );
 
 final settingsRepositoryProvider = Provider<SettingsRepository>(

@@ -4,3 +4,4 @@ export 'month_plan.dart';
 export 'person.dart';
 export 'role.dart';
 export 'roster_settings.dart';
+export 'roster_edit.dart';

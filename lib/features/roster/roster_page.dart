@@ -22,6 +22,7 @@ import '../../shared/platform_services.dart';
 import '../../shared/providers.dart';
 import 'edit_sheet.dart';
 import 'personal_roster_pdf.dart';
+import 'roster_history_page.dart';
 import 'roster_pdf.dart';
 import 'roster_flow.dart';
 import 'roster_table.dart';
@@ -112,9 +113,26 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     return false;
   }
 
-  Future<void> _apply(Map<int, DayAssignment>? result) async {
+  /// Düzenlemeyi kaydeder ve "Geri al" seçenekli bildirim gösterir.
+  Future<void> _apply(
+    Map<int, DayAssignment>? result, {
+    String message = 'Değişiklik kaydedildi.',
+  }) async {
     if (result == null) return;
-    await ref.read(monthPlanProvider.notifier).setAssignments(result);
+    final controller = ref.read(monthPlanProvider.notifier);
+    await controller.setAssignments(result);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          action: SnackBarAction(
+            label: 'Geri al',
+            onPressed: () => controller.undoLast(),
+          ),
+        ),
+      );
   }
 
   /// Aynı roldeki aktif kişiler, Türkçe ada göre.
@@ -528,11 +546,12 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         nursesPerDay: ref.read(effectiveSettingsProvider).nursesPerDay,
       );
       setState(() => _swapFrom = null);
-      await _apply(result);
-      _notify(
-        '${_name(from.personId)} ${formatDayMonth(from.day, plan.month)} ↔ '
-        '${_name(cell.personId)} ${formatDayMonth(cell.day, plan.month)} '
-        'takas edildi.',
+      await _apply(
+        result,
+        message:
+            '${_name(from.personId)} ${formatDayMonth(from.day, plan.month)} ↔ '
+            '${_name(cell.personId)} ${formatDayMonth(cell.day, plan.month)} '
+            'takas edildi.',
       );
     } on RosterEditException catch (e) {
       _notify('Takas yapılamaz: ${e.message}');
@@ -800,6 +819,18 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 ),
               ),
             ],
+          ),
+          IconButton(
+            tooltip: 'Değişiklik geçmişi',
+            icon: const Icon(Icons.history),
+            onPressed: () {
+              setState(() => _swapFrom = null);
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const RosterHistoryPage(),
+                ),
+              );
+            },
           ),
           IconButton(
             tooltip: 'Listeyi sıfırla',

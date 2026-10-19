@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive_ce.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:nobet_listesi/data/hive_boxes.dart';
+import 'package:nobet_listesi/data/roster_history_repository.dart';
 import 'package:nobet_listesi/data/holiday_repository.dart';
 import 'package:nobet_listesi/features/month/month_page.dart';
 import 'package:nobet_listesi/features/month/month_plan_controller.dart';
@@ -545,6 +546,38 @@ void main() {
     expect(plan.wantsOvertime('t1'), isTrue);
     // Ay Planı'na dönülür.
     expect(find.text('Listeyi Oluştur'), findsOneWidget);
+  });
+
+  testWidgets('sıfırlanan liste geçmişten geri alınır', (tester) async {
+    await pumpMonthPage(tester);
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
+    final generated = saved().assignments;
+    final seed = saved().seed;
+
+    await tester.tap(find.byTooltip('Listeyi sıfırla'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Sıfırla'));
+    await tester.pumpAndSettle();
+    expect(saved().hasRoster, isFalse);
+
+    final history = RosterHistoryRepository(boxes.history).load(2026, 10);
+    expect(
+      [for (final e in history) e.title],
+      ['Liste oluşturuldu', 'Liste sıfırlandı'],
+    );
+
+    // Sıfırlamadan önceki liste geri gelir.
+    final container = ProviderScope.containerOf(
+      tester.element(find.text('Listeyi Oluştur')),
+    );
+    await container.read(monthPlanProvider.notifier).undoLast();
+    await tester.pumpAndSettle();
+    expect(saved().assignments, generated);
+    expect(saved().seed, seed);
+    expect(saved().generatedAt, isNotNull);
   });
 
   testWidgets('Listeyi sıfırla: istenirse kişi istekleri de silinir', (
