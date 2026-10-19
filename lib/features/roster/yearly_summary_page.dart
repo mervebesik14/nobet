@@ -6,10 +6,11 @@ import '../../logic/turkish_dates.dart';
 import '../../logic/yearly_summary.dart';
 import '../holidays/holidays_controller.dart';
 import '../people/people_controller.dart';
+import 'monthly_comparison.dart';
 import 'summary_table.dart';
 
-/// Kişi başı yıl toplamları: nöbet, hafta sonu nöbeti, gün aşırı çift,
-/// çalışılan saat ve fazla mesai.
+/// Kişi başı yıl toplamları (nöbet, hafta sonu, tatil, gün aşırı çift,
+/// çalışılan saat, fazla mesai) ve aylara göre karşılaştırma tablosu.
 class YearlySummaryPage extends ConsumerStatefulWidget {
   const YearlySummaryPage({super.key, required this.initialYear});
 
@@ -102,6 +103,7 @@ class _YearlySummaryPageState extends ConsumerState<YearlySummaryPage> {
                 ],
               ),
             ),
+          if (summary.rows.isNotEmpty) MonthlyComparison(summary: summary),
         ],
       ),
     );

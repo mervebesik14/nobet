@@ -183,6 +183,32 @@ void main() {
     expect(cell(n1, 6), '0'); // dini bayram nöbeti
     expect(cell(n1, 8), '${(15 + n1October) * 24}'); // çalışılan saat
 
+    // Aylara göre karşılaştırma: Eylül ve Ekim sütunları, ölçü değişir.
+    expect(find.text('Aylara göre'), findsOneWidget);
+    final sepCell = find.byKey(const ValueKey('cmp-n1-9'));
+    await tester.ensureVisible(sepCell);
+    expect(
+      find.descendant(of: sepCell, matching: find.text('15')),
+      findsOneWidget,
+    );
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Hafta sonu'));
+    await tester.pumpAndSettle();
+    final n1SepWeekend = _september().assignments.values
+        .where(
+          (a) =>
+              a.nurseIds.contains('n1') &&
+              {5, 6, 12, 13, 19, 20, 26, 27}.contains(a.day),
+        )
+        .length;
+    expect(
+      find.descendant(of: sepCell, matching: find.text('$n1SepWeekend')),
+      findsOneWidget,
+    );
+    // Dokununca ayrıntı.
+    await tester.tap(sepCell);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Hemşire 1 · Eyl'), findsOneWidget);
+
     await tester.tap(find.byTooltip('Önceki yıl'));
     await tester.pumpAndSettle();
     expect(find.text('Bu yıl için oluşturulmuş liste yok.'), findsOneWidget);

@@ -6,6 +6,7 @@ class PersonTotals {
     this.nationalHolidayShifts = 0,
     this.religiousHolidayShifts = 0,
     this.everyOtherDayPairs = 0,
+    this.longGaps = 0,
     this.workedHours = 0,
     this.requiredHours = 0,
     this.overtimeHours = 0,
@@ -21,6 +22,9 @@ class PersonTotals {
   /// Tam gün dini bayram (Ramazan / Kurban) nöbetleri.
   final int religiousHolidayShifts;
   final int everyOtherDayPairs;
+
+  /// Nöbetler arası 4–5 günlük boşluk sayısı.
+  final int longGaps;
   final double workedHours;
   final double requiredHours;
 
@@ -36,6 +40,7 @@ class PersonTotals {
     nationalHolidayShifts: nationalHolidayShifts + o.nationalHolidayShifts,
     religiousHolidayShifts: religiousHolidayShifts + o.religiousHolidayShifts,
     everyOtherDayPairs: everyOtherDayPairs + o.everyOtherDayPairs,
+    longGaps: longGaps + o.longGaps,
     workedHours: workedHours + o.workedHours,
     requiredHours: requiredHours + o.requiredHours,
     overtimeHours: overtimeHours + o.overtimeHours,

@@ -90,4 +90,24 @@ void main() {
   test('satır sırası: rol, sonra Türkçe ad', () {
     expect(build().rows.map((r) => r.name), ['Ayşe', 'Zeynep', 'Ali']);
   });
+
+  test('aylık kırılım ve rol ortalamasından fark', () {
+    final s = build();
+    final ayse = s.rows.firstWhere((r) => r.personId == 'b');
+    final zeynep = s.rows.firstWhere((r) => r.personId == 'a');
+    // Eylül: Ayşe 3, Zeynep 1 → ortalama 2. Ekim: Ayşe 2, Zeynep 1.
+    expect(ayse.byMonth.keys, [9, 10]);
+    expect(ayse.byMonth[9]!.shifts, 3);
+    expect(zeynep.byMonth[10]!.shifts, 1);
+    expect(s.deviation(ayse, 9, (t) => t.shifts), 1);
+    expect(s.deviation(zeynep, 9, (t) => t.shifts), -1);
+    expect(s.deviation(ayse, 10, (t) => t.shifts), 0.5);
+    // Tek tekniker: farkı 0.
+    final ali = s.rows.firstWhere((r) => r.personId == 't');
+    expect(s.deviation(ali, 9, (t) => t.shifts), 0);
+    // Kaydı olmayan ay.
+    expect(s.deviation(ayse, 11, (t) => t.shifts), isNull);
+    // Toplam = ayların toplamı.
+    expect(ayse.totals.shifts, 5);
+  });
 }

@@ -15,12 +15,20 @@ class YearlyRow {
     required this.name,
     required this.role,
     required this.totals,
+    this.byMonth = const {},
+    this.isChargeNurse = false,
   });
 
   final String personId;
   final String name;
   final Role role;
   final PersonTotals totals;
+
+  /// Ay (1..12) → o ayın toplamları; yalnız listesi olan aylar.
+  final Map<int, PersonTotals> byMonth;
+
+  /// Sorumlu hemşire rol ortalamalarına girmez.
+  final bool isChargeNurse;
 }
 
 /// Kayıtlı ay listelerini kişi başı toplar: yıllık özet ekranı ve
@@ -37,6 +45,22 @@ class YearlySummary {
   Map<String, PersonTotals> get byId => {
     for (final r in rows) r.personId: r.totals,
   };
+
+  /// [row] kişisinin [month] ayındaki değerinin, aynı roldeki kişilerin o
+  /// ayki ortalamasından farkı (sorumlu hemşire ortalamaya girmez). Kişinin
+  /// o ay kaydı yoksa null.
+  double? deviation(YearlyRow row, int month, num Function(PersonTotals) pick) {
+    final own = row.byMonth[month];
+    if (own == null) return null;
+    final group = [
+      for (final r in rows)
+        if (r.role == row.role && !r.isChargeNurse)
+          if (r.byMonth[month] case final t?) pick(t),
+    ];
+    if (group.isEmpty) return 0;
+    final mean = group.fold<num>(0, (a, b) => a + b) / group.length;
+    return pick(own) - mean;
+  }
 
   /// [year] yılının listesi oluşturulmuş aylarını toplar. [beforeMonth]
   /// verilirse yalnızca ondan önceki aylar (yeni ay oluşturulurken yıl içi
@@ -62,7 +86,9 @@ class YearlySummary {
 
     final byKey = {for (final p in plans) p.key: p};
     final totals = <String, PersonTotals>{};
+    final monthly = <String, Map<int, PersonTotals>>{};
     final info = <String, (String, Role)>{};
+    final charge = <String>{};
     for (final plan in selected) {
       final monthHolidays = holidays.where(
         (h) => h.date.year == plan.year && h.date.month == plan.month,
@@ -97,19 +123,22 @@ class YearlySummary {
       );
       for (final r in summary.people) {
         info[r.personId] = (r.name, r.role);
+        if (r.isChargeNurse) charge.add(r.personId);
+        final month = PersonTotals(
+          shifts: r.shifts,
+          weekendShifts: r.weekendShifts,
+          nationalHolidayShifts: r.nationalHolidayShifts,
+          religiousHolidayShifts: r.religiousHolidayShifts,
+          everyOtherDayPairs: r.everyOtherDayPairs,
+          longGaps: r.longGaps,
+          workedHours: r.workedHours,
+          requiredHours: r.requiredHours,
+          overtimeHours: r.overtimeHours,
+          months: 1,
+        );
+        (monthly[r.personId] ??= {})[plan.month] = month;
         totals[r.personId] =
-            (totals[r.personId] ?? const PersonTotals()) +
-            PersonTotals(
-              shifts: r.shifts,
-              weekendShifts: r.weekendShifts,
-              nationalHolidayShifts: r.nationalHolidayShifts,
-              religiousHolidayShifts: r.religiousHolidayShifts,
-              everyOtherDayPairs: r.everyOtherDayPairs,
-              workedHours: r.workedHours,
-              requiredHours: r.requiredHours,
-              overtimeHours: r.overtimeHours,
-              months: 1,
-            );
+            (totals[r.personId] ?? const PersonTotals()) + month;
       }
     }
 
@@ -121,6 +150,8 @@ class YearlySummary {
               name: info[e.key]!.$1,
               role: info[e.key]!.$2,
               totals: e.value,
+              byMonth: monthly[e.key] ?? const {},
+              isChargeNurse: charge.contains(e.key),
             ),
         ]..sort((a, b) {
           final r = a.role.index.compareTo(b.role.index);
