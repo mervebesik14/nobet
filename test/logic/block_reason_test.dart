@@ -44,4 +44,12 @@ void main() {
       contains('ilk iş gününde'),
     );
   });
+
+  test('şua izni dönüşü mesajı', () {
+    expect(
+      BlockReason.afterRadiationLeave.message('Ali', '10 Ekim'),
+      'Ali şua izni dönüşü ilk iş gününden önceki güne (10 Ekim) atandı. '
+      'Şua izninden sonra ilk nöbet ilk iş gününde olabilir.',
+    );
+  });
 }

@@ -9,7 +9,7 @@
 - Toplam nöbet, hafta sonu nöbeti ve gün aşırı çift sayısı rol grubu içinde eşit dağıtılır (fark ≤ 1 hedef). Öncelik adalet.
 - Hafta sonu = Cumartesi + Pazar (+ resmi tatiller, ayarla).
 - Tam gün resmi (ulusal) tatil ve dini bayram (Ramazan/Kurban) nöbetleri ayrı ayrı sayılır ve dengelenir (ay içinde fark ≤ 1 hedef, yıl içinde az tutana öncelik).
-- Şua izninden önceki 2 takvim gününde nöbet tutulmaz (ay sınırını aşar).
+- Şua izninden önceki 2 takvim gününde nöbet tutulmaz; şua dönüşü yıllık izin gibi ilk iş gününde nöbete başlanır (ay sınırını aşar).
 - Gereken saat = ayın resmi tatil olmayan hafta içi günleri × 7; arife (yarım gün tatil) = 5 saat (ayarlanabilir).
 - Çalışılan saat = nöbet × 24; fazla mesai = max(0, çalışılan − gereken).
 - Liste sonunda kişi başı: toplam nöbet, hafta sonu nöbet, çalışılan saat, gereken saat, fazla mesai.

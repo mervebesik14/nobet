@@ -457,6 +457,13 @@ Map<String, Map<int, BlockReason>> computeBlockReasons(
       ),
   };
 
+  final radiationIds = {for (final p in plans) ...p.radiationLeave.keys};
+  List<DateTime> radiationDates(String id) => [
+    for (final p in plans)
+      for (final d in p.leaveOf(id, LeaveType.radiation))
+        DateTime(p.year, p.month, d),
+  ];
+
   return BlockReason.combine({
     BlockReason.annualLeave: plan.leaveMap(LeaveType.annual),
     BlockReason.radiationLeave: plan.leaveMap(LeaveType.radiation),
@@ -468,15 +475,22 @@ Map<String, Map<int, BlockReason>> computeBlockReasons(
     BlockReason.beforeAnnualLeave: annualRule(before: true),
     BlockReason.afterAnnualLeave: annualRule(before: false),
     BlockReason.beforeRadiationLeave: {
-      for (final id in {for (final p in plans) ...p.radiationLeave.keys})
+      for (final id in radiationIds)
         id: LeaveRules.radiationBlockedDaysInMonth(
           year: plan.year,
           month: plan.month,
-          radiationLeave: [
-            for (final p in plans)
-              for (final d in p.leaveOf(id, LeaveType.radiation))
-                DateTime(p.year, p.month, d),
-          ],
+          radiationLeave: radiationDates(id),
+        ),
+    },
+    // Şua dönüşü yıllık izin gibi: ilk iş gününe kadar nöbet yok.
+    BlockReason.afterRadiationLeave: {
+      for (final id in radiationIds)
+        id: LeaveRules.blockedDaysInMonth(
+          year: plan.year,
+          month: plan.month,
+          annualLeave: radiationDates(id),
+          holidays: allHolidays,
+          before: false,
         ),
     },
   });

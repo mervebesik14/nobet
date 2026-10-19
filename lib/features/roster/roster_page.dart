@@ -330,7 +330,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
               if (blocked[p.id]?[day] case final reason?
                   when reason != BlockReason.beforeAnnualLeave &&
                       reason != BlockReason.afterAnnualLeave &&
-                      reason != BlockReason.beforeRadiationLeave)
+                      reason != BlockReason.beforeRadiationLeave &&
+                      reason != BlockReason.afterRadiationLeave)
                 reason.label,
             ],
           ),

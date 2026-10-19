@@ -15,7 +15,8 @@ import '../models/holiday.dart';
 ///
 /// Kurallar tarih üzerinden çalışır, ay sınırını aşar: 2 Kasım Pazartesi
 /// başlayan izin Ekim'in son günlerini, 30 Ekim Cuma biten izin Kasım'ın ilk
-/// günlerini kapatabilir. Şua izni için bu kurallar uygulanmaz.
+/// günlerini kapatabilir. İzinden sonra kuralı şua izni için de uygulanır
+/// ([blockedDaysInMonth] şua tarihleriyle, `before: false`).
 ///
 /// **Şua izninden önce:** İzin başlangıcından önceki [radiationGapDays] (2)
 /// takvim gününde nöbet tutulmaz (hafta sonu / tatil fark etmez). Örneğin
