@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -349,7 +347,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       ),
       holidays: ref.read(holidaysProvider),
       settings: effectiveSettings(base, nurseOnly: onlyNurses),
-      seed: seed ?? Random().nextInt(1 << 31),
+      seed: seed ?? ref.read(rosterSeedProvider)(),
       previousMonthTail: previousMonthTail(),
       overtimeRequests: plan.overtimeRequests,
       requestedShifts: plan.requestedShifts,

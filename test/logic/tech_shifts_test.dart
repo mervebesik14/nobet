@@ -90,6 +90,58 @@ void main() {
       ).generate();
       expect(gen().assignments, gen().assignments);
     });
+
+    // Küçük ekipte her gün bir öncekine bağlı; tek koltuk hamleleri
+    // takılıyordu. Ay içi fark yine de ≤ 1 olmalı.
+    for (final (techs, month) in [(3, 5), (3, 3), (3, 1), (7, 5), (7, 6)]) {
+      test('$techs tekniker, $month. ay: ay içi fark ≤ 1', () {
+        final people = team(7, techs);
+        final weekend = RosterGenerator.weekendDays(
+          2026,
+          month,
+          holidays,
+          settings,
+        );
+        for (final seed in [1, 2, 3]) {
+          final r = RosterGenerator(
+            year: 2026,
+            month: month,
+            people: people,
+            holidays: holidays,
+            settings: settings,
+            seed: seed,
+            attempts: 150,
+          ).generate();
+          expect(r.isComplete, isTrue, reason: r.issues.join('\n'));
+          final ids = [for (var i = 1; i <= techs; i++) 't$i'];
+          final c24 = {for (final id in ids) id: <int>{}};
+          final c16 = {for (final id in ids) id: <int>{}};
+          for (final a in r.assignments.values) {
+            c24[a.techId]!.add(a.day);
+            c16[a.tech16bId]!.add(a.day);
+          }
+          final measures = {
+            '24': [for (final id in ids) c24[id]!.length],
+            '16B': [for (final id in ids) c16[id]!.length],
+            'hafta sonu': [
+              for (final id in ids)
+                {...c24[id]!, ...c16[id]!}.where(weekend.contains).length,
+            ],
+            'gün aşırı': [
+              for (final id in ids)
+                RosterGenerator.everyOtherDayPairs(c24[id]!),
+            ],
+          };
+          for (final e in measures.entries) {
+            expect(
+              spread(e.value),
+              lessThanOrEqualTo(1),
+              reason: 'tohum $seed, ${e.key}: ${e.value}',
+            );
+          }
+        }
+      });
+    }
   });
 
   group('RosterValidator: 24/16B kuralları', () {

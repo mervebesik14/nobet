@@ -851,9 +851,9 @@ void main() {
       };
       final weekend = RosterGenerator.weekendDays(2026, 10, holidays, settings);
       // Yıl içi denge en düşük öncelik (ay içi denge ve boşluk kurallarından
-      // sonra): tohumların çoğunda 8 tutan n1–n3'ten biri olmalı.
-      var favoured = 0;
-      for (final seed in [1, 2, 3]) {
+      // sonra), ama ay içi eşitken her tohumda belirleyici: 8 tutan n1–n3'ten
+      // biri olmalı.
+      for (final seed in [1, 2, 3, 4, 5]) {
         final r = RosterGenerator(
           year: 2026,
           month: 10,
@@ -884,9 +884,8 @@ void main() {
             if ((w['n$i'] ?? const <int>{}).length == 8) i,
         ];
         expect(eight, hasLength(1), reason: 'seed $seed');
-        if (eight.single <= 3) favoured++;
+        expect(eight.single, lessThanOrEqualTo(3), reason: 'seed $seed');
       }
-      expect(favoured, greaterThanOrEqualTo(2));
     },
   );
 

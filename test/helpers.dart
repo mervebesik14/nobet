@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:flutter_riverpod/misc.dart';
@@ -6,6 +7,7 @@ import 'package:hive_ce/hive_ce.dart';
 import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/data/providers.dart';
 import 'package:nobet_listesi/shared/platform_services.dart';
+import 'package:nobet_listesi/shared/providers.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 /// Diske yazmayan Hive kutuları açar; her test temiz başlar.
@@ -15,9 +17,15 @@ Future<HiveBoxes> openTestBoxes() async {
 }
 
 /// Test kutularını kullanan provider override'ları.
-List<Override> boxOverrides(HiveBoxes boxes) => [
-  hiveBoxesProvider.overrideWithValue(boxes),
-];
+/// Liste tohumu da sabitlenir: arayüz testleri her çalıştırmada aynı listeyi
+/// üretir.
+List<Override> boxOverrides(HiveBoxes boxes) {
+  final rng = Random(1);
+  return [
+    hiveBoxesProvider.overrideWithValue(boxes),
+    rosterSeedProvider.overrideWithValue(() => rng.nextInt(1 << 31)),
+  ];
+}
 
 /// Paylaş / yazdır / dosya seç çağrılarını kaydeden sahte servis.
 class FakePlatformServices extends PlatformServices {

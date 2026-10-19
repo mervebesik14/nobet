@@ -557,11 +557,13 @@ class _RoleSolver {
   static const _balanceWeight = 3.0;
 
   /// Yıllık denge teriminin ağırlığı. Öncelik ay içi adalettir: bir hamle
-  /// yıllık terimlerin her birini en fazla 2 × 2 × 0,1 = 0,4, hepsini birden
-  /// en fazla ~2 puan değiştirir; ay içi dengeyi bozmanın bedeli ise en az 6
-  /// puandır. Böylece yıllık denge yalnızca ay içi denge eşitken ("fazla
-  /// nöbet kime") seçimi belirler, ay içi farkı hiçbir zaman büyütmez.
-  static const _ytdWeight = 0.1;
+  /// yıllık terimlerin her birini en fazla 2 × 2 × 0,3 = 1,2, hepsini birden
+  /// (tatil terimleri yarım) en fazla 4,8 puan değiştirir; ay içi dengeyi
+  /// bozmanın bedeli ise en az 6 puandır (fark 1'i aşarsa ayrıca
+  /// [RosterGenerator.spreadPenalty]). Böylece yıllık denge yalnızca ay içi
+  /// denge eşitken ("fazla nöbet kime") seçimi belirler, ay içi farkı
+  /// hiçbir zaman büyütmez.
+  static const _ytdWeight = 0.3;
 
   /// Açgözlü adımda yıllık farkın her birimi için ceza; ay içi farkın bir
   /// birimi 10 puan olduğundan en fazla 2 × 1 = 2 puanla onun altında kalır.
@@ -989,6 +991,37 @@ class _RoleSolver {
         improved = true;
       }
 
+      // Sonra iki kişinin bir dilimdeki nöbetlerini takas et: tek
+      // nöbetlik hamlelerin bozmadan yapamadığı "fazla nöbet kime" seçimini
+      // (yıl içi denge) düzeltir. Pahalı olduğundan yalnız en iyi sonuca ve
+      // nöbet sayısı farklı (fazla nöbetin el değiştirebileceği) çiftlere
+      // uygulanır; diğer çiftlerde yalnız ay sonuna kadar takas denenir.
+      if (chain && !improved) {
+        for (var i = 0; i < fairIds.length; i++) {
+          for (var j = i + 1; j < fairIds.length; j++) {
+            final a = fairIds[i];
+            final b = fairIds[j];
+            final all = _worked[a]!.length != _worked[b]!.length;
+            for (var from = 1; from <= days; from++) {
+              for (var to = all ? from : days; to <= days; to++) {
+                final countsOnly = to < days;
+                if (_tryRangeSwap(
+                  a,
+                  b,
+                  from,
+                  to,
+                  current,
+                  countsOnly: countsOnly,
+                )) {
+                  current = _score();
+                  improved = true;
+                }
+              }
+            }
+          }
+        }
+      }
+
       if (!improved) break;
     }
   }
@@ -1058,6 +1091,61 @@ class _RoleSolver {
       }
     }
     return false;
+  }
+
+  /// [a] ile [b]'nin [from]–[to] günleri arasındaki tüm nöbetlerini takas
+  /// eder; kurallar bozulmuyor ve puan düşüyorsa bırakır.
+  /// [countsOnly]: nöbet sayılarını değiştirmeyen takas denenmez.
+  bool _tryRangeSwap(
+    String a,
+    String b,
+    int from,
+    int to,
+    double current, {
+    bool countsOnly = false,
+  }) {
+    final moves = <int>[
+      for (var d = from; d <= to; d++)
+        if (_worked[a]!.contains(d) != _worked[b]!.contains(d)) d,
+    ];
+    if (moves.isEmpty) return false;
+    if (countsOnly &&
+        moves.where(_worked[a]!.contains).length * 2 == moves.length) {
+      return false;
+    }
+    for (final d in moves) {
+      if (_isFixed(a, d) || _isFixed(b, d)) return false;
+    }
+    void swap() {
+      for (final d in moves) {
+        final (x, y) = _worked[a]!.contains(d) ? (a, b) : (b, a);
+        _remove(x, d);
+        _add(y, d);
+      }
+    }
+
+    swap();
+    if (_valid(a) && _valid(b) && _score() < current - 1e-9) return true;
+    swap();
+    return false;
+  }
+
+  /// Kişinin tüm nöbetleri kurallara uyuyor mu?
+  bool _valid(String id) {
+    final worked = _worked[id]!;
+    if (cap != null &&
+        !reserve.contains(id) &&
+        worked.length > cap! + _allow(id)) {
+      return false;
+    }
+    for (final d in worked) {
+      if (!available[id]!.contains(d)) return false;
+      if (forbidConsecutive && (_works(id, d - 1) || _works(id, d + 1))) {
+        return false;
+      }
+      if (_breaksChain(id, d)) return false;
+    }
+    return true;
   }
 
   /// a@d1 ve b@d2'yi takas eder; kurallar geçerli ve puan düşüyorsa
@@ -1349,6 +1437,17 @@ class _TechSolver {
       return values.fold(0.0, (s, v) => s + (v - mean) * (v - mean));
     }
 
+    // Ay içi fark 1'i aşarsa güçlü ceza (hemşirelerdeki gibi).
+    int over(int Function(String) pick) {
+      var lo = 1 << 30, hi = -1;
+      for (final id in ids) {
+        final v = pick(id);
+        if (v < lo) lo = v;
+        if (v > hi) hi = v;
+      }
+      return hi - lo > 1 ? hi - lo - 1 : 0;
+    }
+
     final totalPairs = ids.fold(0, (a, id) => a + _pairs24(id));
     var gapExcess = 0;
     final longById = <String, int>{};
@@ -1380,6 +1479,14 @@ class _TechSolver {
                 sq(_nationalCount) +
                 sq(_religiousCount) +
                 sq(_pairs24)) +
+        RosterGenerator.spreadPenalty *
+            (over(longGaps) +
+                over((id) => _w24[id]!.length - _allow(id)) +
+                over((id) => _w16[id]!.length) +
+                over(_weekendCount) +
+                over(_nationalCount) +
+                over(_religiousCount) +
+                over(_pairs24)) +
         0.75 * totalPairs +
         RosterGenerator.changePenalty * _changes() +
         empty;
@@ -1440,10 +1547,15 @@ class _TechSolver {
     var best = candidates.first;
     for (final c in candidates.take(polishCount)) {
       _load(c.$2, c.$3);
-      _improve(rng);
+      _improve(rng, deep: false);
       final score = _score();
       if (score < best.$1) best = (score, [..._slot24], [..._slot16]);
     }
+    // Pahalı takas yalnız en iyi sonuca uygulanır.
+    _load(best.$2, best.$3);
+    _improve(rng);
+    final score = _score();
+    if (score < best.$1) best = (score, [..._slot24], [..._slot16]);
     _load(best.$2, best.$3);
     return _TechSolution(this, best.$2, best.$3, best.$1);
   }
@@ -1518,7 +1630,7 @@ class _TechSolver {
     return cost;
   }
 
-  void _improve(Random rng) {
+  void _improve(Random rng, {bool deep = true}) {
     var current = _score();
     for (var pass = 0; pass < 30; pass++) {
       var improved = false;
@@ -1600,8 +1712,74 @@ class _TechSolver {
         }
       }
 
+      // Basit hamleler tükenince iki kişinin bir günden ay sonuna kadarki
+      // vardiyalarını takas et. Küçük ekipte (ör. 3 tekniker) her gün bir
+      // önceki güne bağlı olduğundan tek koltuk hamleleri takılır; bu hamle
+      // zinciri bütün olarak kaydırır.
+      for (var i = 0; deep && i < ids.length && !improved; i++) {
+        for (var j = i + 1; j < ids.length; j++) {
+          for (var from = 2; from <= days; from++) {
+            if (_trySuffixSwap(ids[i], ids[j], from, current: current)) {
+              current = _score();
+              improved = true;
+            }
+          }
+        }
+      }
+
       if (!improved) break;
     }
+  }
+
+  /// [a] ile [b]'nin [from] gününden itibaren tüm 24 ve 16B koltuklarını
+  /// takas eder; kurallar bozulmuyor ve puan düşüyorsa bırakır.
+  bool _trySuffixSwap(String a, String b, int from, {required double current}) {
+    void swap() {
+      for (var d = from; d <= days; d++) {
+        final s24 = _slot24[d];
+        final s16 = _slot16[d];
+        final n24 = s24 == a ? b : (s24 == b ? a : s24);
+        final n16 = s16 == a ? b : (s16 == b ? a : s16);
+        if (n24 != s24) {
+          _remove24(d);
+          if (n24 != null) _place24(n24, d);
+        }
+        if (n16 != s16) {
+          _remove16(d);
+          if (n16 != null) _place16(n16, d);
+        }
+      }
+    }
+
+    var touches = false;
+    for (var d = from; d <= days && !touches; d++) {
+      touches = [_slot24[d], _slot16[d]].any((x) => x == a || x == b);
+    }
+    if (!touches) return false;
+    swap();
+    if (_valid(a) && _valid(b) && _score() < current - 1e-9) return true;
+    swap();
+    return false;
+  }
+
+  /// Kişinin tüm vardiyaları kurallara uyuyor mu?
+  bool _valid(String id) {
+    if (cap != null &&
+        _w24[id]!.length + _w16[id]!.length > cap! + _allow(id)) {
+      return false;
+    }
+    for (final d in _w24[id]!) {
+      if (!available[id]!.contains(d) ||
+          _worksAny(id, d + 1) ||
+          _has24(id, d - 1) ||
+          _breaks24Chain(id, d)) {
+        return false;
+      }
+    }
+    for (final d in _w16[id]!) {
+      if (!available[id]!.contains(d) || _has24(id, d - 1)) return false;
+    }
+    return true;
   }
 
   bool _trySwap(
