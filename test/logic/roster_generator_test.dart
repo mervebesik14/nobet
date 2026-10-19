@@ -833,4 +833,53 @@ void main() {
       expect(ShiftGaps.excess(w['n$i']!), 0, reason: 'n$i');
     }
   });
+
+  test(
+    'önce ay içi adalet: yıl içi farklar büyük olsa da ay içinde fark ≤ 1',
+    () {
+      // Yıl içinde n1–n3 çok fazla, n4–n7 az tutmuş (fark sınırın üstünde).
+      final ytd = {
+        for (var i = 1; i <= 7; i++)
+          'n$i': PersonTotals(
+            shifts: i <= 3 ? 90 : 60,
+            weekendShifts: i <= 3 ? 30 : 15,
+            everyOtherDayPairs: i <= 3 ? 8 : 0,
+          ),
+      };
+      final weekend = RosterGenerator.weekendDays(2026, 10, holidays, settings);
+      for (final seed in [1, 2, 3]) {
+        final r = RosterGenerator(
+          year: 2026,
+          month: 10,
+          people: team(7, 4),
+          holidays: holidays,
+          settings: settings,
+          seed: seed,
+          attempts: 150,
+          yearToDate: ytd,
+        ).generate();
+        final w = workedDays(r);
+        List<int> per(int Function(Set<int>) f) => [
+          for (var i = 1; i <= 7; i++) f(w['n$i'] ?? const <int>{}),
+        ];
+        expect(spread(per((d) => d.length)), lessThanOrEqualTo(1));
+        expect(
+          spread(per((d) => d.where(weekend.contains).length)),
+          lessThanOrEqualTo(1),
+        );
+        expect(
+          spread(per(RosterGenerator.everyOtherDayPairs)),
+          lessThanOrEqualTo(1),
+        );
+        // 62 / 7: altı kişi 9, bir kişi 8 tutar. Ay içi eşitken 8 tutan
+        // yıl içinde çok tutmuş n1–n3'ten biri olmalı.
+        final eight = [
+          for (var i = 1; i <= 7; i++)
+            if ((w['n$i'] ?? const <int>{}).length == 8) i,
+        ];
+        expect(eight, hasLength(1), reason: 'seed $seed');
+        expect(eight.single, lessThanOrEqualTo(3), reason: 'seed $seed');
+      }
+    },
+  );
 }

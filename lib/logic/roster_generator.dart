@@ -155,6 +155,11 @@ class RosterGenerator {
   /// Boş kalan her koltuk için puana eklenen ceza.
   static const emptySlotPenalty = 1000.0;
 
+  /// Ay içinde bir dengenin (toplam, hafta sonu, tatil, gün aşırı, 4–5 gün
+  /// ara) farkı 1'i aştığında her fazla birim için ceza. Yıl içi dengenin
+  /// bir hamledeki etkisinden (~2) çok büyük: önce ay içi adalet.
+  static const spreadPenalty = 30.0;
+
   /// Nöbetler arası boşluk [ShiftGaps.maxGap]'i aştığında fazla her gün için
   /// ceza: adalet dengesinden ağır, boş koltuktan çok hafif (mümkünse uyulur).
   static const gapExcessPenalty = 8.0;
@@ -505,14 +510,16 @@ class _RoleSolver {
   /// değişiklik (ör. 9-9 → 10-8) 2 × 3 = 6 puandır.
   static const _balanceWeight = 3.0;
 
-  /// Yıllık denge teriminin ağırlığı. Bir hamle üç yıllık terimin her birini
-  /// en fazla 2 × 2 × 0,4 = 1,6, toplamda 4,8 puan değiştirir; bu, ay içi
-  /// dengeyi bozmanın bedelinden (6) küçüktür. Böylece yıllık denge yalnızca
-  /// "fazla nöbet kime" seçimini belirler, ay içi farkı büyütmez.
-  static const _ytdWeight = 0.4;
+  /// Yıllık denge teriminin ağırlığı. Öncelik ay içi adalettir: bir hamle
+  /// yıllık terimlerin her birini en fazla 2 × 2 × 0,1 = 0,4, hepsini birden
+  /// en fazla ~2 puan değiştirir; ay içi dengeyi bozmanın bedeli ise en az 6
+  /// puandır. Böylece yıllık denge yalnızca ay içi denge eşitken ("fazla
+  /// nöbet kime") seçimi belirler, ay içi farkı hiçbir zaman büyütmez.
+  static const _ytdWeight = 0.1;
 
-  /// Açgözlü adımda yıllık farkın her birimi için ceza.
-  static const _ytdGreedyWeight = 3.0;
+  /// Açgözlü adımda yıllık farkın her birimi için ceza; ay içi farkın bir
+  /// birimi 10 puan olduğundan en fazla 2 × 1 = 2 puanla onun altında kalır.
+  static const _ytdGreedyWeight = 1.0;
 
   static Map<String, double> _relative(
     List<Person> members,
@@ -678,6 +685,14 @@ class _RoleSolver {
       gapExcess += excess;
       longGaps.add(long);
     }
+    // Ay içi fark 1'i aşarsa güçlü ceza: ay içi adalet her zaman yıl içi
+    // dengeden önce gelir.
+    int over(List<int> values) {
+      if (values.isEmpty) return 0;
+      final spread = values.reduce(max) - values.reduce(min);
+      return spread > 1 ? spread - 1 : 0;
+    }
+
     return _balanceWeight *
             (sq(counts) +
                 sq(weekends) +
@@ -685,6 +700,13 @@ class _RoleSolver {
                 sq(religiouses) +
                 sq(pairs) +
                 sq(longGaps)) +
+        RosterGenerator.spreadPenalty *
+            (over(counts) +
+                over(weekends) +
+                over(nationals) +
+                over(religiouses) +
+                over(pairs) +
+                over(longGaps)) +
         RosterGenerator.gapExcessPenalty * gapExcess +
         yearly(counts, ytdShifts) +
         yearly(weekends, ytdWeekend) +
@@ -1304,17 +1326,17 @@ class _TechSolver {
     final mean = days / n; // her gün 1 adet 24 ve 1 adet 16B
     // Fazla mesai payı yalnız 24 (ağır) vardiyaya uygulanır.
     final own = is16b ? _w16[id]!.length : _w24[id]!.length - _allow(id);
-    var cost = (own + 1 - mean) * 10 + ytd[id]! * 1.5;
+    var cost = (own + 1 - mean) * 10 + ytd[id]! * 1.0;
     if (weekend.contains(d)) {
       cost += (_weekendCount(id) + 1 - weekend.length * 2 / n) * 10;
     }
     if (national.contains(d)) {
       cost += (_nationalCount(id) + 1 - national.length * 2 / n) * 10;
-      cost += ytdNational[id]! * 1.5;
+      cost += ytdNational[id]! * 1.0;
     }
     if (religious.contains(d)) {
       cost += (_religiousCount(id) + 1 - religious.length * 2 / n) * 10;
-      cost += ytdReligious[id]! * 1.5;
+      cost += ytdReligious[id]! * 1.0;
     }
     if (!is16b) {
       final newPairs =
