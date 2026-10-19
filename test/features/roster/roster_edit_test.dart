@@ -334,6 +334,8 @@ void main() {
 
     await tester.longPress(cell('n0', 3));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Başka bir nöbetle takas et'));
+    await tester.pumpAndSettle();
     expect(
       find.textContaining('Takas: Ayşe – 3 Ekim seçildi.'),
       findsOneWidget,
@@ -358,10 +360,31 @@ void main() {
     expect(find.textContaining('Takas:'), findsNothing);
   });
 
+  testWidgets('basılı tut → Değiştir: elle başkasını yaz', (tester) async {
+    await pumpRoster(tester);
+
+    await tester.longPress(cell('n0', 3));
+    await tester.pumpAndSettle();
+    expect(find.text('Değiştir'), findsOneWidget);
+    await tester.tap(find.text('Değiştir'));
+    await tester.pumpAndSettle();
+    expect(inSheet('Nöbeti kaldır'), findsOneWidget);
+    await tester.tap(inSheet('Hale'));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.nurseIds, ['n6', 'n7']);
+
+    // Boş hücrede basılı tutmak doğrudan atama seçeneklerini açar.
+    await tester.longPress(cell('n0', 4));
+    await tester.pumpAndSettle();
+    expect(inSheet('Bu güne ata'), findsOneWidget);
+  });
+
   testWidgets('takas yapısal olarak olamıyorsa açıklar', (tester) async {
     await pumpRoster(tester);
 
     await tester.longPress(cell('n0', 3));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Başka bir nöbetle takas et'));
     await tester.pumpAndSettle();
     // Gül 3'ünde zaten nöbetçi.
     await tester.tap(cell('n6', 6));
@@ -376,6 +399,8 @@ void main() {
   testWidgets('takas modu iptal edilebilir', (tester) async {
     await pumpRoster(tester);
     await tester.longPress(cell('n0', 3));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Başka bir nöbetle takas et'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('İptal'));
     await tester.pumpAndSettle();
@@ -399,6 +424,7 @@ void main() {
 
     await tester.longPress(cell('n0', 3));
     await tester.pumpAndSettle();
+    expect(find.text('Başka bir nöbetle takas et'), findsNothing);
     expect(find.textContaining('Takas:'), findsNothing);
   });
 

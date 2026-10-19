@@ -451,13 +451,52 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     await _apply(result);
   }
 
-  void _onCellLongPress(RosterCell cell) {
+  /// Uzun basma: nöbet hücresinde elle değiştirme / takas menüsü; boş, 7A
+  /// ya da izin hücresinde dokunmayla aynı düzenleme açılır.
+  Future<void> _onCellLongPress(RosterCell cell, Role role) async {
+    if (_swapFrom != null) return _completeSwap(cell, role);
     if (!_ensureUnlocked()) return;
     if (!(_plan.assignments[cell.day]?.includes(cell.personId) ?? false)) {
-      _notify('Takas için nöbet olan bir hücreye (24) uzun basın.');
-      return;
+      return _onCellTap(cell, role);
     }
-    setState(() => _swapFrom = cell);
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(
+                '${_name(cell.personId)} · ${_dayLabel(cell.day)}',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Değiştir'),
+              subtitle: const Text('Yerine başkasını yaz ya da nöbeti kaldır.'),
+              onTap: () => Navigator.of(context).pop('edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.swap_horiz),
+              title: const Text('Başka bir nöbetle takas et'),
+              subtitle: const Text(
+                'Sonra takas edilecek ikinci nöbete dokunun.',
+              ),
+              onTap: () => Navigator.of(context).pop('swap'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return;
+    switch (choice) {
+      case 'edit':
+        await _onCellTap(cell, role);
+      case 'swap':
+        setState(() => _swapFrom = cell);
+    }
   }
 
   Future<void> _completeSwap(RosterCell cell, Role role) async {
@@ -798,8 +837,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
               child: Text(
-                'Düzenlemek için hücreye dokunun; takas için nöbete uzun '
-                'basın.',
+                'Düzenlemek için hücreye dokunun ya da basılı tutun; basılı '
+                'tutunca takas da seçilebilir.',
                 style: theme.textTheme.bodySmall,
               ),
             ),
@@ -829,7 +868,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
               },
               selectedCell: _swapFrom,
               onCellTap: (cell) => _onCellTap(cell, roleById[cell.personId]!),
-              onCellLongPress: _onCellLongPress,
+              onCellLongPress: (cell) =>
+                  _onCellLongPress(cell, roleById[cell.personId]!),
               onMissingTap: _onMissingTap,
             ),
           ),
