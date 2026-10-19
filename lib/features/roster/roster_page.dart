@@ -45,6 +45,9 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   /// Takas modunda seçilen ilk nöbet.
   RosterCell? _swapFrom;
 
+  /// "Kurallara göre düzelt" çalışıyor mu?
+  bool _fixing = false;
+
   MonthPlan get _plan => ref.read(monthPlanProvider);
 
   void _notify(String message) {
@@ -80,6 +83,41 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       requestedShifts: plan.requestedShifts,
       absentDays: plan.leaveDays,
     );
+  }
+
+  /// Listeyi baştan kurmadan kural bozan nöbetleri en az değişiklikle
+  /// düzeltir; sonuç geçmişe yazılır ve geri alınabilir.
+  Future<void> _fixRoster() async {
+    setState(() {
+      _fixing = true;
+      _swapFrom = null;
+    });
+    final controller = ref.read(monthPlanProvider.notifier);
+    final outcome = await controller.fixRoster();
+    if (!mounted) return;
+    setState(() => _fixing = false);
+    if (outcome == null) return;
+    final changed = outcome.changed;
+    final empty = outcome.result.issues.length;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            changed == 0
+                ? 'Değiştirilecek nöbet bulunamadı; kalan uyarılar kişi '
+                      'sayısı ya da izinler yüzünden giderilemiyor.'
+                : '$changed nöbet değişti.'
+                      '${empty > 0 ? ' $empty koltuk boş kaldı.' : ''}',
+          ),
+          action: changed == 0
+              ? null
+              : SnackBarAction(
+                  label: 'Geri al',
+                  onPressed: () => controller.undoLast(),
+                ),
+        ),
+      );
   }
 
   /// Listeyi onayla sıfırlar; liste boş kaldığı için Ay Planı'na dönülür.
@@ -906,6 +944,23 @@ class _RosterPageState extends ConsumerState<RosterPage> {
               onMissingTap: _onMissingTap,
             ),
           ),
+          if (violations.isNotEmpty && !plan.isLocked)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FilledButton.tonalIcon(
+                  onPressed: _fixing ? null : _fixRoster,
+                  icon: _fixing
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.auto_fix_high),
+                  label: const Text('Kurallara göre düzelt'),
+                ),
+              ),
+            ),
           _ViolationList(violations: violations),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),

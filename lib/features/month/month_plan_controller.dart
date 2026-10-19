@@ -283,8 +283,61 @@ class MonthPlanController extends Notifier<MonthPlan> {
   Future<RosterResult> generate({int? seed, bool? nurseOnly}) async {
     final plan = state;
     final onlyNurses = nurseOnly ?? plan.nurseOnly;
+    final generator = _generator(plan, onlyNurses: onlyNurses, seed: seed);
+    final result = await ref.read(rosterRunnerProvider)(generator);
+    final before = state;
+    state = state.copyWith(
+      assignments: result.assignments,
+      // Yeni listede eski 7A seçimleri ve nöbet devirleri geçersiz olur.
+      dayShiftOverrides: const {},
+      handovers: const {},
+      generatedAt: DateTime.now(),
+      seed: result.seed,
+      nurseOnly: onlyNurses,
+    );
+    await ref.read(monthPlanRepositoryProvider).save(state);
+    await _record(
+      before.hasRoster ? 'Liste yeniden oluşturuldu' : 'Liste oluşturuldu',
+      before,
+      details: false,
+    );
+    return result;
+  }
+
+  /// Kayıtlı listeyi baştan kurmadan güncel kurallara göre düzeltir: kural
+  /// bozan nöbetler en az değişiklikle kaydırılır, elle yapılanlar ve 7A
+  /// seçimleri korunur. Değişen atama sayısını döndürür (kilitliyse null).
+  Future<({RosterResult result, int changed})?> fixRoster() async {
+    if (state.isLocked || !state.hasRoster) return null;
+    final plan = state;
+    final generator = _generator(
+      plan,
+      onlyNurses: plan.nurseOnly,
+      existing: plan.assignments,
+    );
+    final result = await ref.read(rosterRunnerProvider)(generator);
+    var changed = 0;
+    for (final MapEntry(key: d, value: a) in result.assignments.entries) {
+      final was = plan.assignments[d]?.personIds ?? const <String>[];
+      changed += a.personIds.where((id) => !was.contains(id)).length;
+    }
+    if (changed > 0) {
+      await setAssignments(
+        result.assignments,
+        title: 'Kurallara göre düzeltildi',
+      );
+    }
+    return (result: result, changed: changed);
+  }
+
+  RosterGenerator _generator(
+    MonthPlan plan, {
+    required bool onlyNurses,
+    int? seed,
+    Map<int, DayAssignment>? existing,
+  }) {
     final base = ref.read(rosterSettingsProvider);
-    final generator = RosterGenerator(
+    return RosterGenerator(
       year: plan.year,
       month: plan.month,
       people: ref.read(peopleProvider),
@@ -309,25 +362,8 @@ class MonthPlanController extends Notifier<MonthPlan> {
         settings: base,
         beforeMonth: plan.month,
       ).byId,
+      existing: existing,
     );
-    final result = await ref.read(rosterRunnerProvider)(generator);
-    final before = state;
-    state = state.copyWith(
-      assignments: result.assignments,
-      // Yeni listede eski 7A seçimleri ve nöbet devirleri geçersiz olur.
-      dayShiftOverrides: const {},
-      handovers: const {},
-      generatedAt: DateTime.now(),
-      seed: result.seed,
-      nurseOnly: onlyNurses,
-    );
-    await ref.read(monthPlanRepositoryProvider).save(state);
-    await _record(
-      before.hasRoster ? 'Liste yeniden oluşturuldu' : 'Liste oluşturuldu',
-      before,
-      details: false,
-    );
-    return result;
   }
 
   /// Değişikliği geçmişe yazar: [before] geri alma için saklanır. [details]

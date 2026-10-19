@@ -93,6 +93,7 @@ class RosterGenerator {
     this.overtimeAllowance = 2,
     this.requestedShifts = const {},
     this.absentDays = const {},
+    this.existing,
     this.attempts = 400,
   }) : people = people.where((p) => p.worksInMonth(year, month)).toList()
          ..sort((a, b) => a.id.compareTo(b.id));
@@ -137,6 +138,12 @@ class RosterGenerator {
   /// günler kişiden ayrıca eklenir.
   final Map<String, List<int>> absentDays;
 
+  /// Düzeltme modu: verilirse liste baştan kurulmaz, bu atamalardan
+  /// başlanır. Kural bozan nöbetler (istemediği / izinli gün, art arda,
+  /// zincir…) çıkarılır, boşalan koltuklar doldurulur ve boşluk / adalet
+  /// kuralları en az değişiklikle düzeltilir ([changePenalty]).
+  final Map<int, DayAssignment>? existing;
+
   Map<String, Set<int>> _absentFor(List<Person> members) => {
     for (final p in members)
       p.id: {...?absentDays[p.id], ...p.inactiveDaysIn(year, month)},
@@ -154,6 +161,11 @@ class RosterGenerator {
 
   /// Boş kalan her koltuk için puana eklenen ceza.
   static const emptySlotPenalty = 1000.0;
+
+  /// Düzeltme modunda mevcut listeden her farklı atama için ceza: kural
+  /// cezalarından küçük, küçük denge iyileştirmelerinden büyük; liste
+  /// yalnız bir kuralı düzeltmek için değişir.
+  static const changePenalty = 8.0;
 
   /// Ay içinde bir dengenin (toplam, hafta sonu, tatil, gün aşırı, 4–5 gün
   /// ara) farkı 1'i aştığında her fazla birim için ceza. Yıl içi dengenin
@@ -292,7 +304,7 @@ class RosterGenerator {
             },
       },
       settings: settings,
-    ).solve(rng, attempts, _polishCount);
+    )._run(rng, attempts, existing, (a) => a.nurseIds);
 
     final techMembers = people
         .where((p) => p.role == Role.radiologyTech)
@@ -318,7 +330,7 @@ class RosterGenerator {
         yearToDate: yearToDate,
         allowance: _allowanceFor(techMembers),
         settings: settings,
-      ).solve(rng, attempts, _polishCount);
+      )._run(rng, attempts, existing);
       techScore = tech.score;
       for (var d = 1; d <= daysInMonth; d++) {
         assignments[d] = DayAssignment(
@@ -344,7 +356,7 @@ class RosterGenerator {
         yearToDate: yearToDate,
         allowance: _allowanceFor(techMembers),
         settings: settings,
-      ).solve(rng, attempts, _polishCount);
+      )._run(rng, attempts, existing, (a) => [?a.techId]);
       techScore = techs.score;
       for (var d = 1; d <= daysInMonth; d++) {
         assignments[d] = DayAssignment(
@@ -744,6 +756,7 @@ class _RoleSolver {
         yearly(pairs, ytdPairs) +
         0.75 * totalPairs +
         _emptySlots() * RosterGenerator.emptySlotPenalty +
+        RosterGenerator.changePenalty * _changes() +
         reserveCost;
   }
 
@@ -753,6 +766,53 @@ class _RoleSolver {
       empty += perDay - _slots[d].length;
     }
     return empty;
+  }
+
+  /// Sıfırdan çözüm ya da ([existing] verilirse) mevcut listeyi düzeltme.
+  _RoleSolution _run(
+    Random rng,
+    int attempts,
+    Map<int, DayAssignment>? existing,
+    List<String> Function(DayAssignment) seats,
+  ) => existing == null
+      ? solve(rng, attempts, RosterGenerator._polishCount)
+      : solveFrom(rng, [
+          const <String>[],
+          for (var d = 1; d <= days; d++)
+            if (existing[d] case final a?) seats(a) else const <String>[],
+        ]);
+
+  /// Düzeltme modunda başlangıç listesi; puana değişiklik cezası eklenir.
+  List<Set<String>>? _original;
+
+  int _changes() {
+    final original = _original;
+    if (original == null) return 0;
+    var n = 0;
+    for (var d = 1; d <= days; d++) {
+      for (final id in _slots[d]) {
+        if (!original[d].contains(id)) n++;
+      }
+    }
+    return n;
+  }
+
+  /// Mevcut listeden başlayıp düzeltir: kural bozan atamalar alınmaz,
+  /// sonra yerel iyileştirme boşlukları doldurur ve kuralları düzeltir.
+  _RoleSolution solveFrom(Random rng, List<List<String>> slots) {
+    _reset();
+    _original = [for (final s in slots) s.toSet()];
+    if (perDay <= 0) return _RoleSolution(this, _snapshot(), 0);
+    _prefill();
+    for (var d = 1; d <= days; d++) {
+      for (final id in slots[d]) {
+        if (_slots[d].length >= perDay) break;
+        if (!ids.contains(id) || _block(id, d) != null) continue;
+        _add(id, d);
+      }
+    }
+    _improve(rng);
+    return _RoleSolution(this, _snapshot(), _score());
   }
 
   _RoleSolution solve(Random rng, int attempts, int polishCount) {
@@ -869,6 +929,14 @@ class _RoleSolver {
           }
         }
       }
+      // Kaydırma: boş koltuğa doğrudan kimse yazılamıyorsa, başka bir
+      // nöbetini bırakınca yazılabilen biri kaydırılır; bıraktığı koltuğa
+      // o gün boşta olan biri geçer (düzeltme modunda önemli).
+      for (var d = 1; d <= days; d++) {
+        while (_slots[d].length < perDay && _shiftInto(d)) {
+          improved = true;
+        }
+      }
       if (improved) current = _score();
 
       // Değiştirme: d günündeki a yerine b.
@@ -923,6 +991,40 @@ class _RoleSolver {
 
       if (!improved) break;
     }
+  }
+
+  /// Boş [d] koltuğunu kaydırmayla doldurur: x kişisi e günündeki nöbetini
+  /// bırakıp d'ye geçer, e'ye o gün yazılabilen y gelir. Boş koltuk sayısı
+  /// bir azalırsa true; olmazsa her şey eski hâline döner.
+  bool _shiftInto(int d) {
+    for (final x in ids) {
+      if (_slots[d].contains(x) || !available[x]!.contains(d)) continue;
+      for (final e in [..._worked[x]!]..sort()) {
+        if (_isFixed(x, e)) continue;
+        _remove(x, e);
+        if (_block(x, d) == null) {
+          _add(x, d);
+          String? best;
+          for (final y in ids) {
+            if (y == x || _block(y, e) != null) continue;
+            // Yedek kişi (sorumlu hemşire) en son; sonra en az nöbetli.
+            if (best == null ||
+                (reserve.contains(best) && !reserve.contains(y)) ||
+                (reserve.contains(best) == reserve.contains(y) &&
+                    _worked[y]!.length < _worked[best]!.length)) {
+              best = y;
+            }
+          }
+          if (best != null) {
+            _add(best, e);
+            return true;
+          }
+          _remove(x, d);
+        }
+        _add(x, e);
+      }
+    }
+    return false;
   }
 
   /// Zincirli değiştirme: d1 günündeki a yerine b yazılır, b'nin d2 günündeki
@@ -1279,7 +1381,49 @@ class _TechSolver {
                 sq(_religiousCount) +
                 sq(_pairs24)) +
         0.75 * totalPairs +
+        RosterGenerator.changePenalty * _changes() +
         empty;
+  }
+
+  _TechSolution _run(
+    Random rng,
+    int attempts,
+    Map<int, DayAssignment>? existing,
+  ) {
+    if (existing == null) {
+      return solve(rng, attempts, RosterGenerator._polishCount);
+    }
+    _reset();
+    _original24 = [null, for (var d = 1; d <= days; d++) existing[d]?.techId];
+    _original16 = [
+      null,
+      for (var d = 1; d <= days; d++) existing[d]?.tech16bId,
+    ];
+    if (ids.isEmpty) return _TechSolution(this, [..._slot24], [..._slot16], 0);
+    for (var d = 1; d <= days; d++) {
+      final a = _original24![d];
+      if (a != null && ids.contains(a) && _canPlace24(a, d)) _place24(a, d);
+      final b = _original16![d];
+      if (b != null && ids.contains(b) && _canPlace16(b, d)) _place16(b, d);
+    }
+    _improve(rng);
+    return _TechSolution(this, [..._slot24], [..._slot16], _score());
+  }
+
+  /// Düzeltme modunda başlangıç listesi.
+  List<String?>? _original24;
+  List<String?>? _original16;
+
+  int _changes() {
+    final o24 = _original24;
+    final o16 = _original16;
+    if (o24 == null || o16 == null) return 0;
+    var n = 0;
+    for (var d = 1; d <= days; d++) {
+      if (_slot24[d] != null && _slot24[d] != o24[d]) n++;
+      if (_slot16[d] != null && _slot16[d] != o16[d]) n++;
+    }
+    return n;
   }
 
   _TechSolution solve(Random rng, int attempts, int polishCount) {

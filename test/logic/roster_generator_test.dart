@@ -949,4 +949,81 @@ void main() {
       expect(plain['n2'], closeTo(-1, 1e-9));
     });
   });
+
+  group('kurallara göre düzelt (mevcut listeden)', () {
+    final people = team(7, 4);
+
+    int changed(Map<int, DayAssignment> a, Map<int, DayAssignment> b) {
+      var n = 0;
+      for (var d = 1; d <= 31; d++) {
+        final before = a[d]?.personIds.toSet() ?? const <String>{};
+        n += (b[d]?.personIds ?? const <String>[])
+            .where((id) => !before.contains(id))
+            .length;
+      }
+      return n;
+    }
+
+    test('kurallara uyan liste değişmez', () {
+      final base = generator(seed: 1).generate().assignments;
+      final fixed = RosterGenerator(
+        year: 2026,
+        month: 10,
+        people: people,
+        holidays: holidays,
+        settings: settings,
+        seed: 2,
+        existing: base,
+      ).generate();
+      expect(changed(base, fixed.assignments), 0);
+    });
+
+    test(
+      'istemediği güne yazılanı ve uzun boşluğu az değişiklikle düzeltir',
+      () {
+        final base = {...generator(seed: 1).generate().assignments};
+        // n1, 3 Ekim'i istemiyor ama o güne yazılmış.
+        final day3 = base[3]!;
+        final victim = day3.nurseIds.first;
+        final unavailable = {
+          victim: [3],
+        };
+        // Bir hemşirenin 10–20 arasındaki nöbetlerini kaldırıp başkasına
+        // vererek uzun boşluk oluştur (kural bozulsun).
+        final w = workedDays(
+          RosterResult(assignments: base, score: 0, issues: const [], seed: 0),
+        );
+        final target = [
+          for (var i = 1; i <= 7; i++) 'n$i',
+        ].firstWhere((id) => id != victim);
+        for (final d in [...w[target]!]) {
+          if (d < 10 || d > 20) continue;
+          final a = base[d]!;
+          final other = [
+            for (var i = 1; i <= 7; i++) 'n$i',
+          ].firstWhere((id) => !a.nurseIds.contains(id) && id != target);
+          base[d] = a.copyWith(
+            nurseIds: [for (final id in a.nurseIds) id == target ? other : id],
+          );
+        }
+        final fixed = RosterGenerator(
+          year: 2026,
+          month: 10,
+          people: people,
+          holidays: holidays,
+          settings: settings,
+          seed: 2,
+          unavailableDays: unavailable,
+          existing: base,
+        ).generate();
+        expectHardRules(fixed, people, unavailable, settings);
+        final fw = workedDays(fixed);
+        for (var i = 1; i <= 7; i++) {
+          expect(ShiftGaps.excess(fw['n$i']!), 0, reason: 'n$i');
+        }
+        // Liste baştan kurulmadı: değişiklik listenin küçük bir kısmı.
+        expect(changed(base, fixed.assignments), lessThan(20));
+      },
+    );
+  });
 }

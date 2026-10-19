@@ -6,6 +6,8 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/data/holiday_repository.dart';
 import 'package:nobet_listesi/features/roster/roster_page.dart';
+import 'package:nobet_listesi/data/roster_history_repository.dart';
+import 'package:nobet_listesi/features/month/month_plan_controller.dart';
 import 'package:nobet_listesi/models/models.dart';
 import 'package:nobet_listesi/shared/providers.dart';
 
@@ -76,6 +78,7 @@ void main() {
         overrides: [
           ...boxOverrides(boxes),
           todayProvider.overrideWithValue(DateTime(2026, 10, 11)),
+          rosterRunnerProvider.overrideWithValue((g) async => g.generate()),
         ],
         child: const MaterialApp(home: RosterPage()),
       ),
@@ -533,5 +536,35 @@ void main() {
       );
       expect(button.onPressed, isNull);
     });
+  });
+
+  testWidgets('kurallara göre düzelt: ihlal giderilir, geri alınabilir', (
+    tester,
+  ) async {
+    // Ayşe (n0) 3 Ekim'i istemiyor ama listede o gün nöbetçi.
+    await pumpRoster(
+      tester,
+      unavailable: {
+        'n0': [3],
+      },
+    );
+    expect(saved().assignments[3]!.nurseIds, contains('n0'));
+    // Kural ihlali yokken düğme görünmez; burada var.
+    await tester.tap(find.text('Kurallara göre düzelt'));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+
+    final fixed = saved();
+    expect(fixed.assignments[3]!.nurseIds, isNot(contains('n0')));
+    expect(fixed.assignments[3]!.nurseIds, hasLength(2));
+    expect(find.textContaining('nöbet değişti.'), findsOneWidget);
+    expect(
+      RosterHistoryRepository(boxes.history).load(2026, 10).last.title,
+      'Kurallara göre düzeltildi',
+    );
+
+    await tester.tap(find.text('Geri al'));
+    await tester.pumpAndSettle();
+    expect(saved().assignments, _rotation());
   });
 }
