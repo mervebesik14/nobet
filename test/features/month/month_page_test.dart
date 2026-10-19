@@ -49,7 +49,7 @@ void main() {
 
   final services = FakePlatformServices();
 
-  Future<void> pumpPage(WidgetTester tester) async {
+  Future<void> pumpPage(WidgetTester tester, {DateTime? today}) async {
     tester.view.physicalSize = const Size(1200, 5200);
     tester.view.devicePixelRatio = 2.5;
     addTearDown(tester.view.reset);
@@ -57,7 +57,7 @@ void main() {
       ProviderScope(
         overrides: [
           ...boxOverrides(boxes),
-          todayProvider.overrideWithValue(DateTime(2026, 10, 11)),
+          todayProvider.overrideWithValue(today ?? DateTime(2026, 10, 11)),
           platformServicesProvider.overrideWithValue(services),
         ],
         child: const MaterialApp(home: MonthPage()),
@@ -517,6 +517,82 @@ void main() {
       );
       await pumpPage(tester);
       expect(find.text('Yedek al'), findsNothing);
+    });
+  });
+
+  group('ay başı hatırlatması', () {
+    final reminder = find.byKey(const ValueKey('next-month-reminder'));
+
+    Future<void> seedTeam() async {
+      await seed(_team);
+      // Yedek kartı karışmasın.
+      await boxes.meta.put(
+        'lastBackupAt',
+        DateTime(2026, 10, 15).toIso8601String(),
+      );
+    }
+
+    testWidgets('ayın 17sinden önce çıkmaz', (tester) async {
+      await seedTeam();
+      await pumpPage(tester, today: DateTime(2026, 10, 16));
+      expect(reminder, findsNothing);
+    });
+
+    testWidgets('17sinden sonra çıkar; gelecek aya geçirir', (tester) async {
+      await seedTeam();
+      await boxes.monthPlans.put(
+        '2026-11',
+        const MonthPlan(
+          year: 2026,
+          month: 11,
+          unavailableDays: {
+            'n1': [3, 4],
+            'n2': [10],
+          },
+        ),
+      );
+      await pumpPage(tester, today: DateTime(2026, 10, 17));
+      expect(reminder, findsOneWidget);
+      expect(
+        find.textContaining('Kasım listesi henüz oluşturulmadı'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('2 kişinin girişi var'), findsOneWidget);
+
+      await tester.tap(find.text('Kasım ayına geç'));
+      await tester.pumpAndSettle();
+      expect(find.text('Kasım 2026'), findsOneWidget);
+      expect(reminder, findsNothing);
+    });
+
+    testWidgets('"Sonra" 3 gün susturur', (tester) async {
+      await seedTeam();
+      await pumpPage(tester, today: DateTime(2026, 10, 20));
+      await tester.tap(
+        find.descendant(of: reminder, matching: find.text('Sonra')),
+      );
+      await tester.pumpAndSettle();
+      expect(reminder, findsNothing);
+      expect(
+        boxes.meta.get('nextMonthReminderSnoozedUntil'),
+        startsWith('2026-10-23'),
+      );
+    });
+
+    testWidgets('gelecek ayın listesi varsa çıkmaz', (tester) async {
+      await seedTeam();
+      await boxes.monthPlans.put(
+        '2026-11',
+        const MonthPlan(
+          year: 2026,
+          month: 11,
+          assignments: {
+            1: DayAssignment(day: 1, nurseIds: ['n1', 'n2'], techId: 't1'),
+          },
+        ),
+      );
+      await pumpPage(tester, today: DateTime(2026, 10, 25));
+      expect(reminder, findsNothing);
     });
   });
 }

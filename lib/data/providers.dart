@@ -129,3 +129,25 @@ final backupStatusProvider =
     NotifierProvider<BackupStatusController, BackupStatus>(
       BackupStatusController.new,
     );
+
+/// Ay başı hatırlatmasının "Sonra" ile susturulduğu gün (`app_meta`).
+class NextMonthReminderSnooze extends Notifier<DateTime?> {
+  static const _key = 'nextMonthReminderSnoozedUntil';
+
+  @override
+  DateTime? build() {
+    final v = ref.watch(hiveBoxesProvider).meta.get(_key);
+    return v is String ? DateTime.tryParse(v) : null;
+  }
+
+  /// Hatırlatmayı [until] gününe kadar sustur.
+  Future<void> snooze(DateTime until) async {
+    state = until;
+    await ref.read(hiveBoxesProvider).meta.put(_key, until.toIso8601String());
+  }
+}
+
+final nextMonthReminderSnoozeProvider =
+    NotifierProvider<NextMonthReminderSnooze, DateTime?>(
+      NextMonthReminderSnooze.new,
+    );

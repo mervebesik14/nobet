@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../logic/backup_reminder.dart';
 import '../../logic/feasibility_checker.dart';
+import '../../logic/next_month_reminder.dart';
+import '../../logic/turkish_dates.dart';
 import '../../models/models.dart';
 import '../../shared/widgets/month_selector.dart';
 import '../../shared/widgets/section_header.dart';
@@ -43,6 +45,11 @@ class MonthPage extends ConsumerWidget {
     final report = ref.watch(monthFeasibilityProvider);
     final theme = Theme.of(context);
     final backup = ref.watch(backupStatusProvider);
+    final today = ref.watch(todayProvider);
+    final next = NextMonthReminder.nextMonth(today);
+    final nextPlan = ref
+        .watch(monthPlanRepositoryProvider)
+        .get(next.year, next.month);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Ay Planı')),
@@ -74,6 +81,15 @@ class MonthPage extends ConsumerWidget {
             snoozedUntil: backup.snoozedUntil,
           ))
             _BackupReminderCard(lastBackup: backup.lastBackup),
+          if (NextMonthReminder.isDue(
+            today: today,
+            hasPeople: ref.watch(peopleProvider).any((p) => p.isActive),
+            nextMonthHasRoster: nextPlan?.hasRoster ?? false,
+            viewingNextMonth:
+                month.year == next.year && month.month == next.month,
+            snoozedUntil: ref.watch(nextMonthReminderSnoozeProvider),
+          ))
+            _NextMonthReminderCard(month: next, plan: nextPlan),
           if (plan.isLocked)
             Card(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -358,6 +374,70 @@ class _BackupReminderCard extends ConsumerWidget {
                 FilledButton.tonal(
                   onPressed: () => exportBackup(context, ref),
                   child: const Text('Yedek al'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Ay başı hatırlatması: gelecek ayın listesi henüz yoksa istekleri
+/// toplamaya başlatır. "Sonra" birkaç gün susturur.
+class _NextMonthReminderCard extends ConsumerWidget {
+  const _NextMonthReminderCard({required this.month, required this.plan});
+
+  final DateTime month;
+  final MonthPlan? plan;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final name = turkishMonthNames[month.month - 1];
+    final entered =
+        plan?.blockedDays.values.where((d) => d.isNotEmpty).length ?? 0;
+    final color = theme.colorScheme.onSecondaryContainer;
+    return Card(
+      key: const ValueKey('next-month-reminder'),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      color: theme.colorScheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.event_note_outlined, color: color),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '$name listesi henüz oluşturulmadı. İstenmeyen günleri '
+                    've izinleri toplamaya başla.'
+                    '${entered > 0 ? '\nŞu ana kadar $entered kişinin '
+                              'girişi var.' : ''}',
+                    style: TextStyle(color: color),
+                  ),
+                ),
+              ],
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => ref
+                      .read(nextMonthReminderSnoozeProvider.notifier)
+                      .snooze(
+                        ref.read(todayProvider).add(NextMonthReminder.snooze),
+                      ),
+                  child: const Text('Sonra'),
+                ),
+                FilledButton.tonal(
+                  onPressed: () =>
+                      ref.read(planMonthProvider.notifier).select(month),
+                  child: Text('$name ayına geç'),
                 ),
               ],
             ),
