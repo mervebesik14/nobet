@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../models/models.dart';
 import '../../shared/providers.dart';
@@ -131,6 +132,12 @@ class _PersonTile extends ConsumerWidget {
       title: Text(person.name),
       subtitle: period != null
           ? Text(period)
+          : person.startDate != null && person.startDate!.isAfter(today)
+          ? Text(
+              '${person.role.label} · '
+              '${DateFormat('d MMMM y', 'tr_TR').format(person.startDate!)} '
+              'tarihinde başlıyor',
+            )
           : !activeNow
           ? Text('${person.role.label} · pasif')
           : person.isChargeNurse

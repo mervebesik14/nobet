@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
 import '../../models/models.dart';
 import '../../shared/providers.dart';
@@ -22,6 +23,9 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
   late Role _role;
   late bool _isActive;
   late bool _isChargeNurse;
+
+  /// İşe başlama tarihi (isteğe bağlı).
+  DateTime? _startDate;
 
   /// Pasif dönemi (Aktif kapalıyken): başlangıç ve (boşsa süresiz) bitiş.
   DateTime? _inactiveFrom;
@@ -54,6 +58,7 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
         ? person.isActive
         : person.hasEndedInactivity(today);
     _isChargeNurse = person?.isChargeNurse ?? false;
+    _startDate = person?.startDate;
     _inactiveFrom = _isActive ? null : person?.inactiveFrom;
     _inactiveUntil = _isActive ? null : person?.inactiveUntil;
     // Geçmiş listelerde geçen kişinin görevi değişirse o listeler bozulur.
@@ -79,6 +84,18 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
     return null;
   }
 
+  Future<void> _pickStartDate() async {
+    final today = ref.read(todayProvider);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _startDate ?? today,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+      helpText: 'İşe başlama tarihi',
+    );
+    if (picked != null) setState(() => _startDate = picked);
+  }
+
   Future<void> _save() async {
     if (_saving || !_formKey.currentState!.validate()) return;
     setState(() => _saving = true);
@@ -91,6 +108,7 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
         role: _role,
         isActive: _isActive,
         isChargeNurse: chargeNurse,
+        startDate: _startDate,
       );
     } else {
       final messenger = ScaffoldMessenger.of(context);
@@ -99,6 +117,8 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
           name: _name.text,
           role: _role,
           isChargeNurse: chargeNurse,
+          startDate: _startDate,
+          clearStartDate: _startDate == null,
         ),
       );
       final from = _inactiveFrom;
@@ -210,6 +230,38 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
                 value: _isChargeNurse,
                 onChanged: (value) => setState(() => _isChargeNurse = value),
               ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.work_history_outlined),
+              title: const Text('İşe başlama tarihi'),
+              subtitle: Text(
+                _startDate == null
+                    ? 'Girilmedi. Yıl içinde işe başladıysa girin: öncesi '
+                          'yıl içi dengede "eksik nöbet" sayılmaz.'
+                    : '${DateFormat('d MMMM y', 'tr_TR').format(_startDate!)}. '
+                          'Öncesinde nöbete yazılmaz; yıl içi dengede yalnız '
+                          'bu tarihten sonrası sayılır.',
+              ),
+              trailing: _startDate == null
+                  ? TextButton(
+                      onPressed: _pickStartDate,
+                      child: const Text('Seç'),
+                    )
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextButton(
+                          onPressed: _pickStartDate,
+                          child: const Text('Değiştir'),
+                        ),
+                        IconButton(
+                          tooltip: 'Başlama tarihini kaldır',
+                          icon: const Icon(Icons.close),
+                          onPressed: () => setState(() => _startDate = null),
+                        ),
+                      ],
+                    ),
+            ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Aktif'),

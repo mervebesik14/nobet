@@ -22,6 +22,10 @@ void main() {
   tearDown(() => Hive.close());
 
   Future<void> pumpPage(WidgetTester tester) async {
+    // Telefon boyu: uzun kişi formu tek ekrana sığsın.
+    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -429,5 +433,34 @@ void main() {
     expect(find.text('Ali'), findsNothing);
     expect(find.text('Ali silindi.'), findsOneWidget);
     expect(boxes.people.get('1'), isNull);
+  });
+
+  testWidgets('işe henüz başlamamış kişi başlama tarihiyle görünür', (
+    tester,
+  ) async {
+    await seed([
+      Person(
+        id: 'y',
+        name: 'Yeni',
+        role: Role.nurse,
+        startDate: DateTime(2026, 11, 2),
+      ),
+    ]);
+    await pumpPage(tester);
+    expect(
+      find.text('Hemşire · 2 Kasım 2026 tarihinde başlıyor'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Yeni'));
+    await tester.pumpAndSettle();
+    expect(find.text('İşe başlama tarihi'), findsOneWidget);
+    expect(find.textContaining('2 Kasım 2026'), findsOneWidget);
+    // Tarih kaldırılıp kaydedilir.
+    await tester.tap(find.byTooltip('Başlama tarihini kaldır'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Kaydet'));
+    await tester.pumpAndSettle();
+    expect(boxes.people.get('y')!.startDate, isNull);
   });
 }

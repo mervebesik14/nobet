@@ -899,4 +899,54 @@ void main() {
       expect(spread(fives), 0, reason: 'seed $seed: $fives');
     }
   });
+
+  group('yıl içi pay: çalışabildiği güne göre', () {
+    final people = team(3, 0);
+
+    test('işe sonradan başlayan "eksik tutmuş" sayılmaz', () {
+      // n1, n2 yılın 300 gününde 90 nöbet; n3 yalnız 100 günde 30 nöbet
+      // tuttu (geç başladı). Oranları aynı: kimse payından sapmıyor.
+      final rel = RosterGenerator.relativeToShare(
+        people,
+        const {
+          'n1': PersonTotals(shifts: 90, availableDays: 300),
+          'n2': PersonTotals(shifts: 90, availableDays: 300),
+          'n3': PersonTotals(shifts: 30, availableDays: 100),
+        },
+        (t) => t.shifts,
+        2,
+      );
+      expect(rel['n1'], closeTo(0, 1e-9));
+      expect(rel['n3'], closeTo(0, 1e-9));
+    });
+
+    test('payından az tutan negatif, gün bilgisi yoksa ortalama', () {
+      final rel = RosterGenerator.relativeToShare(
+        people,
+        const {
+          'n1': PersonTotals(shifts: 91, availableDays: 300),
+          'n2': PersonTotals(shifts: 90, availableDays: 300),
+          'n3': PersonTotals(shifts: 29, availableDays: 100),
+        },
+        (t) => t.shifts,
+        2,
+      );
+      // Pay: 210 × 300 / 700 = 90, 210 × 100 / 700 = 30.
+      expect(rel['n1'], closeTo(1, 1e-9));
+      expect(rel['n3'], closeTo(-1, 1e-9));
+
+      final plain = RosterGenerator.relativeToShare(
+        people,
+        const {
+          'n1': PersonTotals(shifts: 12),
+          'n2': PersonTotals(shifts: 9),
+          'n3': PersonTotals(shifts: 9),
+        },
+        (t) => t.shifts,
+        2,
+      );
+      expect(plain['n1'], closeTo(2, 1e-9)); // 12 − 10
+      expect(plain['n2'], closeTo(-1, 1e-9));
+    });
+  });
 }

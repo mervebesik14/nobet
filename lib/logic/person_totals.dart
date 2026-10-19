@@ -11,6 +11,7 @@ class PersonTotals {
     this.requiredHours = 0,
     this.overtimeHours = 0,
     this.months = 0,
+    this.availableDays = 0,
   });
 
   final int shifts;
@@ -34,6 +35,11 @@ class PersonTotals {
   /// Toplama giren ay sayısı.
   final int months;
 
+  /// Kişinin bu aylarda çalışabildiği gün sayısı: ayın günleri eksi izin,
+  /// rapor, pasif ve işe başlamadan önceki günler. Yıl içi dengede kişinin
+  /// payı buna göre hesaplanır.
+  final int availableDays;
+
   PersonTotals operator +(PersonTotals o) => PersonTotals(
     shifts: shifts + o.shifts,
     weekendShifts: weekendShifts + o.weekendShifts,
@@ -45,5 +51,6 @@ class PersonTotals {
     requiredHours: requiredHours + o.requiredHours,
     overtimeHours: overtimeHours + o.overtimeHours,
     months: months + o.months,
+    availableDays: availableDays + o.availableDays,
   );
 }

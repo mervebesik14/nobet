@@ -318,4 +318,27 @@ void main() {
       [2],
     );
   });
+
+  group('Person işe başlama tarihi', () {
+    final p = Person(
+      id: 'a',
+      name: 'Yeni',
+      role: Role.nurse,
+      startDate: DateTime(2026, 10, 15),
+    );
+
+    test('JSON gidiş-dönüş ve copyWith', () {
+      expect(Person.fromJson(p.toJson()), p);
+      expect(p.copyWith(clearStartDate: true).startDate, isNull);
+    });
+
+    test('öncesinde çalışmaz; başladığı ayda öncesi pasif gün', () {
+      expect(p.isActiveOn(DateTime(2026, 10, 14)), isFalse);
+      expect(p.isActiveOn(DateTime(2026, 10, 15)), isTrue);
+      expect(p.worksInMonth(2026, 9), isFalse);
+      expect(p.worksInMonth(2026, 10), isTrue);
+      expect(p.inactiveDaysIn(2026, 10), [for (var d = 1; d <= 14; d++) d]);
+      expect(p.inactiveDaysIn(2026, 11), isEmpty);
+    });
+  });
 }

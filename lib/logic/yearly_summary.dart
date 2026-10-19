@@ -46,6 +46,16 @@ class YearlySummary {
     for (final r in rows) r.personId: r.totals,
   };
 
+  /// Kişinin [plan] ayında çalışabildiği gün sayısı: ayın günleri eksi
+  /// izin / rapor günleri, pasif ve işe başlamadan önceki günler.
+  static int _availableDays(MonthPlan plan, Person? person, String id) {
+    final off = {
+      ...plan.leaveDaysOf(id),
+      ...?person?.inactiveDaysIn(plan.year, plan.month),
+    };
+    return plan.daysInMonth - off.length;
+  }
+
   /// [row] kişisinin [month] ayındaki değerinin, aynı roldeki kişilerin o
   /// ayki ortalamasından farkı (sorumlu hemşire ortalamaya girmez). Kişinin
   /// o ay kaydı yoksa null.
@@ -85,6 +95,7 @@ class YearlySummary {
           ..sort((a, b) => a.month.compareTo(b.month));
 
     final byKey = {for (final p in plans) p.key: p};
+    final byPerson = {for (final p in people) p.id: p};
     final totals = <String, PersonTotals>{};
     final monthly = <String, Map<int, PersonTotals>>{};
     final info = <String, (String, Role)>{};
@@ -137,6 +148,7 @@ class YearlySummary {
           requiredHours: r.requiredHours,
           overtimeHours: r.overtimeHours,
           months: 1,
+          availableDays: _availableDays(plan, byPerson[r.personId], r.personId),
         );
         (monthly[r.personId] ??= {})[plan.month] = month;
         totals[r.personId] =

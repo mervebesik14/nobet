@@ -195,6 +195,34 @@ class RosterGenerator {
     };
   }
 
+  /// Kişinin yıl içi toplamının, çalışabildiği güne göre payından farkı
+  /// (± [clamp] ile sınırlı). Pay = grubun toplamı × kişinin çalışabildiği
+  /// gün / grubun çalışabildiği gün: işe sonradan başlayan ya da uzun izne
+  /// çıkan kişi "eksik tutmuş" sayılmaz. Gün bilgisi yoksa grup ortalaması
+  /// kullanılır. Pozitif: payından fazla tutmuş.
+  static Map<String, double> relativeToShare(
+    List<Person> members,
+    Map<String, PersonTotals> ytd,
+    int Function(PersonTotals) pick,
+    double clamp,
+  ) {
+    if (members.isEmpty) return const {};
+    final totals = {
+      for (final p in members) p.id: ytd[p.id] ?? const PersonTotals(),
+    };
+    final sum = totals.values.fold(0, (a, t) => a + pick(t));
+    final days = totals.values.fold(0, (a, t) => a + t.availableDays);
+    final mean = sum / members.length;
+    return {
+      for (final e in totals.entries)
+        e.key:
+            (pick(e.value) -
+                    (days > 0 ? sum * e.value.availableDays / days : mean))
+                .clamp(-clamp, clamp)
+                .toDouble(),
+    };
+  }
+
   /// Ayın tam gün tatilleri (arifeler hariç). [religious] verilirse yalnız
   /// dini bayramlar (true) ya da yalnız resmi tatiller (false). Resmi tatil
   /// ve dini bayram nöbetleri hafta sonundan ve birbirinden ayrı dengelenir.
@@ -532,15 +560,7 @@ class _RoleSolver {
     Map<String, PersonTotals> ytd,
     int Function(PersonTotals) pick,
   ) {
-    if (members.isEmpty) return const {};
-    final values = {
-      for (final p in members) p.id: pick(ytd[p.id] ?? const PersonTotals()),
-    };
-    final mean = values.values.fold(0, (a, b) => a + b) / values.length;
-    return {
-      for (final e in values.entries)
-        e.key: (e.value - mean).clamp(-_ytdClamp, _ytdClamp).toDouble(),
-    };
+    return RosterGenerator.relativeToShare(members, ytd, pick, _ytdClamp);
   }
 
   late List<List<String>> _slots;
@@ -1111,15 +1131,7 @@ class _TechSolver {
     Map<String, PersonTotals> ytd,
     int Function(PersonTotals) pick,
   ) {
-    if (members.isEmpty) return const {};
-    final values = {
-      for (final p in members) p.id: pick(ytd[p.id] ?? const PersonTotals()),
-    };
-    final mean = values.values.fold(0, (a, b) => a + b) / values.length;
-    return {
-      for (final e in values.entries)
-        e.key: (e.value - mean).clamp(-_ytdClamp, _ytdClamp).toDouble(),
-    };
+    return RosterGenerator.relativeToShare(members, ytd, pick, _ytdClamp);
   }
 
   void _reset() {

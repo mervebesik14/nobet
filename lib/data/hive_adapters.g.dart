@@ -62,13 +62,14 @@ class PersonAdapter extends TypeAdapter<Person> {
       isChargeNurse: fields[5] == null ? false : fields[5] as bool,
       inactiveFrom: fields[6] as DateTime?,
       inactiveUntil: fields[7] as DateTime?,
+      startDate: fields[8] as DateTime?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Person obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -84,7 +85,9 @@ class PersonAdapter extends TypeAdapter<Person> {
       ..writeByte(6)
       ..write(obj.inactiveFrom)
       ..writeByte(7)
-      ..write(obj.inactiveUntil);
+      ..write(obj.inactiveUntil)
+      ..writeByte(8)
+      ..write(obj.startDate);
   }
 
   @override

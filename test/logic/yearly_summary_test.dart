@@ -110,4 +110,37 @@ void main() {
     // Toplam = ayların toplamı.
     expect(ayse.totals.shifts, 5);
   });
+
+  test('çalışabildiği gün: izin ve işe başlamadan önceki günler düşülür', () {
+    final s = YearlySummary.build(
+      year: 2026,
+      plans: [
+        MonthPlan(
+          year: 2026,
+          month: 10,
+          assignments: {
+            20: const DayAssignment(day: 20, nurseIds: ['n'], techId: 't'),
+            22: const DayAssignment(day: 22, nurseIds: ['b'], techId: 't'),
+          },
+          annualLeave: const {
+            'b': [1, 2, 3],
+          },
+        ),
+      ],
+      people: [
+        ...people,
+        Person(
+          id: 'n',
+          name: 'Nur',
+          role: Role.nurse,
+          startDate: DateTime(2026, 10, 16),
+        ),
+      ],
+      holidays: holidays,
+      settings: const RosterSettings(),
+    );
+    expect(s.byId['a']!.availableDays, 31);
+    expect(s.byId['b']!.availableDays, 28); // 3 gün izin
+    expect(s.byId['n']!.availableDays, 16); // 16–31 Ekim
+  });
 }

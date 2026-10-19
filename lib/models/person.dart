@@ -11,6 +11,7 @@ class Person {
     this.isChargeNurse = false,
     this.inactiveFrom,
     this.inactiveUntil,
+    this.startDate,
   });
 
   final String id;
@@ -36,13 +37,19 @@ class Person {
   /// Pasif döneminin son günü (dahil). Boşsa dönem süresizdir.
   final DateTime? inactiveUntil;
 
+  /// İşe başlama tarihi (isteğe bağlı). Öncesindeki günlerde kişi nöbete
+  /// yazılmaz ve yıl içi dengede o günler kişinin payına sayılmaz.
+  final DateTime? startDate;
+
   static DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
 
   /// Kişi [date] gününde çalışabilir mi (aktif mi)?
   bool isActiveOn(DateTime date) {
+    final day = _day(date);
+    final start = startDate;
+    if (start != null && day.isBefore(_day(start))) return false;
     final from = inactiveFrom;
     if (from == null) return isActive;
-    final day = _day(date);
     if (day.isBefore(_day(from))) return true;
     final until = inactiveUntil;
     return until != null && day.isAfter(_day(until));
@@ -59,7 +66,7 @@ class Person {
 
   /// Kişi [year]/[month] ayında en az bir gün aktif mi?
   bool worksInMonth(int year, int month) {
-    if (inactiveFrom == null) return isActive;
+    if (inactiveFrom == null && startDate == null) return isActive;
     final last = DateTime(year, month + 1, 0).day;
     for (var d = 1; d <= last; d++) {
       if (isActiveOn(DateTime(year, month, d))) return true;
@@ -68,9 +75,13 @@ class Person {
   }
 
   /// [year]/[month] ayında, ayın bir kısmında çalıştığı halde pasif olduğu
-  /// günler. Ayda hiç aktif değilse ya da tamamen aktifse boş.
+  /// (ya da henüz işe başlamadığı) günler. Ayda hiç aktif değilse ya da
+  /// tamamen aktifse boş.
   List<int> inactiveDaysIn(int year, int month) {
-    if (inactiveFrom == null || !worksInMonth(year, month)) return const [];
+    if ((inactiveFrom == null && startDate == null) ||
+        !worksInMonth(year, month)) {
+      return const [];
+    }
     final last = DateTime(year, month + 1, 0).day;
     return [
       for (var d = 1; d <= last; d++)
@@ -89,6 +100,8 @@ class Person {
     DateTime? inactiveUntil,
     bool clearInactiveFrom = false,
     bool clearInactiveUntil = false,
+    DateTime? startDate,
+    bool clearStartDate = false,
   }) {
     return Person(
       id: id,
@@ -103,6 +116,7 @@ class Person {
       inactiveUntil: clearInactiveUntil || clearInactiveFrom
           ? null
           : (inactiveUntil ?? this.inactiveUntil),
+      startDate: clearStartDate ? null : (startDate ?? this.startDate),
     );
   }
 
@@ -115,6 +129,7 @@ class Person {
     'isChargeNurse': isChargeNurse,
     'inactiveFrom': inactiveFrom?.toIso8601String(),
     'inactiveUntil': inactiveUntil?.toIso8601String(),
+    'startDate': startDate?.toIso8601String(),
   };
 
   factory Person.fromJson(Map<String, dynamic> json) => Person(
@@ -130,6 +145,9 @@ class Person {
     inactiveUntil: json['inactiveUntil'] == null
         ? null
         : DateTime.parse(json['inactiveUntil'] as String),
+    startDate: json['startDate'] == null
+        ? null
+        : DateTime.parse(json['startDate'] as String),
   );
 
   @override
@@ -142,7 +160,8 @@ class Person {
       other.colorValue == colorValue &&
       other.isChargeNurse == isChargeNurse &&
       other.inactiveFrom == inactiveFrom &&
-      other.inactiveUntil == inactiveUntil;
+      other.inactiveUntil == inactiveUntil &&
+      other.startDate == startDate;
 
   @override
   int get hashCode => Object.hash(
@@ -154,6 +173,7 @@ class Person {
     isChargeNurse,
     inactiveFrom,
     inactiveUntil,
+    startDate,
   );
 
   @override

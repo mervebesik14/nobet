@@ -68,6 +68,7 @@ class PeopleController extends Notifier<List<Person>> {
     required Role role,
     bool isActive = true,
     bool isChargeNurse = false,
+    DateTime? startDate,
   }) async {
     final person = Person(
       id: _uuid.v4(),
@@ -75,6 +76,9 @@ class PeopleController extends Notifier<List<Person>> {
       role: role,
       isActive: isActive,
       isChargeNurse: isChargeNurse,
+      startDate: startDate == null
+          ? null
+          : DateTime(startDate.year, startDate.month, startDate.day),
     );
     await _save(person);
     return person;
