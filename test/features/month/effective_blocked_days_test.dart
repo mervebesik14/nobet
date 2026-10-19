@@ -148,4 +148,48 @@ void main() {
     final blocked = container().read(effectiveBlockedDaysProvider);
     expect(blocked['n1'], [for (var d = 20; d <= 31; d++) d]);
   });
+
+  test('şua dönüşünün ilk iş günü ay sınırını aşarak mutlaka nöbet', () {
+    // t1 şuası 26 Ekim – 4 Kasım (Ekim ve Kasım planlarında); dönüş 5 Kasım
+    // Perşembe. Sorumlu hemşirenin seçtiği günler de korunur.
+    boxes.monthPlans.put(
+      '2026-10',
+      const MonthPlan(
+        year: 2026,
+        month: 10,
+        radiationLeave: {
+          't1': [26, 27, 28, 29, 30, 31],
+        },
+      ),
+    );
+    const november = MonthPlan(
+      year: 2026,
+      month: 11,
+      radiationLeave: {
+        't1': [1, 2, 3, 4],
+      },
+      requestedShifts: {
+        's': [3, 10],
+      },
+    );
+    boxes.monthPlans.put('2026-11', november);
+    final repo = MonthPlanRepository(boxes.monthPlans);
+    final holidays = boxes.holidays.values.toList();
+    expect(computeRadiationReturnDays(november, holidays, repository: repo), {
+      't1': {5},
+    });
+    expect(computeRequiredShifts(november, holidays, repository: repo), {
+      't1': [5],
+      's': [3, 10],
+    });
+    // Ekim'de dönüş günü yok (şua Kasım'a taşıyor).
+    expect(
+      computeRadiationReturnDays(
+        boxes.monthPlans.get('2026-10')!,
+        holidays,
+        repository: repo,
+      ),
+      isEmpty,
+    );
+  });
 }

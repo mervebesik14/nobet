@@ -40,8 +40,13 @@ void main() {
     previousMonthTail: tail,
   );
 
+  /// Ay sonundaki açık boşluk uyarısı: örnek listeler ayın yalnız ilk
+  /// günlerini doldurduğu için her testte çıkar; kendi testinde denetlenir.
+  bool monthEndGap(RuleViolation v) =>
+      v.kind == ViolationKind.longGap && v.message.contains('ay sonuna kadar');
+
   List<RuleViolation> except(List<RuleViolation> all, ViolationKind kind) =>
-      all.where((v) => v.kind != kind).toList();
+      all.where((v) => v.kind != kind && !monthEndGap(v)).toList();
 
   test('eksik koltuklar her gün ve rol için raporlanır', () {
     final v = check({
@@ -367,7 +372,7 @@ void main() {
         people: people,
         absentDays: absent,
       ))
-        if (v.kind == ViolationKind.longGap) v,
+        if (v.kind == ViolationKind.longGap && !monthEndGap(v)) v,
     ];
 
     final v = gaps();
@@ -436,5 +441,72 @@ void main() {
     final over = v.where((x) => x.kind == ViolationKind.overStaffed).single;
     expect(over.days, [1]);
     expect(over.message, '1 Şubat: 1 fazla hemşire yazılı.');
+  });
+
+  test('ay sonunda 5 günden uzun boşluk uyarı verir', () {
+    final v = [
+      for (final x in validator.validate(
+        year: 2027,
+        month: 2,
+        assignments: {
+          20: const DayAssignment(day: 20, nurseIds: ['a', 'b'], techId: 'm'),
+          25: const DayAssignment(day: 25, nurseIds: ['b', 'c'], techId: 'z'),
+        },
+        people: people,
+      ))
+        if (x.kind == ViolationKind.longGap && x.personId == 'a') x,
+    ];
+    // Şubat 2027: 28 gün; 21–28 → 8 gün.
+    expect(v.single.days, [20]);
+    expect(
+      v.single.message,
+      'Ayşe son nöbeti 20 Şubat; ay sonuna kadar 8 gün boş (en fazla 5).',
+    );
+  });
+
+  test('şua dönüşünün ilk iş günü nöbette değilse uyarı', () {
+    List<RuleViolation> returns(
+      Map<int, DayAssignment> a, {
+      Map<String, List<int>> unavailable = const {},
+    }) => [
+      for (final x in validator.validate(
+        year: 2027,
+        month: 2,
+        assignments: a,
+        people: people,
+        unavailableDays: unavailable,
+        radiationReturnDays: {
+          'm': {5},
+        },
+      ))
+        if (x.kind == ViolationKind.radiationReturn) x,
+    ];
+    final v = returns({
+      5: const DayAssignment(day: 5, nurseIds: ['a', 'b'], techId: 'z'),
+    });
+    expect(v.single.personId, 'm');
+    expect(v.single.days, [5]);
+    expect(
+      v.single.message,
+      'Mehmet şua izninden dönüşün ilk iş günü (5 Şubat) nöbete yazılmadı.',
+    );
+    // Nöbetteyse ya da o günü istemiyorsa uyarı yok.
+    expect(
+      returns({
+        5: const DayAssignment(day: 5, nurseIds: ['a', 'b'], techId: 'm'),
+      }),
+      isEmpty,
+    );
+    expect(
+      returns(
+        {
+          5: const DayAssignment(day: 5, nurseIds: ['a', 'b'], techId: 'z'),
+        },
+        unavailable: {
+          'm': [5],
+        },
+      ),
+      isEmpty,
+    );
   });
 }

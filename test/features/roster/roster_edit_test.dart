@@ -16,11 +16,19 @@ import '../../helpers.dart';
 const _nurses = ['Ayşe', 'Banu', 'Cemile', 'Derya', 'Elif', 'Fatma', 'Gül'];
 const _techs = ['Ali', 'Burak', 'Can', 'Deniz'];
 
-/// 7 hemşire + 4 tekniker; Hale (n7) yedek hemşire, hiç nöbeti yok.
+/// 7 hemşire + 4 tekniker; Hale (n7) yedek hemşire, hiç nöbeti yok. 5
+/// Ekim'den itibaren pasif: testler ona 3 Ekim'de nöbet verir; pasif günler
+/// boşluğu kestiği için ay sonu boşluk uyarısı çıkmaz, kurala uygun aday
+/// kalır.
 final _people = [
   for (var i = 0; i < _nurses.length; i++)
     Person(id: 'n$i', name: _nurses[i], role: Role.nurse),
-  const Person(id: 'n7', name: 'Hale', role: Role.nurse),
+  Person(
+    id: 'n7',
+    name: 'Hale',
+    role: Role.nurse,
+    inactiveFrom: DateTime(2026, 10, 5),
+  ),
   for (var i = 0; i < _techs.length; i++)
     Person(id: 't$i', name: _techs[i], role: Role.radiologyTech),
 ];

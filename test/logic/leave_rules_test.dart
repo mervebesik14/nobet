@@ -188,4 +188,59 @@ void main() {
       );
     });
   });
+
+  group('şua izni dönüşü: ilk iş günü mutlaka nöbet', () {
+    Set<int> returns(int month, List<DateTime> leave) =>
+        LeaveRules.radiationReturnDaysInMonth(
+          year: 2026,
+          month: month,
+          radiationLeave: leave,
+          holidays: holidays,
+        );
+    List<DateTime> range(DateTime from, DateTime to) => [
+      for (
+        var d = from;
+        !d.isAfter(to);
+        d = DateTime(d.year, d.month, d.day + 1)
+      )
+        d,
+    ];
+
+    test('hafta içi biten şua: ertesi gün', () {
+      // Şua 26 Ekim – 4 Kasım Çarşamba: dönüş 5 Kasım Perşembe.
+      final leave = range(DateTime(2026, 10, 26), DateTime(2026, 11, 4));
+      expect(returns(11, leave), {5});
+      expect(returns(10, leave), isEmpty);
+    });
+
+    test('Cuma biten şua: Pazartesi', () {
+      // Şua 5–9 Ekim (9 Cuma): dönüş 12 Ekim Pazartesi.
+      expect(returns(10, range(DateTime(2026, 10, 5), DateTime(2026, 10, 9))), {
+        12,
+      });
+    });
+
+    test('tatil araya girerse sonraki iş günü; ay sınırını aşar', () {
+      // Şua 26–28 Ekim (28 arife, iş günü sayılır ama izinde): 29 Ekim
+      // Cumhuriyet Bayramı, 30 Cuma iş günü → dönüş 30 Ekim.
+      expect(
+        returns(10, range(DateTime(2026, 10, 26), DateTime(2026, 10, 28))),
+        {30},
+      );
+      // Şua 30 Ekim Cuma biter: 31 Cmt, 1 Paz → dönüş 2 Kasım Pazartesi.
+      final leave = range(DateTime(2026, 10, 19), DateTime(2026, 10, 30));
+      expect(returns(10, leave), isEmpty);
+      expect(returns(11, leave), {2});
+    });
+
+    test('iki ayrı şua dönemi: iki dönüş günü', () {
+      expect(
+        returns(10, [
+          ...range(DateTime(2026, 10, 1), DateTime(2026, 10, 2)),
+          ...range(DateTime(2026, 10, 13), DateTime(2026, 10, 14)),
+        ]),
+        {5, 15},
+      );
+    });
+  });
 }

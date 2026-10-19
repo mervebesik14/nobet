@@ -22,6 +22,11 @@ import '../models/holiday.dart';
 /// takvim gününde nöbet tutulmaz (hafta sonu / tatil fark etmez). Örneğin
 /// şua izni 10'unda başlıyorsa 8 ve 9'unda nöbet yazılmaz.
 ///
+/// **Şua izninden dönüş:** Kişi izin bittikten sonraki ilk iş gününde
+/// mutlaka nöbet tutar ([radiationReturnDaysInMonth]); yalnız o gün
+/// istemediği bir günse yazılmaz. Örneğin şua 4 Kasım Çarşamba bitiyorsa
+/// 5 Kasım Perşembe nöbetçidir.
+///
 /// İş günü = hafta içi (Pazartesi–Cuma) ve tam gün resmi tatil olmayan gün.
 /// Arife (yarım gün tatil) iş günü sayılır.
 class LeaveRules {
@@ -138,6 +143,39 @@ class LeaveRules {
       for (final d in blocked.difference(leave))
         if (d.year == year && d.month == month) d.day,
     };
+  }
+
+  /// [radiationLeave] şua izni tarihlerine (her aydan olabilir) göre,
+  /// [year]/[month] ayına düşen dönüş günleri: her şua döneminin bitişinden
+  /// sonraki ilk iş günü. Kişi bu günlerde mutlaka nöbet tutar.
+  static Set<int> radiationReturnDaysInMonth({
+    required int year,
+    required int month,
+    required Iterable<DateTime> radiationLeave,
+    required Iterable<Holiday> holidays,
+  }) {
+    final leave = {for (final d in radiationLeave) _day(d)};
+    if (leave.isEmpty) return const {};
+    final fullHolidays = {
+      for (final h in holidays)
+        if (!h.isHalfDay) _day(h.date),
+    };
+    bool isWorkday(DateTime d) =>
+        d.weekday != DateTime.saturday &&
+        d.weekday != DateTime.sunday &&
+        !fullHolidays.contains(d);
+    final result = <int>{};
+    for (final day in leave) {
+      if (leave.contains(_shift(day, 1))) continue; // dönemin sonu değil
+      var d = _shift(day, 1);
+      for (var i = 0; i < _maxGap && !isWorkday(d); i++) {
+        d = _shift(d, 1);
+      }
+      if (isWorkday(d) && d.year == year && d.month == month) {
+        result.add(d.day);
+      }
+    }
+    return result;
   }
 
   /// Bayram + hafta sonu gibi uzun ardışık tatillerde bile yeter.

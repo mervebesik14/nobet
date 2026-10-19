@@ -128,9 +128,10 @@ class RosterGenerator {
   /// Fazla mesai isteyene tanınan ek nöbet payı.
   final int overtimeAllowance;
 
-  /// Kişi → mutlaka nöbet tutacağı günler (sorumlu hemşire için seçilir).
-  /// Bu günlere sabit yazılır; kalan koltuklar diğerleriyle dolar. Kişinin
-  /// o gün uygun olmadığı (istemediği / izinli) günler yok sayılır.
+  /// Kişi → mutlaka nöbet tutacağı günler: sorumlu hemşirenin seçtiği
+  /// günler ve şua izni dönüşünün ilk iş günü. Bu günlere sabit yazılır;
+  /// kalan koltuklar diğerleriyle dolar. Kişinin o gün uygun olmadığı
+  /// (istemediği / izinli) günler yok sayılır.
   final Map<String, List<int>> requestedShifts;
 
   /// Kişi → izinli (yıllık / şua / rapor) günler. Araya izin giren
@@ -147,6 +148,20 @@ class RosterGenerator {
   Map<String, Set<int>> _absentFor(List<Person> members) => {
     for (final p in members)
       p.id: {...?absentDays[p.id], ...p.inactiveDaysIn(year, month)},
+  };
+
+  /// Kişi → mutlaka nöbet tutacağı günler ([requestedShifts]); ayın dışı ve
+  /// istemediği / izinli günler atılır.
+  Map<String, Set<int>> _fixedFor(List<Person> members) => {
+    for (final p in members)
+      if (requestedShifts[p.id]?.isNotEmpty ?? false)
+        p.id: {
+          for (final d in requestedShifts[p.id]!)
+            if (d >= 1 &&
+                d <= daysInMonth &&
+                !(unavailableDays[p.id] ?? const []).contains(d))
+              d,
+        },
   };
 
   /// Kişi → fazla mesai payı (fazla mesai isteyene [overtimeAllowance], yoksa
@@ -292,17 +307,7 @@ class RosterGenerator {
         for (final p in nurseMembers)
           if (p.isChargeNurse) p.id,
       },
-      fixed: {
-        for (final p in nurseMembers)
-          if (requestedShifts[p.id]?.isNotEmpty ?? false)
-            p.id: {
-              for (final d in requestedShifts[p.id]!)
-                if (d >= 1 &&
-                    d <= daysInMonth &&
-                    !(unavailableDays[p.id] ?? const []).contains(d))
-                  d,
-            },
-      },
+      fixed: _fixedFor(nurseMembers),
       settings: settings,
     )._run(rng, attempts, existing, (a) => a.nurseIds);
 
@@ -329,6 +334,7 @@ class RosterGenerator {
         absent: _absentFor(techMembers),
         yearToDate: yearToDate,
         allowance: _allowanceFor(techMembers),
+        fixed: _fixedFor(techMembers),
         settings: settings,
       )._run(rng, attempts, existing);
       techScore = tech.score;
@@ -355,6 +361,7 @@ class RosterGenerator {
         absent: _absentFor(techMembers),
         yearToDate: yearToDate,
         allowance: _allowanceFor(techMembers),
+        fixed: _fixedFor(techMembers),
         settings: settings,
       )._run(rng, attempts, existing, (a) => [?a.techId]);
       techScore = techs.score;
@@ -722,6 +729,7 @@ class _RoleSolver {
         to: days,
         works: (d) => _works(id, d),
         isAbsent: off == null || off.isEmpty ? null : off.contains,
+        openEnd: true,
       );
       gapExcess += excess;
       longGaps.add(long);
@@ -1255,6 +1263,7 @@ class _TechSolver {
     this.absent = const {},
     required Map<String, PersonTotals> yearToDate,
     this.allowance = const {},
+    this.fixed = const {},
     required RosterSettings settings,
   }) : ids = [for (final p in members) p.id],
        maxChain = max(1, settings.maxEveryOtherDayChain),
@@ -1288,6 +1297,26 @@ class _TechSolver {
 
   /// Kişi → fazla mesai payı; 24 sayısı dengesinde bu kadarı hoş görülür.
   final Map<String, int> allowance;
+
+  /// Kişi → mutlaka nöbet tutacağı günler (ör. şua dönüşü): her denemede
+  /// önce yazılır (24, olmazsa 16B), yerel iyileştirmede oynatılmaz.
+  final Map<String, Set<int>> fixed;
+
+  bool _isFixed(String id, int d) => fixed[id]?.contains(d) ?? false;
+
+  void _prefill() {
+    for (final MapEntry(key: id, value: days) in fixed.entries) {
+      if (!_w24.containsKey(id)) continue;
+      for (final d in days.toList()..sort()) {
+        if (_slot24[d] == id || _slot16[d] == id) continue;
+        if (_canPlace24(id, d)) {
+          _place24(id, d);
+        } else if (_canPlace16(id, d)) {
+          _place16(id, d);
+        }
+      }
+    }
+  }
 
   int _allow(String id) => allowance[id] ?? 0;
 
@@ -1462,6 +1491,7 @@ class _TechSolver {
             ? (t?.contains(d) ?? false)
             : _w24[id]!.contains(d) || _w16[id]!.contains(d),
         isAbsent: off == null || off.isEmpty ? null : off.contains,
+        openEnd: true,
       );
       gapExcess += excess;
       longById[id] = long;
@@ -1507,6 +1537,7 @@ class _TechSolver {
       for (var d = 1; d <= days; d++) existing[d]?.tech16bId,
     ];
     if (ids.isEmpty) return _TechSolution(this, [..._slot24], [..._slot16], 0);
+    _prefill();
     for (var d = 1; d <= days; d++) {
       final a = _original24![d];
       if (a != null && ids.contains(a) && _canPlace24(a, d)) _place24(a, d);
@@ -1574,6 +1605,7 @@ class _TechSolver {
         return c != 0 ? c : tie[a]!.compareTo(tie[b]!);
       });
     }
+    _prefill();
     for (final d in order) {
       _fillDay(d, rng);
     }
@@ -1658,7 +1690,7 @@ class _TechSolver {
       for (var d = 1; d <= days; d++) {
         for (final is16b in const [false, true]) {
           final a = is16b ? _slot16[d] : _slot24[d];
-          if (a == null) continue;
+          if (a == null || _isFixed(a, d)) continue;
           for (final b in ids) {
             if (b == a) continue;
             if (is16b) {
@@ -1704,6 +1736,7 @@ class _TechSolver {
             final a = slot[d1];
             final b = slot[d2];
             if (a == null || b == null || a == b) continue;
+            if (_isFixed(a, d1) || _isFixed(b, d2)) continue;
             if (_trySwap(a, d1, b, d2, is16b: is16b, current: current)) {
               current = _score();
               improved = true;
@@ -1752,8 +1785,10 @@ class _TechSolver {
     }
 
     var touches = false;
-    for (var d = from; d <= days && !touches; d++) {
-      touches = [_slot24[d], _slot16[d]].any((x) => x == a || x == b);
+    for (var d = from; d <= days; d++) {
+      if (_isFixed(a, d) || _isFixed(b, d)) return false;
+      touches =
+          touches || [_slot24[d], _slot16[d]].any((x) => x == a || x == b);
     }
     if (!touches) return false;
     swap();

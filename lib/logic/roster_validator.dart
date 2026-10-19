@@ -41,6 +41,9 @@ enum ViolationKind {
 
   /// Güne gerekenden fazla hemşire yazılmış (serbest düzenleme).
   overStaffed,
+
+  /// Şua izninden dönen kişi ilk iş gününde nöbette değil.
+  radiationReturn,
 }
 
 /// Bir kural ihlali.
@@ -93,6 +96,7 @@ class RosterValidator {
     Set<String> overtimeRequests = const {},
     int overtimeAllowance = 2,
     Map<String, List<int>> requestedShifts = const {},
+    Map<String, Set<int>> radiationReturnDays = const {},
     Map<String, List<int>> absentDays = const {},
   }) {
     final daysInMonth = DateTime(year, month + 1, 0).day;
@@ -327,20 +331,28 @@ class RosterValidator {
         ...?absentDays[id],
         ...?byId[id]?.inactiveDaysIn(year, month),
       };
-      for (final (a, b, gap) in ShiftGaps.gaps(days, absent: off)) {
+      for (final (a, b, gap) in ShiftGaps.gaps(
+        days,
+        absent: off,
+        monthEnd: daysInMonth,
+      )) {
         if (gap <= ShiftGaps.maxGap || (byId[id]?.isChargeNurse ?? false)) {
           continue;
         }
+        final from = a >= 1 ? '$a' : date(a);
         violations.add(
           RuleViolation(
             kind: ViolationKind.longGap,
-            days: [if (a >= 1) a, b],
+            days: [if (a >= 1) a, if (b <= daysInMonth) b],
             personId: id,
             role: role,
-            message:
-                '${name(id)} ${a >= 1 ? '$a' : date(a)} ve '
-                '${formatDayMonth(b, month)} arasında $gap gün boş '
-                '(en fazla ${ShiftGaps.maxGap}).',
+            message: b > daysInMonth
+                ? '${name(id)} son nöbeti ${a >= 1 ? formatDayMonth(a, month) : from}; '
+                      'ay sonuna kadar $gap gün boş '
+                      '(en fazla ${ShiftGaps.maxGap}).'
+                : '${name(id)} $from ve '
+                      '${formatDayMonth(b, month)} arasında $gap gün boş '
+                      '(en fazla ${ShiftGaps.maxGap}).',
           ),
         );
       }
@@ -445,6 +457,32 @@ class RosterValidator {
             ),
           );
         }
+      }
+    }
+
+    // Şua dönüşünün ilk iş günü mutlaka nöbet (istemediği gün değilse).
+    for (final MapEntry(key: id, value: returnDays)
+        in radiationReturnDays.entries) {
+      final person = byId[id];
+      if (person == null || !person.worksInMonth(year, month)) continue;
+      if (person.role == Role.radiologyTech && settings.techsPerDay == 0) {
+        continue; // yalnız hemşire ayı
+      }
+      for (final d in returnDays.toList()..sort()) {
+        if (d < 1 || d > daysInMonth) continue;
+        if (worked[id]?.contains(d) ?? false) continue;
+        if (unavailableDays[id]?.contains(d) ?? false) continue;
+        violations.add(
+          RuleViolation(
+            kind: ViolationKind.radiationReturn,
+            days: [d],
+            personId: id,
+            role: person.role,
+            message:
+                '${name(id)} şua izninden dönüşün ilk iş günü '
+                '(${date(d)}) nöbete yazılmadı.',
+          ),
+        );
       }
     }
 

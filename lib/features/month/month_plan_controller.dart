@@ -350,7 +350,11 @@ class MonthPlanController extends Notifier<MonthPlan> {
       seed: seed ?? ref.read(rosterSeedProvider)(),
       previousMonthTail: previousMonthTail(),
       overtimeRequests: plan.overtimeRequests,
-      requestedShifts: plan.requestedShifts,
+      requestedShifts: computeRequiredShifts(
+        plan,
+        ref.read(holidaysProvider),
+        repository: ref.read(monthPlanRepositoryProvider),
+      ),
       absentDays: plan.leaveDays,
       yearToDate: YearlySummary.build(
         year: plan.year,
@@ -520,6 +524,11 @@ final rosterViolationsProvider = Provider<List<RuleViolation>>((ref) {
     previousMonthTail: ref.read(monthPlanProvider.notifier).previousMonthTail(),
     overtimeRequests: plan.overtimeRequests,
     requestedShifts: plan.requestedShifts,
+    radiationReturnDays: computeRadiationReturnDays(
+      plan,
+      ref.watch(holidaysProvider),
+      repository: ref.read(monthPlanRepositoryProvider),
+    ),
     absentDays: plan.leaveDays,
   );
 });
@@ -547,22 +556,7 @@ Map<String, Map<int, BlockReason>> computeBlockReasons(
   MonthPlanRepository? repository,
   Iterable<Person> people = const [],
 }) {
-  final prevMonth = DateTime(plan.year, plan.month - 1);
-  final nextMonth = DateTime(plan.year, plan.month + 1);
-  final neighbours = [
-    ?repository?.get(prevMonth.year, prevMonth.month),
-    ?repository?.get(nextMonth.year, nextMonth.month),
-  ];
-  final plans = [plan, ...neighbours];
-
-  // Komşu ay başka yıldaysa ve o yılın tatilleri henüz yüklenmediyse
-  // hazır Türkiye tatilleri kullanılır.
-  final allHolidays = [...holidays];
-  for (final year in {prevMonth.year, nextMonth.year}) {
-    if (!allHolidays.any((h) => h.date.year == year)) {
-      allHolidays.addAll(TurkishHolidays.forYear(year));
-    }
-  }
+  final (plans, allHolidays) = _withNeighbours(plan, holidays, repository);
 
   final annualIds = {for (final p in plans) ...p.annualLeave.keys};
   Map<String, Set<int>> annualRule({required bool before}) => {
@@ -617,6 +611,76 @@ Map<String, Map<int, BlockReason>> computeBlockReasons(
         ),
     },
   });
+}
+
+/// [plan] ile komşu ayların planları (izin kuralları ay sınırını aşar) ve
+/// komşu yılların tatilleri dahil tatiller.
+(List<MonthPlan>, List<Holiday>) _withNeighbours(
+  MonthPlan plan,
+  Iterable<Holiday> holidays,
+  MonthPlanRepository? repository,
+) {
+  final prevMonth = DateTime(plan.year, plan.month - 1);
+  final nextMonth = DateTime(plan.year, plan.month + 1);
+  final plans = [
+    plan,
+    ?repository?.get(prevMonth.year, prevMonth.month),
+    ?repository?.get(nextMonth.year, nextMonth.month),
+  ];
+
+  // Komşu ay başka yıldaysa ve o yılın tatilleri henüz yüklenmediyse
+  // hazır Türkiye tatilleri kullanılır.
+  final allHolidays = [...holidays];
+  for (final year in {prevMonth.year, nextMonth.year}) {
+    if (!allHolidays.any((h) => h.date.year == year)) {
+      allHolidays.addAll(TurkishHolidays.forYear(year));
+    }
+  }
+  return (plans, allHolidays);
+}
+
+/// [plan] ayında kişi → şua izni dönüşünün ilk iş günü (komşu aylardaki
+/// şua dahil); kişi bu günde mutlaka nöbet tutar.
+Map<String, Set<int>> computeRadiationReturnDays(
+  MonthPlan plan,
+  Iterable<Holiday> holidays, {
+  MonthPlanRepository? repository,
+}) {
+  final (plans, allHolidays) = _withNeighbours(plan, holidays, repository);
+  final result = <String, Set<int>>{};
+  for (final id in {for (final p in plans) ...p.radiationLeave.keys}) {
+    final days = LeaveRules.radiationReturnDaysInMonth(
+      year: plan.year,
+      month: plan.month,
+      radiationLeave: [
+        for (final p in plans)
+          for (final d in p.leaveOf(id, LeaveType.radiation))
+            DateTime(p.year, p.month, d),
+      ],
+      holidays: allHolidays,
+    );
+    if (days.isNotEmpty) result[id] = days;
+  }
+  return result;
+}
+
+/// [plan] ayında kişi → mutlaka nöbet tutacağı günler: plandaki istenen
+/// nöbet günleri (sorumlu hemşire) ve şua izni dönüşünün ilk iş günü.
+/// İstemediği günler üretici tarafından yine yazılmaz.
+Map<String, List<int>> computeRequiredShifts(
+  MonthPlan plan,
+  Iterable<Holiday> holidays, {
+  MonthPlanRepository? repository,
+}) {
+  final returns = computeRadiationReturnDays(
+    plan,
+    holidays,
+    repository: repository,
+  );
+  return {
+    for (final id in {...plan.requestedShifts.keys, ...returns.keys})
+      id: {...?plan.requestedShifts[id], ...?returns[id]}.toList()..sort(),
+  };
 }
 
 /// [plan] ayında kişi → nöbet yazılamayan günler (sıralı); nedenleri

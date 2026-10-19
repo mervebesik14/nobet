@@ -110,7 +110,11 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       ...plan.leaveDaysOf(id),
       ...?_peopleById[id]?.inactiveDaysIn(plan.year, plan.month),
     };
-    final longest = ShiftGaps.longest(days, absent: absent);
+    final longest = ShiftGaps.longest(
+      days,
+      absent: absent,
+      monthEnd: plan.daysInMonth,
+    );
     final dayShiftCount = dayShifts.values
         .where((s) => s.personId == id)
         .length;

@@ -69,12 +69,23 @@ void main() {
         if (id != 'n0') expect(a.includes(id), isTrue, reason: '$id gün $d');
       }
     }
-    // Sonuç kurallara uygun.
+    // Sonuç kurallara uygun (n0 20 Ekim'den itibaren pasif: ay sonu boşluğu
+    // pasif günlerle kesilir).
     final violations = const RosterValidator(settings).validate(
       year: 2026,
       month: 10,
       assignments: r.assignments,
-      people: people(),
+      people: [
+        for (final p in people())
+          p.id == 'n0'
+              ? Person(
+                  id: p.id,
+                  name: p.name,
+                  role: p.role,
+                  inactiveFrom: DateTime(2026, 10, 20),
+                )
+              : p,
+      ],
     );
     expect(violations, isEmpty, reason: violations.join('\n'));
   });

@@ -3,8 +3,13 @@
 /// Boşluk = iki ardışık nöbet arasındaki boş gün sayısı: 3 ve 8'inde nöbet
 /// → 4, 5, 6, 7 → 4 gün. Arada izin (yıllık / şua / rapor) ya da pasif gün
 /// varsa o aralık sayılmaz. Önceki ayın son günleri (0, -1, ...) da nöbet
-/// günü olarak verilebilir; ay sonundan sonraki boşluk bilinmediği için
-/// sayılmaz.
+/// günü olarak verilebilir.
+///
+/// Ay sonu: son nöbetten ay sonuna kadarki boş günler [maxGap]'i aşıyorsa
+/// (ör. son nöbet 24'ünde, 25–30 boş → 6 gün) sonraki ay ne olursa olsun
+/// sınır aşılmıştır; bu açık boşluk da aşım sayılır (ay sonu verilirse).
+/// [maxGap] ve altındaki açık boşluk ise sonraki ayın başına bağlı olduğu
+/// için sayılmaz.
 class ShiftGaps {
   const ShiftGaps._();
 
@@ -16,9 +21,12 @@ class ShiftGaps {
   static const longGapMax = 5;
 
   /// Sayılan boşluklar, sırayla: (önceki nöbet, sonraki nöbet, boş gün).
+  /// [monthEnd] verilirse ay sonundaki [maxGap]'i aşan açık boşluk da
+  /// eklenir; sonraki nöbet olarak `monthEnd + 1` yazılır.
   static List<(int, int, int)> gaps(
     Iterable<int> days, {
     Set<int> absent = const {},
+    int? monthEnd,
   }) {
     final sorted = days.toSet().toList()..sort();
     final out = <(int, int, int)>[];
@@ -32,13 +40,28 @@ class ShiftGaps {
       }
       if (!interrupted) out.add((a, b, b - a - 1));
     }
+    if (monthEnd != null && sorted.isNotEmpty) {
+      final a = sorted.last;
+      final open = monthEnd - a;
+      var interrupted = false;
+      for (var d = a + 1; d <= monthEnd && !interrupted; d++) {
+        interrupted = absent.contains(d);
+      }
+      if (open > maxGap && !interrupted) out.add((a, monthEnd + 1, open));
+    }
     return out;
   }
 
-  /// [maxGap]'i aşan boşlukların toplam fazla günü (6 gün → 1).
-  static int excess(Iterable<int> days, {Set<int> absent = const {}}) => gaps(
+  /// [maxGap]'i aşan boşlukların toplam fazla günü (6 gün → 1). [monthEnd]
+  /// verilirse ay sonundaki açık boşluk da sayılır.
+  static int excess(
+    Iterable<int> days, {
+    Set<int> absent = const {},
+    int? monthEnd,
+  }) => gaps(
     days,
     absent: absent,
+    monthEnd: monthEnd,
   ).fold(0, (s, g) => s + (g.$3 > maxGap ? g.$3 - maxGap : 0));
 
   /// 4 ya da 5 günlük boşluk sayısı.
@@ -67,12 +90,14 @@ class ShiftGaps {
 
   /// Hızlı tarama (algoritmanın puan hesabı için): [from]..[to] günlerini
   /// sırayla gezer, liste kopyalamaz / sıralamaz. ([excess], [longCount],
-  /// [maxGapCount]) ile aynı sonucu verir.
+  /// [maxGapCount]) ile aynı sonucu verir. [openEnd] ise [to] ay sonu
+  /// sayılır ve oradaki açık boşluğun aşımı da eklenir.
   static (int excess, int long, int five) scan({
     required int from,
     required int to,
     required bool Function(int day) works,
     bool Function(int day)? isAbsent,
+    bool openEnd = false,
   }) {
     var excess = 0;
     var long = 0;
@@ -92,13 +117,21 @@ class ShiftGaps {
         last = null;
       }
     }
+    if (openEnd && last != null && to - last > maxGap) {
+      excess += to - last - maxGap;
+    }
     return (excess, long, five);
   }
 
-  /// En uzun boşluk (gün); sayılan boşluk yoksa null.
-  static int? longest(Iterable<int> days, {Set<int> absent = const {}}) {
+  /// En uzun boşluk (gün); sayılan boşluk yoksa null. [monthEnd] verilirse
+  /// ay sonundaki aşan açık boşluk da hesaba katılır.
+  static int? longest(
+    Iterable<int> days, {
+    Set<int> absent = const {},
+    int? monthEnd,
+  }) {
     int? best;
-    for (final (_, _, gap) in gaps(days, absent: absent)) {
+    for (final (_, _, gap) in gaps(days, absent: absent, monthEnd: monthEnd)) {
       if (best == null || gap > best) best = gap;
     }
     return best;

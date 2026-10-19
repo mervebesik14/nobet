@@ -319,4 +319,108 @@ void main() {
       expect(r[2]!.tech16bId, 'a');
     });
   });
+
+  group('şua dönüşü: ilk iş günü mutlaka nöbet', () {
+    // Kasım 2026: şua 1–4 Kasım (4 Çarşamba), dönüş 5 Kasım Perşembe.
+    const leave = [1, 2, 3, 4];
+    for (final techsPerDay in [1, 2]) {
+      test('günde $techsPerDay tekniker: tekniker 5 Kasım nöbette', () {
+        for (final seed in [1, 2, 3, 4]) {
+          final r = RosterGenerator(
+            year: 2026,
+            month: 11,
+            people: team(7, 4),
+            holidays: holidays,
+            settings: RosterSettings(techsPerDay: techsPerDay),
+            seed: seed,
+            attempts: 60,
+            unavailableDays: const {'t2': leave},
+            absentDays: const {'t2': leave},
+            requestedShifts: const {
+              't2': [5],
+            },
+          ).generate();
+          expect(r.isComplete, isTrue, reason: r.issues.join('\n'));
+          expect(
+            r.assignments[5]!.includes('t2'),
+            isTrue,
+            reason: 'seed $seed',
+          );
+          for (final d in leave) {
+            expect(r.assignments[d]!.includes('t2'), isFalse);
+          }
+        }
+      });
+    }
+
+    test('hemşire de 5 Kasım nöbette', () {
+      for (final seed in [1, 2, 3]) {
+        final r = RosterGenerator(
+          year: 2026,
+          month: 11,
+          people: team(7, 4),
+          holidays: holidays,
+          seed: seed,
+          attempts: 60,
+          unavailableDays: const {'n3': leave},
+          absentDays: const {'n3': leave},
+          requestedShifts: const {
+            'n3': [5],
+          },
+        ).generate();
+        expect(
+          r.assignments[5]!.nurseIds,
+          contains('n3'),
+          reason: 'seed $seed',
+        );
+      }
+    });
+
+    test('istemediği günse yazılmaz', () {
+      final r = RosterGenerator(
+        year: 2026,
+        month: 11,
+        people: team(7, 4),
+        holidays: holidays,
+        seed: 1,
+        attempts: 30,
+        unavailableDays: const {
+          't2': [...leave, 5],
+        },
+        requestedShifts: const {
+          't2': [5],
+        },
+      ).generate();
+      expect(r.assignments[5]!.includes('t2'), isFalse);
+    });
+  });
+
+  test('ay sonunda 5 günden uzun boşluk kalmaz', () {
+    for (final (techsPerDay, month) in [(1, 9), (2, 11), (1, 6)]) {
+      for (final seed in [1, 2, 3]) {
+        final people = team(9, 5);
+        final r = RosterGenerator(
+          year: 2026,
+          month: month,
+          people: people,
+          holidays: holidays,
+          settings: RosterSettings(techsPerDay: techsPerDay),
+          seed: seed,
+          attempts: 100,
+        ).generate();
+        final days = DateTime(2026, month + 1, 0).day;
+        for (final p in people) {
+          final last = r.assignments.values
+              .where((a) => a.includes(p.id))
+              .map((a) => a.day)
+              .fold(0, (a, b) => a > b ? a : b);
+          expect(
+            days - last,
+            lessThanOrEqualTo(5),
+            reason: '${p.id}, $month. ay, tohum $seed: son nöbet $last',
+          );
+        }
+      }
+    }
+  });
 }

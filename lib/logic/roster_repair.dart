@@ -136,7 +136,7 @@ class RosterRepair {
               if (x.includes(p.id)) x.day,
           };
           final off = {...?absentDays[p.id], ...p.inactiveDaysIn(year, month)};
-          excess += ShiftGaps.excess(days, absent: off);
+          excess += ShiftGaps.excess(days, absent: off, monthEnd: daysInMonth);
           fives.add(ShiftGaps.maxGapCount(days, absent: off));
         }
         return (excess, ShiftGaps.unevenMaxGaps(fives));

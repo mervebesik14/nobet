@@ -66,4 +66,35 @@ void main() {
     expect(ShiftGaps.longest([1, 6, 12, 19, 21], absent: {15}), 5);
     expect(ShiftGaps.longest([4]), isNull);
   });
+
+  test('ay sonundaki açık boşluk 5 günü aşarsa sayılır', () {
+    // 30 günlük ay, son nöbet 24: 25–30 → 6 gün, ay sonunda bile aşılmış.
+    expect(ShiftGaps.gaps([20, 24], monthEnd: 30), [(20, 24, 3), (24, 31, 6)]);
+    expect(ShiftGaps.excess([20, 24], monthEnd: 30), 1);
+    expect(ShiftGaps.longest([20, 24], monthEnd: 30), 6);
+    // Ay sonu verilmezse ya da açık boşluk 5 ve altındaysa sayılmaz (sonraki
+    // ayın başına bağlı).
+    expect(ShiftGaps.excess([20, 24]), 0);
+    expect(ShiftGaps.gaps([20, 25], monthEnd: 30), [(20, 25, 4)]);
+    // Araya izin girerse sayılmaz; 4–5 günlük sayılar etkilenmez.
+    expect(ShiftGaps.excess([20, 24], monthEnd: 30, absent: {28}), 0);
+    expect(ShiftGaps.longCount([18, 24]), 1);
+    // Hızlı tarama aynı sonucu verir.
+    for (final days in [
+      [20, 24],
+      [3, 9, 18],
+      [-2],
+    ]) {
+      expect(
+        ShiftGaps.scan(
+          from: -3,
+          to: 30,
+          works: days.contains,
+          openEnd: true,
+        ).$1,
+        ShiftGaps.excess(days, monthEnd: 30),
+        reason: '$days',
+      );
+    }
+  });
 }
