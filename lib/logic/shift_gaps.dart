@@ -47,4 +47,32 @@ class ShiftGaps {
         absent: absent,
         days,
       ).where((g) => g.$3 >= longGapMin && g.$3 <= longGapMax).length;
+
+  /// Hızlı tarama (algoritmanın puan hesabı için): [from]..[to] günlerini
+  /// sırayla gezer, liste kopyalamaz / sıralamaz. ([excess], [longCount])
+  /// ile aynı sonucu verir.
+  static (int excess, int long) scan({
+    required int from,
+    required int to,
+    required bool Function(int day) works,
+    bool Function(int day)? isAbsent,
+  }) {
+    var excess = 0;
+    var long = 0;
+    int? last;
+    for (var d = from; d <= to; d++) {
+      if (works(d)) {
+        if (last != null) {
+          final gap = d - last - 1;
+          if (gap > maxGap) excess += gap - maxGap;
+          if (gap >= longGapMin && gap <= longGapMax) long++;
+        }
+        last = d;
+      } else if (isAbsent != null && isAbsent(d)) {
+        // Araya izin girdi: aralık kesilir.
+        last = null;
+      }
+    }
+    return (excess, long);
+  }
 }

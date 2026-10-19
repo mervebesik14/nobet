@@ -26,4 +26,28 @@ void main() {
     expect(ShiftGaps.excess(days, absent: {15}), 0);
     expect(ShiftGaps.longCount(days, absent: {3}), 1);
   });
+
+  test('hızlı tarama listeyle aynı sonucu verir', () {
+    final cases = <(List<int>, Set<int>)>[
+      ([1, 6, 12, 19, 21], {}),
+      ([1, 6, 12, 19, 21], {15}),
+      ([-1, 6, 14], {}),
+      ([2, 9, 20, 30], {10, 11}),
+    ];
+    for (final (days, absent) in cases) {
+      expect(
+        ShiftGaps.scan(
+          from: -3,
+          to: 31,
+          works: days.contains,
+          isAbsent: absent.contains,
+        ),
+        (
+          ShiftGaps.excess(days, absent: absent),
+          ShiftGaps.longCount(days, absent: absent),
+        ),
+        reason: '$days $absent',
+      );
+    }
+  });
 }

@@ -469,6 +469,12 @@ class _RoleSolver {
 
   /// Kişi → izinli / pasif günler (boşluk hesabında aralığı keser).
   final Map<String, Set<int>> absent;
+
+  /// Boşluk taramasının başladığı gün: önceki ay kuyruğunun en eski günü.
+  late final int _tailStart = tail.values.fold(
+    1,
+    (m, days) => days.fold(m, (a, d) => d < a ? d : a),
+  );
   final bool forbidConsecutive;
   final int maxChain;
   final int? cap;
@@ -532,6 +538,26 @@ class _RoleSolver {
   void _reset() {
     _slots = List.generate(days + 1, (_) => <String>[]);
     _worked = {for (final id in ids) id: <int>{}};
+    _weekendN = {for (final id in ids) id: 0};
+    _nationalN = {for (final id in ids) id: 0};
+    _religiousN = {for (final id in ids) id: 0};
+    _pairsN = {for (final id in ids) id: 0};
+  }
+
+  // Sayaçlar: puan hesabında her seferinde baştan saymamak için _add /
+  // _remove ile güncellenir.
+  late Map<String, int> _weekendN;
+  late Map<String, int> _nationalN;
+  late Map<String, int> _religiousN;
+  late Map<String, int> _pairsN;
+
+  void _count(String id, int d, int delta) {
+    final w = _worked[id]!;
+    if (weekend.contains(d)) _weekendN[id] = _weekendN[id]! + delta;
+    if (national.contains(d)) _nationalN[id] = _nationalN[id]! + delta;
+    if (religious.contains(d)) _religiousN[id] = _religiousN[id]! + delta;
+    final pairs = (w.contains(d - 2) ? 1 : 0) + (w.contains(d + 2) ? 1 : 0);
+    _pairsN[id] = _pairsN[id]! + delta * pairs;
   }
 
   void _load(List<List<String>> slots) {
@@ -550,11 +576,13 @@ class _RoleSolver {
   void _add(String id, int d) {
     _slots[d].add(id);
     _worked[id]!.add(d);
+    _count(id, d, 1);
   }
 
   void _remove(String id, int d) {
     _slots[d].remove(id);
     _worked[id]!.remove(d);
+    _count(id, d, -1);
   }
 
   bool _works(String id, int d) {
@@ -592,14 +620,13 @@ class _RoleSolver {
     return false;
   }
 
-  int _weekendCount(String id) => _worked[id]!.where(weekend.contains).length;
+  int _weekendCount(String id) => _weekendN[id]!;
 
-  int _nationalCount(String id) => _worked[id]!.where(national.contains).length;
+  int _nationalCount(String id) => _nationalN[id]!;
 
-  int _religiousCount(String id) =>
-      _worked[id]!.where(religious.contains).length;
+  int _religiousCount(String id) => _religiousN[id]!;
 
-  int _pairs(String id) => RosterGenerator.everyOtherDayPairs(_worked[id]!);
+  int _pairs(String id) => _pairsN[id]!;
 
   /// Rol puanı: grup içi sapmaların kareleri + toplam çift cezası + boş
   /// koltuk cezası.
@@ -641,10 +668,15 @@ class _RoleSolver {
     var gapExcess = 0;
     final longGaps = <int>[];
     for (final id in ids) {
-      final all = [...?tail[id], ..._worked[id]!];
-      final off = absent[id] ?? const <int>{};
-      gapExcess += ShiftGaps.excess(all, absent: off);
-      longGaps.add(ShiftGaps.longCount(all, absent: off));
+      final off = absent[id];
+      final (excess, long) = ShiftGaps.scan(
+        from: _tailStart,
+        to: days,
+        works: (d) => _works(id, d),
+        isAbsent: off == null || off.isEmpty ? null : off.contains,
+      );
+      gapExcess += excess;
+      longGaps.add(long);
     }
     return _balanceWeight *
             (sq(counts) +
@@ -686,10 +718,15 @@ class _RoleSolver {
     var best = candidates.first;
     for (final (_, slots) in candidates.take(polishCount)) {
       _load(slots);
-      _improve(rng);
+      _improve(rng, chain: false);
       final score = _score();
       if (score < best.$1) best = (score, _snapshot());
     }
+    // Pahalı zincirli değiştirme yalnız en iyi sonuca uygulanır.
+    _load(best.$2);
+    _improve(rng);
+    final score = _score();
+    if (score < best.$1) best = (score, _snapshot());
     _load(best.$2);
     return _RoleSolution(this, best.$2, best.$1);
   }
@@ -766,7 +803,7 @@ class _RoleSolver {
   }
 
   /// Yerel iyileştirme: puanı düşüren hamle kalmayana kadar.
-  void _improve(Random rng) {
+  void _improve(Random rng, {bool chain = true}) {
     var current = _score();
     for (var pass = 0; pass < 30; pass++) {
       var improved = false;
@@ -828,7 +865,7 @@ class _RoleSolver {
       }
 
       // Basit hamleler tükenince zincirli değiştirme dene.
-      if (!improved && _tryChain(current)) {
+      if (chain && !improved && _tryChain(current)) {
         current = _score();
         improved = true;
       }
@@ -1019,6 +1056,12 @@ class _TechSolver {
 
   /// Kişi → izinli / pasif günler (boşluk hesabında aralığı keser).
   final Map<String, Set<int>> absent;
+
+  /// Boşluk taramasının başladığı gün: önceki ay kuyruğunun en eski günü.
+  late final int _tailStart = tail.values.fold(
+    1,
+    (m, days) => days.fold(m, (a, d) => d < a ? d : a),
+  );
   final int maxChain;
   final int? cap;
   final Map<String, double> ytd;
@@ -1162,16 +1205,23 @@ class _TechSolver {
     }
 
     final totalPairs = ids.fold(0, (a, id) => a + _pairs24(id));
-    List<int> allDays(String id) => [...?tail[id], ..._w24[id]!, ..._w16[id]!];
     var gapExcess = 0;
+    final longById = <String, int>{};
     for (final id in ids) {
-      gapExcess += ShiftGaps.excess(
-        allDays(id),
-        absent: absent[id] ?? const {},
+      final off = absent[id];
+      final t = tail[id];
+      final (excess, long) = ShiftGaps.scan(
+        from: _tailStart,
+        to: days,
+        works: (d) => d <= 0
+            ? (t?.contains(d) ?? false)
+            : _w24[id]!.contains(d) || _w16[id]!.contains(d),
+        isAbsent: off == null || off.isEmpty ? null : off.contains,
       );
+      gapExcess += excess;
+      longById[id] = long;
     }
-    int longGaps(String id) =>
-        ShiftGaps.longCount(allDays(id), absent: absent[id] ?? const {});
+    int longGaps(String id) => longById[id]!;
     const balance = 3.0;
     return RosterGenerator.gapExcessPenalty * gapExcess +
         balance * sq(longGaps) +
