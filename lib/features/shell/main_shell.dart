@@ -5,6 +5,7 @@ import '../holidays/holidays_page.dart';
 import '../month/month_page.dart';
 import '../people/people_page.dart';
 import '../settings/settings_page.dart';
+import '../statistics/statistics_page.dart';
 
 /// Alt navigasyonda seçili sekmenin indeksi.
 class SelectedTabNotifier extends Notifier<int> {
@@ -18,7 +19,8 @@ final selectedTabProvider = NotifierProvider<SelectedTabNotifier, int>(
   SelectedTabNotifier.new,
 );
 
-/// Dört sekmeli ana iskelet: Kişiler, Ay Planı, Tatiller, Ayarlar.
+/// Beş sekmeli ana iskelet: Kişiler, Ay Planı, Tatiller, İstatistik,
+/// Ayarlar.
 class MainShell extends ConsumerWidget {
   const MainShell({super.key});
 
@@ -26,6 +28,7 @@ class MainShell extends ConsumerWidget {
     PeoplePage(),
     MonthPage(),
     HolidaysPage(),
+    StatisticsPage(),
     SettingsPage(),
   ];
 
@@ -54,6 +57,11 @@ class MainShell extends ConsumerWidget {
             icon: Icon(Icons.celebration_outlined),
             selectedIcon: Icon(Icons.celebration),
             label: 'Tatiller',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.insights_outlined),
+            selectedIcon: Icon(Icons.insights),
+            label: 'İstatistik',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),

@@ -10,7 +10,6 @@ import '../../shared/widgets/section_header.dart';
 import '../people/people_controller.dart';
 import '../roster/roster_flow.dart';
 import '../roster/roster_page.dart';
-import '../roster/yearly_summary_page.dart';
 import 'month_plan_controller.dart';
 import 'unavailable_days_page.dart';
 import '../../shared/app_colors.dart';
@@ -46,20 +45,7 @@ class MonthPage extends ConsumerWidget {
     final backup = ref.watch(backupStatusProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Ay Planı'),
-        actions: [
-          IconButton(
-            tooltip: 'Yıllık Özet',
-            icon: const Icon(Icons.insights),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => YearlySummaryPage(initialYear: month.year),
-              ),
-            ),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Ay Planı')),
       floatingActionButton: active.isEmpty
           ? null
           : plan.hasRoster

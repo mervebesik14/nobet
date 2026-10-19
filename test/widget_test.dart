@@ -15,7 +15,7 @@ void main() {
 
   tearDown(() => Hive.close());
 
-  testWidgets('Alt navigasyonda 4 sekme var ve geçiş çalışıyor', (
+  testWidgets('Alt navigasyonda 5 sekme var ve geçiş çalışıyor', (
     tester,
   ) async {
     final boxes = await openTestBoxes();
@@ -24,7 +24,13 @@ void main() {
     );
 
     final nav = find.byType(NavigationBar);
-    for (final label in ['Kişiler', 'Ay Planı', 'Tatiller', 'Ayarlar']) {
+    for (final label in [
+      'Kişiler',
+      'Ay Planı',
+      'Tatiller',
+      'İstatistik',
+      'Ayarlar',
+    ]) {
       expect(
         find.descendant(of: nav, matching: find.text(label)),
         findsOneWidget,
@@ -34,7 +40,13 @@ void main() {
     await tester.tap(find.descendant(of: nav, matching: find.text('Ayarlar')));
     await tester.pumpAndSettle();
 
-    final selected = tester.widget<NavigationBar>(nav).selectedIndex;
-    expect(selected, 3);
+    expect(tester.widget<NavigationBar>(nav).selectedIndex, 4);
+
+    await tester.tap(
+      find.descendant(of: nav, matching: find.text('İstatistik')),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.widget<NavigationBar>(nav).selectedIndex, 3);
+    expect(find.byTooltip('Eski listeleri gir'), findsOneWidget);
   });
 }

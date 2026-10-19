@@ -6,6 +6,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/data/holiday_repository.dart';
 import 'package:nobet_listesi/features/month/month_page.dart';
+import 'package:nobet_listesi/features/statistics/statistics_page.dart';
 import 'package:nobet_listesi/features/month/month_plan_controller.dart';
 import 'package:nobet_listesi/models/models.dart';
 import 'package:nobet_listesi/shared/providers.dart';
@@ -68,6 +69,22 @@ void main() {
         child: const MaterialApp(home: MonthPage()),
       ),
     );
+  }
+
+  /// İstatistik sekmesi (aynı kutularla).
+  Future<void> pumpStatistics(WidgetTester tester) async {
+    // Önceki ekranın açık sayfaları kalmasın.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          ...boxOverrides(boxes),
+          todayProvider.overrideWithValue(DateTime(2026, 10, 11)),
+        ],
+        child: const MaterialApp(home: StatisticsPage()),
+      ),
+    );
+    await tester.pumpAndSettle();
   }
 
   testWidgets('geçmiş ay açılınca kilitlenir; kilit açılabilir', (
@@ -158,11 +175,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Hemşire + Tekniker'));
     await tester.pumpAndSettle();
-    await tester.pageBack();
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byTooltip('Yıllık Özet'));
-    await tester.pumpAndSettle();
+    await pumpStatistics(tester);
     expect(find.text('2026'), findsOneWidget);
     expect(find.text('Dahil aylar: Eylül, Ekim'), findsOneWidget);
 
@@ -191,6 +204,7 @@ void main() {
       find.descendant(of: sepCell, matching: find.text('15')),
       findsOneWidget,
     );
+    await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Hafta sonu'));
     await tester.tap(find.widgetWithText(ChoiceChip, 'Hafta sonu'));
     await tester.pumpAndSettle();
     final n1SepWeekend = _september().assignments.values
@@ -221,9 +235,10 @@ void main() {
   testWidgets('eski listeler kişi kişi girilir; yıllık özete yansır', (
     tester,
   ) async {
-    await pumpMonthPage(tester);
-    await tester.tap(find.byTooltip('Yıllık Özet'));
-    await tester.pumpAndSettle();
+    tester.view.physicalSize = const Size(1600, 3200);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    await pumpStatistics(tester);
     await tester.tap(find.byTooltip('Eski listeleri gir'));
     await tester.pumpAndSettle();
 

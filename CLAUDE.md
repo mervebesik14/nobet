@@ -26,7 +26,7 @@
   - `lib/models`: Person, Role, Holiday, MonthPlan, DayAssignment, RosterSettings
   - `lib/data`: Hive kutuları, repository'ler, Türkiye tatil verisi
   - `lib/logic`: roster_generator, work_hours_calculator, feasibility_checker, roster_validator
-  - `lib/features/{people,month,holidays,roster,settings}`: ekranlar
+  - `lib/features/{people,month,holidays,roster,statistics,settings}`: ekranlar
   - `lib/features/shell`: alt navigasyonlu ana iskelet
   - `lib/shared/widgets`: ortak widget'lar
 - Locale `tr_TR`; tarihler `intl` ile Türkçe biçimlenir.

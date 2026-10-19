@@ -8,25 +8,28 @@ import '../holidays/holidays_controller.dart';
 import '../people/people_controller.dart';
 import 'monthly_comparison.dart';
 import 'past_roster_page.dart';
-import 'summary_table.dart';
+import '../../shared/providers.dart';
+import '../month/month_plan_controller.dart';
+import '../roster/summary_table.dart';
 
-/// Kişi başı yıl toplamları (nöbet, hafta sonu, tatil, gün aşırı çift,
-/// çalışılan saat, fazla mesai) ve aylara göre karşılaştırma tablosu.
-class YearlySummaryPage extends ConsumerStatefulWidget {
-  const YearlySummaryPage({super.key, required this.initialYear});
-
-  final int initialYear;
+/// İstatistik sekmesi: seçilen yılın kişi başı toplamları (nöbet, hafta
+/// sonu, resmi tatil, dini bayram, gün aşırı çift, çalışılan saat, fazla
+/// mesai), aylara göre karşılaştırma tablosu ve eski listeleri girme.
+class StatisticsPage extends ConsumerStatefulWidget {
+  const StatisticsPage({super.key});
 
   @override
-  ConsumerState<YearlySummaryPage> createState() => _YearlySummaryPageState();
+  ConsumerState<StatisticsPage> createState() => _StatisticsPageState();
 }
 
-class _YearlySummaryPageState extends ConsumerState<YearlySummaryPage> {
-  late int _year = widget.initialYear;
+class _StatisticsPageState extends ConsumerState<StatisticsPage> {
+  late int _year = ref.read(todayProvider).year;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Listeler değişince (oluşturma, düzenleme, eski liste girişi) yenilenir.
+    ref.watch(monthPlanProvider);
     final summary = YearlySummary.build(
       year: _year,
       plans: ref.watch(monthPlanRepositoryProvider).getAll(),
@@ -38,7 +41,7 @@ class _YearlySummaryPageState extends ConsumerState<YearlySummaryPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Yıllık Özet'),
+        title: const Text('İstatistik'),
         actions: [
           IconButton(
             tooltip: 'Eski listeleri gir',

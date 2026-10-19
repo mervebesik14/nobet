@@ -4,16 +4,16 @@ import 'package:intl/intl.dart';
 import '../../logic/person_totals.dart';
 import '../../logic/yearly_summary.dart';
 import '../../models/models.dart';
-import 'summary_table.dart';
+import '../roster/summary_table.dart';
 
 /// Karşılaştırılan ölçü.
 enum ComparisonMetric {
   shifts('Nöbet', 'nöbet'),
+  religious('Dini bayram', 'dini bayram nöbeti'),
+  overtime('Fazla mesai', 'saat fazla mesai'),
   weekend('Hafta sonu', 'hafta sonu nöbeti'),
   national('Resmi tatil', 'resmi tatil nöbeti'),
-  religious('Dini bayram', 'dini bayram nöbeti'),
-  longGaps('4–5 gün ara', '4–5 günlük ara'),
-  overtime('Fazla mesai', 'saat fazla mesai');
+  longGaps('4–5 gün ara', '4–5 günlük ara');
 
   const ComparisonMetric(this.label, this.unit);
 
