@@ -10,6 +10,7 @@ import '../../models/models.dart';
 import '../../shared/widgets/month_selector.dart';
 import '../../shared/widgets/section_header.dart';
 import '../people/people_controller.dart';
+import '../roster/manual_entry_flow.dart';
 import '../roster/roster_flow.dart';
 import '../roster/roster_page.dart';
 import 'month_plan_controller.dart';
@@ -23,9 +24,10 @@ import '../settings/backup_actions.dart';
 class MonthPage extends ConsumerWidget {
   const MonthPage({super.key});
 
-  static void _openRoster(BuildContext context) => Navigator.of(
-    context,
-  ).push(MaterialPageRoute<void>(builder: (_) => const RosterPage()));
+  static void _openRoster(BuildContext context, {bool freeEdit = false}) =>
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => RosterPage(freeEdit: freeEdit)),
+      );
 
   Future<void> _create(BuildContext context, WidgetRef ref) async {
     if (await generateRoster(context, ref) && context.mounted) {
@@ -111,16 +113,31 @@ class MonthPage extends ConsumerWidget {
                 tileColor: theme.colorScheme.headerTint,
               ),
             ),
-          if (plan.hasRoster)
+          if (active.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: OutlinedButton.icon(
-                  onPressed: () => resetRosterFlow(context, ref),
-                  icon: const Icon(Icons.delete_sweep_outlined),
-                  label: const Text('Listeyi sıfırla'),
-                ),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      // Elle girilen liste dokunarak düzenlenmeye hazır açılır.
+                      if (await manualEntryFlow(context, ref) &&
+                          context.mounted) {
+                        _openRoster(context, freeEdit: true);
+                      }
+                    },
+                    icon: const Icon(Icons.edit_note),
+                    label: const Text('Listeyi elle gir'),
+                  ),
+                  if (plan.hasRoster)
+                    OutlinedButton.icon(
+                      onPressed: () => resetRosterFlow(context, ref),
+                      icon: const Icon(Icons.delete_sweep_outlined),
+                      label: const Text('Listeyi sıfırla'),
+                    ),
+                ],
               ),
             ),
           if (active.isEmpty)

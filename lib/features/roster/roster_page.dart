@@ -39,7 +39,10 @@ import '../../shared/app_colors.dart';
 /// bu kişiyi ata). Nöbete uzun bas: takas modu; ikinci nöbete dokununca iki
 /// nöbet yer değiştirir. Her değişiklikten sonra kurallar yeniden denetlenir.
 class RosterPage extends ConsumerStatefulWidget {
-  const RosterPage({super.key});
+  const RosterPage({super.key, this.freeEdit = false});
+
+  /// Serbest düzenleme açık başlasın (elle giriş sonrası).
+  final bool freeEdit;
 
   @override
   ConsumerState<RosterPage> createState() => _RosterPageState();
@@ -53,7 +56,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   bool _fixing = false;
 
   /// Serbest düzenleme: dokununca doğrudan ekle / sil.
-  bool _freeEdit = false;
+  late bool _freeEdit = widget.freeEdit;
 
   /// Tabloda vurgulanan kişi (adına dokunulunca).
   String? _highlightId;

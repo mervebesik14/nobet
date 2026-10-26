@@ -10,6 +10,7 @@ import '../../logic/feasibility_checker.dart';
 import '../../logic/leave_rules.dart';
 import '../../logic/roster_diff.dart';
 import '../../logic/roster_generator.dart';
+import '../../logic/roster_import.dart';
 import '../../logic/roster_validator.dart';
 import '../../logic/yearly_summary.dart';
 import '../../models/models.dart';
@@ -300,6 +301,57 @@ class MonthPlanController extends Notifier<MonthPlan> {
       details: false,
     );
     return result;
+  }
+
+  /// Elle girmek için boş liste açar: ayın her günü boş koltuklarla. Önceki
+  /// liste varsa geçmişten geri alınabilir. Kilitli ayda false.
+  Future<bool> startEmptyRoster({required bool nurseOnly}) => _replaceRoster(
+    {for (var d = 1; d <= state.daysInMonth; d++) d: DayAssignment(day: d)},
+    nurseOnly: nurseOnly,
+    title: 'Elle giriş için boş liste açıldı',
+  );
+
+  /// Dışarıda hazırlanmış (Excel'den okunan) listeyi olduğu gibi kaydeder;
+  /// kural ihlalleri her zamanki gibi uyarı olarak görünür. Dosyadaki
+  /// izinler mevcut izinlere eklenir. Kilitli ayda false.
+  Future<bool> importRoster(
+    RosterImportResult imported, {
+    required bool nurseOnly,
+  }) async {
+    if (state.isLocked) return false;
+    var plan = state;
+    for (final MapEntry(key: type, value: byPerson)
+        in imported.leaves.entries) {
+      for (final MapEntry(key: id, value: days) in byPerson.entries) {
+        plan = plan.withLeave(id, type, {...plan.leaveOf(id, type), ...days});
+      }
+    }
+    state = plan;
+    return _replaceRoster(
+      imported.assignments,
+      nurseOnly: nurseOnly,
+      title: "Liste Excel'den alındı",
+    );
+  }
+
+  Future<bool> _replaceRoster(
+    Map<int, DayAssignment> assignments, {
+    required bool nurseOnly,
+    required String title,
+  }) async {
+    if (state.isLocked) return false;
+    final before = state;
+    state = state.copyWith(
+      assignments: assignments,
+      // Yeni listede eski 7A seçimleri ve nöbet devirleri geçersiz olur.
+      dayShiftOverrides: const {},
+      handovers: const {},
+      generatedAt: DateTime.now(),
+      nurseOnly: nurseOnly,
+    );
+    await ref.read(monthPlanRepositoryProvider).save(state);
+    await _record(title, before, details: false);
+    return true;
   }
 
   /// Kayıtlı listeyi baştan kurmadan güncel kurallara göre düzeltir: kural

@@ -34,6 +34,9 @@ class FakePlatformServices extends PlatformServices {
   /// pickJsonFile'ın döndüreceği dosya (boşsa kullanıcı vazgeçmiş sayılır).
   Uint8List? pickedFile;
 
+  /// pickExcelFile'ın döndüreceği dosya (boşsa kullanıcı vazgeçmiş sayılır).
+  Uint8List? pickedExcel;
+
   final calls = <String>[];
   final sharedFiles = <({String name, String mime, Uint8List bytes})>[];
   Uint8List? lastPdf;
@@ -91,6 +94,12 @@ class FakePlatformServices extends PlatformServices {
   Future<Uint8List?> pickJsonFile() async {
     calls.add('pickJsonFile');
     return pickedFile;
+  }
+
+  @override
+  Future<Uint8List?> pickExcelFile() async {
+    calls.add('pickExcelFile');
+    return pickedExcel;
   }
 
   @override

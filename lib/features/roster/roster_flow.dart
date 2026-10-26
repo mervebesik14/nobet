@@ -29,7 +29,7 @@ Future<bool> generateRoster(BuildContext context, WidgetRef ref) async {
   // Mod: yalnızca tekniker tanımlıysa sor; değilse zaten yalnız hemşire.
   final bool nurseOnly;
   if (hasTechs) {
-    final choice = await _chooseMode(context);
+    final choice = await chooseRosterMode(context);
     if (choice == null || !context.mounted) return false;
     nurseOnly = choice;
   } else {
@@ -106,7 +106,9 @@ Future<bool> generateRoster(BuildContext context, WidgetRef ref) async {
 
 /// Liste kimler için oluşturulsun? true = yalnız hemşire, false = hemşire +
 /// tekniker, null = vazgeçildi.
-Future<bool?> _chooseMode(BuildContext context) {
+/// "Liste kimler için?": true = yalnız hemşire, false = hemşire + tekniker,
+/// null = vazgeçildi.
+Future<bool?> chooseRosterMode(BuildContext context) {
   return showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(

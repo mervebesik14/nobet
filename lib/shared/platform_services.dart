@@ -62,6 +62,15 @@ class PlatformServices {
     return file?.xFile.readAsBytes();
   }
 
+  /// Kullanıcıya bir Excel (.xlsx) dosyası seçtirir; vazgeçerse boş döner.
+  Future<Uint8List?> pickExcelFile() async {
+    final file = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: const ['xlsx'],
+    );
+    return file?.xFile.readAsBytes();
+  }
+
   /// PDF'e gömülen Türkçe destekli fontlar.
   Future<({pw.Font regular, pw.Font bold})> loadPdfFonts() async => (
     regular: pw.Font.ttf(
