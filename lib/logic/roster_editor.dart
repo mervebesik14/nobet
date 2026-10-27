@@ -172,4 +172,25 @@ class RosterEditor {
     }
     return {...assignments, day: updated};
   }
+
+  /// Teknikeri [day] gününde 24 ya da ([secondary] ise) 16B koltuğuna
+  /// yazar. Kişi o gün öteki koltuktaysa oradan alınır (24 → 16B ya da
+  /// tersi); koltukta başkası varsa onun yerine geçer.
+  static Map<int, DayAssignment> setTechSeat(
+    Map<int, DayAssignment> assignments, {
+    required int day,
+    required String personId,
+    required bool secondary,
+  }) {
+    final current = assignments[day] ?? DayAssignment(day: day);
+    final other = secondary ? current.techId : current.tech16bId;
+    final keepOther = other == personId ? null : other;
+    final updated = DayAssignment(
+      day: day,
+      nurseIds: current.nurseIds,
+      techId: secondary ? keepOther : personId,
+      tech16bId: secondary ? personId : keepOther,
+    );
+    return {...assignments, day: updated};
+  }
 }

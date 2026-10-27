@@ -506,13 +506,19 @@ class MonthPlanController extends Notifier<MonthPlan> {
 
   /// Elle düzenlenmiş atamaları kaydeder. Kilitli ayda değişiklik
   /// yapılmaz ve false döner.
+  /// [dayShiftOverrides] verilirse 7A seçimleri de aynı değişiklikte
+  /// güncellenir (tek geri alma).
   Future<bool> setAssignments(
     Map<int, DayAssignment> assignments, {
     String title = 'Elle değişiklik',
+    Map<int, String>? dayShiftOverrides,
   }) async {
     if (state.isLocked) return false;
     final before = state;
-    state = state.copyWith(assignments: assignments);
+    state = state.copyWith(
+      assignments: assignments,
+      dayShiftOverrides: dayShiftOverrides,
+    );
     await ref.read(monthPlanRepositoryProvider).save(state);
     await _record(title, before);
     return true;

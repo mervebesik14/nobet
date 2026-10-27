@@ -228,4 +228,60 @@ void main() {
       expect(removed[3]!.tech16bId, 'u');
     });
   });
+
+  group('setTechSeat (16B / 24)', () {
+    const day = DayAssignment(day: 5, nurseIds: ['n1', 'n2'], techId: 't1');
+    final base = {5: day};
+
+    test('boş 16B koltuğuna yazar, 24 yerinde kalır', () {
+      final r = RosterEditor.setTechSeat(
+        base,
+        day: 5,
+        personId: 't2',
+        secondary: true,
+      );
+      expect(
+        r[5],
+        const DayAssignment(
+          day: 5,
+          nurseIds: ['n1', 'n2'],
+          techId: 't1',
+          tech16bId: 't2',
+        ),
+      );
+      expect(base[5], day, reason: 'girdi değişmez');
+    });
+
+    test("24 tutan 16B'ye geçer; 24 boş kalır", () {
+      final r = RosterEditor.setTechSeat(
+        base,
+        day: 5,
+        personId: 't1',
+        secondary: true,
+      );
+      expect(r[5]!.techId, isNull);
+      expect(r[5]!.tech16bId, 't1');
+    });
+
+    test("16B tutan 24'e geçer; koltuktaki kişinin yerine", () {
+      final r = RosterEditor.setTechSeat(
+        {5: const DayAssignment(day: 5, techId: 't1', tech16bId: 't2')},
+        day: 5,
+        personId: 't2',
+        secondary: false,
+      );
+      expect(r[5]!.techId, 't2');
+      expect(r[5]!.tech16bId, isNull);
+    });
+
+    test('listede olmayan güne de yazar', () {
+      final r = RosterEditor.setTechSeat(
+        const {},
+        day: 9,
+        personId: 't3',
+        secondary: true,
+      );
+      expect(r[9], const DayAssignment(day: 9, tech16bId: 't3'));
+    });
+  });
 }

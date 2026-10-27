@@ -697,4 +697,96 @@ void main() {
     expect(find.text('Kural ihlali'), findsNothing);
     expect(saved().assignments[3]!.nurseIds, ['n6']);
   });
+
+  group('basılı tut → 7A / 16B', () {
+    // Sorumlu hemşire: mesai günlerinde 7A var (Ekim 2026: 7 Çarşamba,
+    // 8 Perşembe).
+    Future<void> addCharge() => boxes.people.put(
+      'c',
+      const Person(
+        id: 'c',
+        name: 'Sorumlu',
+        role: Role.nurse,
+        isChargeNurse: true,
+      ),
+    );
+
+    testWidgets("24 nöbeti 7A'ya çevrilir (tek değişiklik)", (tester) async {
+      await addCharge();
+      await pumpRoster(tester);
+      // Ayşe 7 Ekim Çarşamba 24 nöbette.
+      await tester.longPress(cell('n0', 7));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text("7A'ya çevir"));
+      await tester.pumpAndSettle();
+      expect(find.text('Kural ihlali'), findsNothing);
+      expect(saved().assignments[7]!.nurseIds, isNot(contains('n0')));
+      expect(saved().dayShiftOverrides, {7: 'n0'});
+      expect(find.text("Ayşe 7 Ekim 24 yerine 7A'ya yazıldı."), findsOneWidget);
+      expect(
+        find.descendant(of: cell('n0', 7), matching: find.text('7A')),
+        findsOneWidget,
+      );
+      // Geri al ikisini birden geri alır.
+      await tester.tap(find.text('Geri al'));
+      await tester.pumpAndSettle();
+      expect(saved().assignments[7]!.nurseIds, contains('n0'));
+      expect(saved().dayShiftOverrides, isEmpty);
+    });
+
+    testWidgets('boş hücreye 7A yazılır; nöbet ertesiyse uyarır', (
+      tester,
+    ) async {
+      await addCharge();
+      await pumpRoster(tester);
+      // Banu 7 Ekim nöbette → 8 Ekim nöbet ertesi.
+      await tester.longPress(cell('n1', 8));
+      await tester.pumpAndSettle();
+      expect(find.text('24 nöbet yaz'), findsOneWidget);
+      await tester.tap(find.text('7A yaz'));
+      await tester.pumpAndSettle();
+      expect(find.text('Kural ihlali'), findsOneWidget);
+      expect(find.textContaining('Banu 8 Ekim nöbet ertesi.'), findsOneWidget);
+      await tester.tap(find.text('Yine de yap'));
+      await tester.pumpAndSettle();
+      expect(saved().dayShiftOverrides, {8: 'n1'});
+      expect(saved().assignments, _rotation());
+    });
+
+    testWidgets("tekniker 16B'ye ve geri 24'e çevrilir", (tester) async {
+      await pumpRoster(tester);
+      // Ali 4 Ekim 24 nöbette.
+      await tester.longPress(cell('t0', 4));
+      await tester.pumpAndSettle();
+      expect(find.text("7A'ya çevir"), findsNothing);
+      await tester.tap(find.text("16B'ye çevir"));
+      await tester.pumpAndSettle();
+      expect(saved().assignments[4]!.techId, isNull);
+      expect(saved().assignments[4]!.tech16bId, 't0');
+      expect(find.text("Ali 4 Ekim 16B'ye yazıldı."), findsOneWidget);
+      expect(
+        find.descendant(of: cell('t0', 4), matching: find.text('16B')),
+        findsOneWidget,
+      );
+
+      await tester.longPress(cell('t0', 4));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text("24'e çevir"));
+      await tester.pumpAndSettle();
+      expect(saved().assignments[4]!.techId, 't0');
+      expect(saved().assignments[4]!.tech16bId, isNull);
+      expect(find.text("Ali 4 Ekim 24'e yazıldı."), findsOneWidget);
+    });
+
+    testWidgets('boş tekniker hücresine 16B yazılır', (tester) async {
+      await pumpRoster(tester);
+      // 4 Ekim: Ali 24'te; Burak'a 16B.
+      await tester.longPress(cell('t1', 4));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('16B yaz'));
+      await tester.pumpAndSettle();
+      expect(saved().assignments[4]!.techId, 't0');
+      expect(saved().assignments[4]!.tech16bId, 't1');
+    });
+  });
 }

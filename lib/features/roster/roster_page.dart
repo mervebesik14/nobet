@@ -237,6 +237,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         if (_confirmedKinds.contains(v.kind) && !before.contains(v.message))
           v.message,
     ];
+    return _confirmWarnings(added);
+  }
+
+  /// [warnings] varsa gösterip onay ister; yoksa ya da "Yine de yap"
+  /// denirse true.
+  Future<bool> _confirmWarnings(List<String> warnings) async {
+    final added = warnings;
     if (added.isEmpty) return true;
     final ok = await showDialog<bool>(
       context: context,
@@ -299,10 +306,14 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   Future<void> _apply(
     Map<int, DayAssignment>? result, {
     String message = 'Değişiklik kaydedildi.',
+    Map<int, String>? dayShiftOverrides,
   }) async {
     if (result == null) return;
     final controller = ref.read(monthPlanProvider.notifier);
-    await controller.setAssignments(result);
+    await controller.setAssignments(
+      result,
+      dayShiftOverrides: dayShiftOverrides,
+    );
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -654,14 +665,125 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     await _apply(result);
   }
 
-  /// Uzun basma: nöbet hücresinde elle değiştirme / takas menüsü; boş, 7A
-  /// ya da izin hücresinde dokunmayla aynı düzenleme açılır.
+  /// [day] gününde 7A var mı? Sorumlu hemşire tanımlıyken mesai günleri
+  /// (hafta içi, tam gün tatil olmayan).
+  bool _hasDayShiftSlot(int day) {
+    final plan = _plan;
+    final date = DateTime(plan.year, plan.month, day);
+    if (date.weekday >= DateTime.saturday) return false;
+    final fullHoliday = ref
+        .read(holidaysProvider)
+        .any(
+          (h) =>
+              !h.isHalfDay &&
+              h.date.year == date.year &&
+              h.date.month == date.month &&
+              h.date.day == day,
+        );
+    if (fullHoliday) return false;
+    return ref
+        .read(peopleProvider)
+        .any((p) => p.isChargeNurse && p.worksInMonth(plan.year, plan.month));
+  }
+
+  /// [id] kişisi [day] gününün 7A'sına yazılırsa uyarılar ([assignments]
+  /// sonrasına göre): o gün nöbetçi, nöbet ertesi, izinli, istemediği gün.
+  List<String> _dayShiftWarnings(
+    String id,
+    int day,
+    Map<int, DayAssignment> assignments,
+  ) {
+    final plan = _plan;
+    final tail = ref.read(monthPlanProvider.notifier).previousMonthTail();
+    bool onDuty(int d) => d < 1
+        ? tail.isNotEmpty && tail.last.contains(id)
+        : assignments[d]?.includes(id) ?? false;
+    final who = '${_name(id)} ${formatDayMonth(day, plan.month)}';
+    return [
+      if (onDuty(day)) '$who nöbetçi.',
+      if (onDuty(day - 1)) '$who nöbet ertesi.',
+      if (ref.read(blockReasonsProvider)[id]?[day] case final reason?
+          when reason != BlockReason.beforeAnnualLeave &&
+              reason != BlockReason.afterAnnualLeave &&
+              reason != BlockReason.beforeRadiationLeave &&
+              reason != BlockReason.afterRadiationLeave)
+        '$who: ${reason.label}.',
+    ];
+  }
+
+  /// Hemşireyi [cell] gününün 7A'sına yazar; o gün 24 nöbetteyse nöbeti
+  /// kalkar. O günün 7A'sı ondan alınıp bu kişiye verilir.
+  Future<void> _writeDayShift(RosterCell cell) async {
+    final plan = _plan;
+    final day = cell.day;
+    final id = cell.personId;
+    var after = plan.assignments;
+    final onShift = after[day]?.includes(id) ?? false;
+    if (onShift) {
+      after = RosterEditor.replace(
+        after,
+        day: day,
+        role: Role.nurse,
+        oldId: id,
+        newId: null,
+        nursesPerDay: ref.read(effectiveSettingsProvider).nursesPerDay,
+      );
+    }
+    if (!await _confirmWarnings(_dayShiftWarnings(id, day, after))) return;
+    await _apply(
+      after,
+      dayShiftOverrides: {...plan.dayShiftOverrides, day: id},
+      message:
+          '${_name(id)} ${formatDayMonth(day, plan.month)} '
+          '${onShift ? '24 yerine ' : ''}7A\'ya yazıldı.',
+    );
+  }
+
+  /// Teknikeri [cell] gününde 16B (ya da [secondary] false ise 24)
+  /// koltuğuna yazar; koltuktaki kişinin yerine geçer.
+  Future<void> _writeTechSeat(
+    RosterCell cell, {
+    required bool secondary,
+  }) async {
+    final plan = _plan;
+    final current = plan.assignments[cell.day];
+    final replaced = secondary ? current?.tech16bId : current?.techId;
+    final after = RosterEditor.setTechSeat(
+      plan.assignments,
+      day: cell.day,
+      personId: cell.personId,
+      secondary: secondary,
+    );
+    if (!await _confirmViolations(after)) return;
+    await _apply(
+      after,
+      message:
+          '${_name(cell.personId)} ${formatDayMonth(cell.day, plan.month)} '
+          '${secondary ? "16B'ye" : "24'e"} yazıldı'
+          '${replaced != null && replaced != cell.personId ? ' (${_name(replaced)} yerine)' : ''}.',
+    );
+  }
+
+  /// Uzun basma menüsü. Nöbet hücresinde: değiştir, sil, takas ve
+  /// hemşirede 7A'ya / teknikerde 16B'ye (ya da 24'e) çevir. Boş hücrede:
+  /// 24 nöbet yaz ve hemşirede 7A / teknikerde 16B yaz. 7A hücresinde
+  /// dokunmayla aynı 7A seçenekleri açılır.
   Future<void> _onCellLongPress(RosterCell cell, Role role) async {
     if (_swapFrom != null) return _completeSwap(cell, role);
     if (!_ensureUnlocked()) return;
-    if (!(_plan.assignments[cell.day]?.includes(cell.personId) ?? false)) {
+    final plan = _plan;
+    final current = plan.assignments[cell.day];
+    final onShift = current?.includes(cell.personId) ?? false;
+    final secondary = current?.isSecondaryTech(cell.personId) ?? false;
+    final isDayShift =
+        ref.read(dayShiftsProvider)[cell.day]?.personId == cell.personId;
+    final nurse = role == Role.nurse;
+    final can7A = nurse && !isDayShift && _hasDayShiftSlot(cell.day);
+    final tech = role == Role.radiologyTech;
+    if (!onShift && (isDayShift || (nurse && !can7A))) {
       return _onCellTap(cell, role);
     }
+
     final choice = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -675,37 +797,82 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: const Text('Değiştir'),
-              subtitle: const Text('Yerine başkasını yaz.'),
-              onTap: () => Navigator.of(context).pop('edit'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline),
-              title: const Text('Sil'),
-              subtitle: const Text('Nöbeti kaldır; koltuk boş kalır.'),
-              onTap: () => Navigator.of(context).pop('delete'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.swap_horiz),
-              title: const Text('Başka bir nöbetle takas et'),
-              subtitle: const Text(
-                'Sonra takas edilecek ikinci nöbete dokunun.',
+            if (onShift) ...[
+              ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('Değiştir'),
+                subtitle: const Text('Yerine başkasını yaz.'),
+                onTap: () => Navigator.of(context).pop('edit'),
               ),
-              onTap: () => Navigator.of(context).pop('swap'),
-            ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('Sil'),
+                subtitle: const Text('Nöbeti kaldır; koltuk boş kalır.'),
+                onTap: () => Navigator.of(context).pop('delete'),
+              ),
+              if (can7A)
+                ListTile(
+                  leading: const Icon(Icons.wb_sunny_outlined),
+                  title: const Text("7A'ya çevir"),
+                  subtitle: const Text(
+                    '24 nöbeti kalkar, bu günün 7A\'sına yazılır.',
+                  ),
+                  onTap: () => Navigator.of(context).pop('7a'),
+                ),
+              if (tech)
+                ListTile(
+                  leading: const Icon(Icons.schedule),
+                  title: Text(secondary ? "24'e çevir" : "16B'ye çevir"),
+                  subtitle: Text(
+                    secondary
+                        ? '16B yerine 24 nöbet tutar.'
+                        : '24 yerine 16B vardiyası tutar.',
+                  ),
+                  onTap: () =>
+                      Navigator.of(context).pop(secondary ? '24' : '16b'),
+                ),
+              ListTile(
+                leading: const Icon(Icons.swap_horiz),
+                title: const Text('Başka bir nöbetle takas et'),
+                subtitle: const Text(
+                  'Sonra takas edilecek ikinci nöbete dokunun.',
+                ),
+                onTap: () => Navigator.of(context).pop('swap'),
+              ),
+            ] else ...[
+              ListTile(
+                leading: const Icon(Icons.add_circle_outline),
+                title: const Text('24 nöbet yaz'),
+                onTap: () => Navigator.of(context).pop('add'),
+              ),
+              if (can7A)
+                ListTile(
+                  leading: const Icon(Icons.wb_sunny_outlined),
+                  title: const Text('7A yaz'),
+                  subtitle: const Text('Bu günün 7A\'sı bu kişiye geçer.'),
+                  onTap: () => Navigator.of(context).pop('7a'),
+                ),
+              if (tech)
+                ListTile(
+                  leading: const Icon(Icons.schedule),
+                  title: const Text('16B yaz'),
+                  subtitle: const Text(
+                    '16B koltuğunda başkası varsa onun yerine.',
+                  ),
+                  onTap: () => Navigator.of(context).pop('16b'),
+                ),
+            ],
           ],
         ),
       ),
     );
     if (!mounted) return;
     switch (choice) {
-      case 'edit':
-        // Serbest düzenleme açıkken dokunmak siler; burada her zaman
-        // değiştirme seçenekleri açılır.
+      case 'edit' || 'add':
+        // Serbest düzenlemede "Değiştir" silmesin, seçenekleri açsın;
+        // "24 nöbet yaz" ise her iki kipte de dokunmayla aynı.
         final free = _freeEdit;
-        _freeEdit = false;
+        if (choice == 'edit') _freeEdit = false;
         try {
           await _onCellTap(cell, role);
         } finally {
@@ -713,6 +880,12 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         }
       case 'delete':
         await _deleteShift(cell, role);
+      case '7a':
+        await _writeDayShift(cell);
+      case '16b':
+        await _writeTechSeat(cell, secondary: true);
+      case '24':
+        await _writeTechSeat(cell, secondary: false);
       case 'swap':
         setState(() => _swapFrom = cell);
     }
