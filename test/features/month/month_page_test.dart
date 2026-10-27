@@ -565,6 +565,20 @@ void main() {
       expect(reminder, findsNothing);
     });
 
+    testWidgets('ayarda seçilen günden itibaren çıkar', (tester) async {
+      await seedTeam();
+      await boxes.meta.put('monthReminderDay', 8);
+      await pumpPage(tester, today: DateTime(2026, 10, 8));
+      expect(reminder, findsOneWidget);
+    });
+
+    testWidgets('ayarda seçilen günden önce çıkmaz', (tester) async {
+      await seedTeam();
+      await boxes.meta.put('monthReminderDay', 8);
+      await pumpPage(tester, today: DateTime(2026, 10, 7));
+      expect(reminder, findsNothing);
+    });
+
     testWidgets('"Sonra" 3 gün susturur', (tester) async {
       await seedTeam();
       await pumpPage(tester, today: DateTime(2026, 10, 20));

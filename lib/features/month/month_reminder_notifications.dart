@@ -24,6 +24,27 @@ class MonthReminderEnabled extends Notifier<bool> {
 final monthReminderEnabledProvider =
     NotifierProvider<MonthReminderEnabled, bool>(MonthReminderEnabled.new);
 
+/// Ay başı hatırlatmasının günü (`app_meta`, varsayılan 16): bildirim o gün
+/// gelir, Ay ekranındaki kart da o günden itibaren çıkar.
+class MonthReminderDay extends Notifier<int> {
+  static const _key = 'monthReminderDay';
+
+  @override
+  int build() => NextMonthReminder.clampDay(
+    ref.watch(hiveBoxesProvider).meta.get(_key) as int? ??
+        NextMonthReminder.defaultDay,
+  );
+
+  Future<void> set(int day) async {
+    state = NextMonthReminder.clampDay(day);
+    await ref.read(hiveBoxesProvider).meta.put(_key, state);
+  }
+}
+
+final monthReminderDayProvider = NotifierProvider<MonthReminderDay, int>(
+  MonthReminderDay.new,
+);
+
 /// Bildirim kimlikleri: [firstId] … [firstId] + 11.
 const monthReminderFirstId = 1600;
 const _maxReminders = 12;
@@ -41,12 +62,13 @@ ScheduledNotification monthReminderNotification(
       'İstenmeyen günleri ve izinleri toplamaya başla.',
 );
 
-/// Ay başı bildirimlerini kurar: her ayın 16'sı 10:00, ertesi ayın listesi
+/// Ay başı bildirimlerini kurar: her ayın seçilen günü 10:00, ertesi ayın listesi
 /// yoksa (ileriye 3 ay). Açılışta ve ay planları değişince (kısa bir
 /// beklemeyle) yeniden kurulur; kapatılınca hepsi iptal edilir. Uygulama
 /// kökünde izlenir.
 final monthReminderWatcherProvider = Provider<void>((ref) {
   final enabled = ref.watch(monthReminderEnabledProvider);
+  final day = ref.watch(monthReminderDayProvider);
   final service = ref.watch(notificationServiceProvider);
   final repo = ref.watch(monthPlanRepositoryProvider);
   final boxes = ref.watch(hiveBoxesProvider);
@@ -68,6 +90,7 @@ final monthReminderWatcherProvider = Provider<void>((ref) {
       final upcoming = NextMonthReminder.notifications(
         now: ref.read(clockProvider)(),
         hasRoster: (y, m) => repo.get(y, m)?.hasRoster ?? false,
+        day: day,
       );
       await service.schedule([
         for (var i = 0; i < upcoming.length; i++)

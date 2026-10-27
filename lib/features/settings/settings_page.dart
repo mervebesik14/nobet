@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../data/backup_service.dart';
 import '../../data/providers.dart';
+import '../../logic/next_month_reminder.dart';
 import '../../models/models.dart';
 import '../../shared/notification_service.dart';
 import '../../shared/platform_services.dart';
@@ -24,6 +25,7 @@ class SettingsPage extends ConsumerWidget {
     final s = ref.watch(rosterSettingsProvider);
     final controller = ref.read(rosterSettingsProvider.notifier);
     final themeMode = ref.watch(themeModeProvider);
+    final reminderDay = ref.watch(monthReminderDayProvider);
     void update(RosterSettings next) => controller.update(next);
 
     return Scaffold(
@@ -192,14 +194,26 @@ class SettingsPage extends ConsumerWidget {
             key: const ValueKey('month-reminder-switch'),
             secondary: const Icon(Icons.notifications_active_outlined),
             title: const Text('Ay başı hatırlatması'),
-            subtitle: const Text(
-              'Her ayın 16\'sı saat 10:00\'da, gelecek ayın listesi henüz '
-              'oluşturulmadıysa elektroşok sesiyle bildirim gelir.',
+            subtitle: Text(
+              'Her ayın ${NextMonthReminder.dayLabel(reminderDay)} saat '
+              '10:00\'da, gelecek ayın listesi henüz oluşturulmadıysa '
+              'elektroşok sesiyle bildirim gelir.',
             ),
             isThreeLine: true,
             value: ref.watch(monthReminderEnabledProvider),
             onChanged: (v) =>
                 ref.read(monthReminderEnabledProvider.notifier).set(v),
+          ),
+          ListTile(
+            key: const ValueKey('month-reminder-day'),
+            leading: const Icon(Icons.event_outlined),
+            title: const Text('Bildirim günü'),
+            subtitle: Text(
+              'Her ayın ${NextMonthReminder.dayLabel(reminderDay)}. Ay '
+              'ekranındaki hatırlatma da bu günden itibaren çıkar.',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _pickReminderDay(context, ref, reminderDay),
           ),
           ListTile(
             leading: const Icon(Icons.volume_up_outlined),
@@ -251,6 +265,45 @@ class SettingsPage extends ConsumerWidget {
   static String _lastBackupText(DateTime? last) => last == null
       ? 'Henüz yedek alınmadı.'
       : 'Son yedek: ${DateFormat('d MMMM y', 'tr_TR').format(last)}';
+
+  static Future<void> _pickReminderDay(
+    BuildContext context,
+    WidgetRef ref,
+    int current,
+  ) async {
+    final day = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Bildirim günü'),
+        content: SingleChildScrollView(
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (var d = 1; d <= NextMonthReminder.maxDay; d++)
+                ChoiceChip(
+                  key: ValueKey('reminder-day-$d'),
+                  label: SizedBox(
+                    width: 24,
+                    child: Text('$d', textAlign: TextAlign.center),
+                  ),
+                  showCheckmark: false,
+                  selected: d == current,
+                  onSelected: (_) => Navigator.of(context).pop(d),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Vazgeç'),
+          ),
+        ],
+      ),
+    );
+    if (day != null) await ref.read(monthReminderDayProvider.notifier).set(day);
+  }
 
   static Future<void> _testNotification(
     BuildContext context,

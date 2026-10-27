@@ -14,6 +14,7 @@ import '../roster/manual_entry_flow.dart';
 import '../roster/roster_flow.dart';
 import '../roster/roster_page.dart';
 import 'month_plan_controller.dart';
+import 'month_reminder_notifications.dart';
 import 'unavailable_days_page.dart';
 import '../../shared/app_colors.dart';
 import '../../shared/providers.dart';
@@ -90,6 +91,7 @@ class MonthPage extends ConsumerWidget {
             viewingNextMonth:
                 month.year == next.year && month.month == next.month,
             snoozedUntil: ref.watch(nextMonthReminderSnoozeProvider),
+            day: ref.watch(monthReminderDayProvider),
           ))
             _NextMonthReminderCard(month: next, plan: nextPlan),
           if (plan.isLocked)

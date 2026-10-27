@@ -1,15 +1,34 @@
 /// Ay başı hatırlatma kuralı (saf Dart).
 ///
-/// Ayın [startDay]. gününden itibaren gelecek ayın listesi henüz
-/// oluşturulmadıysa, istenmeyen günleri ve izinleri toplamaya başlamak için
-/// hatırlatılır. "Sonra" denince [snooze] boyunca susar. Ayrıca her ayın
-/// [startDay]. günü [notifyHour]'da telefon bildirimi gelir
+/// Ayın seçilen gününden (varsayılan [defaultDay]) itibaren gelecek ayın
+/// listesi henüz oluşturulmadıysa, istenmeyen günleri ve izinleri toplamaya
+/// başlamak için hatırlatılır. "Sonra" denince [snooze] boyunca susar.
+/// Ayrıca her ayın o günü [notifyHour]'da telefon bildirimi gelir
 /// ([notifications]).
 class NextMonthReminder {
   const NextMonthReminder._();
 
-  /// Hatırlatmanın başladığı gün.
-  static const startDay = 16;
+  /// Hatırlatmanın varsayılan günü.
+  static const defaultDay = 16;
+
+  /// Seçilebilecek en geç gün: her ayda bulunsun diye 28.
+  static const maxDay = 28;
+
+  /// Seçilen günü 1 … [maxDay] aralığına çeker.
+  static int clampDay(int day) => day.clamp(1, maxDay);
+
+  /// "16'sı", "1'i", "20'si" gibi: ayın günü, iyelik ekiyle.
+  static String dayLabel(int day) {
+    final suffix = switch (day % 10) {
+      0 => day == 10 || day == 30 ? 'u' : 'si', // on'u, yirmi'si, otuz'u
+      1 || 5 || 8 => 'i',
+      2 || 7 => 'si',
+      3 || 4 => 'ü',
+      6 => 'sı',
+      _ => 'u', // 9
+    };
+    return "$day'$suffix";
+  }
 
   /// Bildirimin saati (yerel saat).
   static const notifyHour = 10;
@@ -31,24 +50,26 @@ class NextMonthReminder {
     required bool nextMonthHasRoster,
     bool viewingNextMonth = false,
     DateTime? snoozedUntil,
+    int day = defaultDay,
   }) {
     if (!hasPeople || nextMonthHasRoster || viewingNextMonth) return false;
-    if (today.day < startDay) return false;
+    if (today.day < clampDay(day)) return false;
     return snoozedUntil == null || !_day(today).isBefore(_day(snoozedUntil));
   }
 
   /// [now]'dan sonraki bildirimler, en fazla [count] tane: her ayın
-  /// [startDay]. günü [notifyHour]'da, ertesi ayın ([month]) listesi
+  /// [day]. günü [notifyHour]'da, ertesi ayın ([month]) listesi
   /// oluşturulmadıysa. Uygulama açılınca ve listeler değişince yeniden
   /// kurulur; listesi oluşturulan ayın bildirimi düşer.
   static List<({DateTime at, DateTime month})> notifications({
     required DateTime now,
     required bool Function(int year, int month) hasRoster,
     int count = 3,
+    int day = defaultDay,
   }) {
     final result = <({DateTime at, DateTime month})>[];
     for (var i = 0; i < 24 && result.length < count; i++) {
-      final at = DateTime(now.year, now.month + i, startDay, notifyHour);
+      final at = DateTime(now.year, now.month + i, clampDay(day), notifyHour);
       if (!at.isAfter(now)) continue;
       final month = DateTime(at.year, at.month + 1);
       if (hasRoster(month.year, month.month)) continue;

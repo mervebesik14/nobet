@@ -322,6 +322,36 @@ void main() {
       expect(notifications.scheduled.first.body, startsWith('Aralık listesi'));
     });
 
+    testWidgets('bildirim günü seçilir; bildirimler o güne kurulur', (
+      tester,
+    ) async {
+      await openApp(tester);
+      await tester.tap(find.text('Ayarlar'));
+      await tester.pumpAndSettle();
+      final tile = find.byKey(const ValueKey('month-reminder-day'));
+      await tester.scrollUntilVisible(tile, 200);
+      expect(
+        find.text(
+          "Her ayın 16'sı. Ay ekranındaki hatırlatma da bu günden itibaren çıkar.",
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('reminder-day-20')));
+      await tester.pump(const Duration(seconds: 3));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+      expect(boxes.meta.get('monthReminderDay'), 20);
+      expect(find.textContaining("Her ayın 20'si"), findsNWidgets(2));
+      // Saat 2026-10-11 09:00: bu ayın 20'si de girer.
+      expect(notifications.scheduled.map((n) => n.at), [
+        DateTime(2026, 10, 20, 10),
+        DateTime(2026, 11, 20, 10),
+        DateTime(2026, 12, 20, 10),
+      ]);
+    });
+
     testWidgets('ayarlardan kapatılır; deneme bildirimi gönderilir', (
       tester,
     ) async {

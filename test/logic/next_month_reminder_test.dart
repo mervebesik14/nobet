@@ -9,18 +9,41 @@ void main() {
       bool hasRoster = false,
       bool viewing = false,
       DateTime? snoozedUntil,
+      int day = 16,
     }) => NextMonthReminder.isDue(
       today: today,
       hasPeople: hasPeople,
       nextMonthHasRoster: hasRoster,
       viewingNextMonth: viewing,
       snoozedUntil: snoozedUntil,
+      day: day,
     );
 
     test('ayın 16sından önce hatırlatılmaz', () {
       expect(due(DateTime(2026, 10, 15)), isFalse);
       expect(due(DateTime(2026, 10, 16)), isTrue);
       expect(due(DateTime(2026, 10, 31)), isTrue);
+    });
+
+    test('seçilen günden itibaren hatırlatılır (en geç 28)', () {
+      expect(due(DateTime(2026, 10, 4), day: 5), isFalse);
+      expect(due(DateTime(2026, 10, 5), day: 5), isTrue);
+      expect(due(DateTime(2026, 10, 27), day: 31), isFalse);
+      expect(due(DateTime(2026, 10, 28), day: 31), isTrue);
+    });
+
+    test('gün etiketi iyelik ekiyle', () {
+      expect([1, 2, 3, 6, 9, 10, 16, 20, 28].map(NextMonthReminder.dayLabel), [
+        "1'i",
+        "2'si",
+        "3'ü",
+        "6'sı",
+        "9'u",
+        "10'u",
+        "16'sı",
+        "20'si",
+        "28'i",
+      ]);
     });
 
     test('gelecek ayın listesi varsa ya da kişi yoksa hatırlatılmaz', () {
@@ -51,10 +74,12 @@ void main() {
       DateTime now, {
       Set<String> rosters = const {},
       int count = 3,
+      int day = 16,
     }) => NextMonthReminder.notifications(
       now: now,
       hasRoster: (y, m) => rosters.contains('$y-$m'),
       count: count,
+      day: day,
     );
 
     test('her ayın 16sı 10:00, ertesi ay için', () {
@@ -73,6 +98,17 @@ void main() {
       expect(
         plan(DateTime(2026, 10, 16, 10), count: 1).single.at,
         DateTime(2026, 11, 16, 10),
+      );
+    });
+
+    test('seçilen gün; 28\'den sonrası 28 olur', () {
+      expect(
+        plan(DateTime(2026, 10, 27), day: 1, count: 1).single.at,
+        DateTime(2026, 11, 1, 10),
+      );
+      expect(
+        plan(DateTime(2027, 1, 30), day: 30, count: 1).single.at,
+        DateTime(2027, 2, 28, 10),
       );
     });
 
