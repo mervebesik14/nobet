@@ -7,7 +7,9 @@ import 'package:intl/intl.dart';
 import '../../data/backup_service.dart';
 import '../../data/providers.dart';
 import '../../models/models.dart';
+import '../../shared/notification_service.dart';
 import '../../shared/platform_services.dart';
+import '../month/month_reminder_notifications.dart';
 import 'auto_backups_page.dart';
 import 'backup_actions.dart';
 
@@ -185,6 +187,26 @@ class SettingsPage extends ConsumerWidget {
                   ref.read(themeModeProvider.notifier).set(v.single),
             ),
           ),
+          const _Header('Bildirimler'),
+          SwitchListTile(
+            key: const ValueKey('month-reminder-switch'),
+            secondary: const Icon(Icons.notifications_active_outlined),
+            title: const Text('Ay başı hatırlatması'),
+            subtitle: const Text(
+              'Her ayın 16\'sı saat 10:00\'da, gelecek ayın listesi henüz '
+              'oluşturulmadıysa elektroşok sesiyle bildirim gelir.',
+            ),
+            isThreeLine: true,
+            value: ref.watch(monthReminderEnabledProvider),
+            onChanged: (v) =>
+                ref.read(monthReminderEnabledProvider.notifier).set(v),
+          ),
+          ListTile(
+            leading: const Icon(Icons.volume_up_outlined),
+            title: const Text('Bildirimi dene'),
+            subtitle: const Text('Şimdi bir deneme bildirimi gelir.'),
+            onTap: () => _testNotification(context, ref),
+          ),
           const _Header('Yedekleme'),
           const Padding(
             padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -229,6 +251,33 @@ class SettingsPage extends ConsumerWidget {
   static String _lastBackupText(DateTime? last) => last == null
       ? 'Henüz yedek alınmadı.'
       : 'Son yedek: ${DateFormat('d MMMM y', 'tr_TR').format(last)}';
+
+  static Future<void> _testNotification(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final service = ref.read(notificationServiceProvider);
+    try {
+      final allowed = await service.requestPermission();
+      if (!allowed) {
+        if (context.mounted) {
+          _notify(
+            context,
+            'Bildirim izni yok. Telefonun Ayarlar > Bildirimler > Nöbetçi '
+            'bölümünden izin verin.',
+          );
+        }
+        return;
+      }
+      await service.show(
+        id: monthReminderFirstId - 1,
+        title: 'Nöbetçi',
+        body: 'Deneme: ay başı hatırlatması böyle gelecek.',
+      );
+    } catch (e) {
+      if (context.mounted) _notify(context, 'Bildirim gönderilemedi: $e');
+    }
+  }
 
   static void _notify(BuildContext context, String message) {
     ScaffoldMessenger.of(context)

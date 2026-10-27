@@ -12,6 +12,7 @@ import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/features/settings/auto_backups_page.dart';
 import 'package:nobet_listesi/features/settings/settings_page.dart';
 import 'package:nobet_listesi/models/models.dart';
+import 'package:nobet_listesi/shared/notification_service.dart';
 import 'package:nobet_listesi/shared/platform_services.dart';
 import 'package:nobet_listesi/shared/providers.dart';
 
@@ -20,12 +21,14 @@ import '../../helpers.dart';
 void main() {
   late HiveBoxes boxes;
   late FakePlatformServices services;
+  late FakeNotificationService notifications;
 
   setUpAll(() => initializeDateFormatting('tr_TR'));
 
   setUp(() async {
     boxes = await openTestBoxes();
     services = FakePlatformServices();
+    notifications = FakeNotificationService();
   });
 
   tearDown(() => Hive.close());
@@ -40,6 +43,8 @@ void main() {
           ...boxOverrides(boxes),
           todayProvider.overrideWithValue(DateTime(2026, 10, 11)),
           platformServicesProvider.overrideWithValue(services),
+          notificationServiceProvider.overrideWithValue(notifications),
+          clockProvider.overrideWithValue(() => DateTime(2026, 10, 11, 9)),
         ],
         child: home ?? const MaterialApp(home: SettingsPage()),
       ),
@@ -271,5 +276,73 @@ void main() {
     await tester.tap(find.text('Otomatik yedekler'));
     await tester.pumpAndSettle();
     expect(find.text('Henüz otomatik yedek yok.'), findsOneWidget);
+  });
+
+  group('ay başı bildirimi', () {
+    Future<void> openApp(WidgetTester tester) async {
+      await pump(tester, home: const NobetApp());
+      // İzleyici değişiklikleri 2 sn bekleyip kurar.
+      await tester.pump(const Duration(seconds: 3));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pump();
+    }
+
+    testWidgets('açılışta her ayın 16sı 10:00 için kurulur', (tester) async {
+      await openApp(tester);
+      expect(notifications.permissionRequests, 1);
+      expect(notifications.scheduled.map((n) => n.at), [
+        DateTime(2026, 10, 16, 10),
+        DateTime(2026, 11, 16, 10),
+        DateTime(2026, 12, 16, 10),
+      ]);
+      expect(
+        notifications.scheduled.first.body,
+        'Kasım listesi henüz oluşturulmadı. İstenmeyen günleri ve izinleri '
+        'toplamaya başla.',
+      );
+    });
+
+    testWidgets('listesi oluşturulan ayın bildirimi düşer', (tester) async {
+      await openApp(tester);
+      await tester.runAsync(
+        () => boxes.monthPlans.put(
+          '2026-11',
+          const MonthPlan(
+            year: 2026,
+            month: 11,
+            assignments: {
+              1: DayAssignment(day: 1, nurseIds: ['a']),
+            },
+          ),
+        ),
+      );
+      await tester.pump(const Duration(seconds: 3));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      expect(notifications.scheduled.first.at, DateTime(2026, 11, 16, 10));
+      expect(notifications.scheduled.first.body, startsWith('Aralık listesi'));
+    });
+
+    testWidgets('ayarlardan kapatılır; deneme bildirimi gönderilir', (
+      tester,
+    ) async {
+      await openApp(tester);
+      await tester.tap(find.text('Ayarlar'));
+      await tester.pumpAndSettle();
+      final toggle = find.byKey(const ValueKey('month-reminder-switch'));
+      await tester.scrollUntilVisible(toggle, 200);
+      expect(tester.widget<SwitchListTile>(toggle).value, isTrue);
+      await tester.tap(toggle);
+      await tester.pump(const Duration(seconds: 3));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+      expect(tester.widget<SwitchListTile>(toggle).value, isFalse);
+      expect(boxes.meta.get('monthReminderNotifications'), isFalse);
+      expect(notifications.scheduled, isEmpty);
+
+      await tester.tap(find.text('Bildirimi dene'));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+      expect(notifications.shown.single, startsWith('Deneme'));
+    });
   });
 }

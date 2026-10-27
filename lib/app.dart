@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'data/auto_backup_service.dart';
 import 'data/providers.dart';
+import 'features/month/month_reminder_notifications.dart';
 
 import 'features/shell/main_shell.dart';
 
@@ -17,6 +18,8 @@ class NobetApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Veri değiştikçe telefona sessizce yedek alınır.
     ref.watch(autoBackupWatcherProvider);
+    // Her ayın 16'sı, gelecek ayın listesi yoksa telefon bildirimi.
+    ref.watch(monthReminderWatcherProvider);
     return MaterialApp(
       themeMode: ref.watch(themeModeProvider),
       title: 'Nöbetçi',

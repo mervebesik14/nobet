@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bildirim sesi yalnız adıyla çağrılır; sürüm derlemesinde silinmesin. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@raw/defibrilator" />

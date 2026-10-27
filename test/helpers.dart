@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:hive_ce/hive_ce.dart';
 import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/data/providers.dart';
+import 'package:nobet_listesi/shared/notification_service.dart';
 import 'package:nobet_listesi/shared/platform_services.dart';
 import 'package:nobet_listesi/shared/providers.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -108,5 +109,42 @@ class FakePlatformServices extends PlatformServices {
       File('assets/fonts/$file').readAsBytesSync().buffer.asByteData(),
     );
     return (regular: load('Roboto-Regular.ttf'), bold: load('Roboto-Bold.ttf'));
+  }
+}
+
+/// Bildirimleri telefona göndermeyip kaydeden sahte servis.
+class FakeNotificationService extends NotificationService {
+  /// Son planlanan bildirimler.
+  final scheduled = <ScheduledNotification>[];
+
+  /// Hemen gösterilen bildirimlerin metinleri.
+  final shown = <String>[];
+  var permissionRequests = 0;
+  var scheduleCalls = 0;
+
+  @override
+  Future<bool> requestPermission() async {
+    permissionRequests++;
+    return true;
+  }
+
+  @override
+  Future<void> schedule(
+    List<ScheduledNotification> items, {
+    required Iterable<int> ids,
+  }) async {
+    scheduleCalls++;
+    scheduled
+      ..clear()
+      ..addAll(items);
+  }
+
+  @override
+  Future<void> show({
+    required int id,
+    required String title,
+    required String body,
+  }) async {
+    shown.add(body);
   }
 }

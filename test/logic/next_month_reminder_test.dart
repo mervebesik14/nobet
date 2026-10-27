@@ -17,9 +17,9 @@ void main() {
       snoozedUntil: snoozedUntil,
     );
 
-    test('ayın 17sinden önce hatırlatılmaz', () {
-      expect(due(DateTime(2026, 10, 16)), isFalse);
-      expect(due(DateTime(2026, 10, 17)), isTrue);
+    test('ayın 16sından önce hatırlatılmaz', () {
+      expect(due(DateTime(2026, 10, 15)), isFalse);
+      expect(due(DateTime(2026, 10, 16)), isTrue);
       expect(due(DateTime(2026, 10, 31)), isTrue);
     });
 
@@ -42,6 +42,44 @@ void main() {
       expect(
         NextMonthReminder.nextMonth(DateTime(2026, 12, 21)),
         DateTime(2027, 1),
+      );
+    });
+  });
+
+  group('bildirimler', () {
+    List<({DateTime at, DateTime month})> plan(
+      DateTime now, {
+      Set<String> rosters = const {},
+      int count = 3,
+    }) => NextMonthReminder.notifications(
+      now: now,
+      hasRoster: (y, m) => rosters.contains('$y-$m'),
+      count: count,
+    );
+
+    test('her ayın 16sı 10:00, ertesi ay için', () {
+      expect(plan(DateTime(2026, 10, 27)), [
+        (at: DateTime(2026, 11, 16, 10), month: DateTime(2026, 12)),
+        (at: DateTime(2026, 12, 16, 10), month: DateTime(2027)),
+        (at: DateTime(2027, 1, 16, 10), month: DateTime(2027, 2)),
+      ]);
+    });
+
+    test('bu ayın 16sı henüz gelmediyse o da girer; saat geçtiyse girmez', () {
+      expect(
+        plan(DateTime(2026, 10, 16, 9, 59), count: 1).single.at,
+        DateTime(2026, 10, 16, 10),
+      );
+      expect(
+        plan(DateTime(2026, 10, 16, 10), count: 1).single.at,
+        DateTime(2026, 11, 16, 10),
+      );
+    });
+
+    test('listesi oluşturulan ayın bildirimi düşer', () {
+      expect(
+        plan(DateTime(2026, 10, 27), rosters: {'2026-12'}).map((n) => n.month),
+        [DateTime(2027), DateTime(2027, 2), DateTime(2027, 3)],
       );
     });
   });

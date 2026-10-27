@@ -532,13 +532,13 @@ void main() {
       );
     }
 
-    testWidgets('ayın 17sinden önce çıkmaz', (tester) async {
+    testWidgets('ayın 16sından önce çıkmaz', (tester) async {
       await seedTeam();
-      await pumpPage(tester, today: DateTime(2026, 10, 16));
+      await pumpPage(tester, today: DateTime(2026, 10, 15));
       expect(reminder, findsNothing);
     });
 
-    testWidgets('17sinden sonra çıkar; gelecek aya geçirir', (tester) async {
+    testWidgets('16sından itibaren çıkar; gelecek aya geçirir', (tester) async {
       await seedTeam();
       await boxes.monthPlans.put(
         '2026-11',
@@ -551,7 +551,7 @@ void main() {
           },
         ),
       );
-      await pumpPage(tester, today: DateTime(2026, 10, 17));
+      await pumpPage(tester, today: DateTime(2026, 10, 16));
       expect(reminder, findsOneWidget);
       expect(
         find.textContaining('Kasım listesi henüz oluşturulmadı'),
