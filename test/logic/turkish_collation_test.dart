@@ -49,6 +49,11 @@ void main() {
     });
   });
 
+  test('turkishUpperCase: i→İ, ı→I', () {
+    expect(turkishUpperCase('Hemşireler'), 'HEMŞİRELER');
+    expect(turkishUpperCase('ışık'), 'IŞIK');
+  });
+
   test('normalizeName kırpar, boşlukları tekleştirir, Türkçe küçültür', () {
     expect(normalizeName('  AYŞE   IŞIK '), 'ayşe ışık');
     expect(normalizeName('İpek'), 'ipek');

@@ -3,7 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../models/models.dart';
+import '../../logic/turkish_collation.dart';
+import '../../shared/brand.dart';
 import '../../shared/providers.dart';
+import '../../shared/widgets/brand_widgets.dart';
 import '../../shared/widgets/placeholder_view.dart';
 import '../../shared/widgets/section_header.dart';
 import 'people_controller.dart';
@@ -32,9 +35,23 @@ class PeoplePage extends ConsumerWidget {
     final active = people.where((p) => p.isActiveOn(today)).toList();
     final inactive = people.where((p) => !p.isActiveOn(today)).toList();
 
+    final counts = [
+      for (final role in Role.values)
+        if (active.any((p) => p.role == role))
+          '${active.where((p) => p.role == role).length} '
+              '${turkishLowerCase(role.label)}',
+    ];
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Kişiler')),
+      appBar: BrandHeader(
+        title: 'Kişiler',
+        subtitle: counts.isEmpty
+            ? 'Hemşire ve teknikerler'
+            : counts.join(' · '),
+      ),
       floatingActionButton: FloatingActionButton(
+        // Sekmeler birlikte durduğu için kahraman geçişi yok.
+        heroTag: null,
         tooltip: 'Kişi ekle',
         onPressed: () => _openForm(context),
         child: const Icon(Icons.add),
@@ -48,26 +65,36 @@ class PeoplePage extends ConsumerWidget {
             )
           : ListView(
               // FAB son satırı örtmesin.
-              padding: const EdgeInsets.only(bottom: 88),
+              padding: const EdgeInsets.only(top: 4, bottom: 96),
               children: [
                 for (final role in Role.values) ...[
                   SectionHeader(
                     title: role.pluralLabel,
                     count: active.where((p) => p.role == role).length,
                   ),
-                  for (final person in active.where((p) => p.role == role))
-                    _PersonTile(
-                      person: person,
-                      onTap: () => _openForm(context, person),
-                    ),
+                  GroupCard(
+                    dividerIndent: 72,
+                    children: [
+                      for (final person in active.where((p) => p.role == role))
+                        _PersonTile(
+                          person: person,
+                          onTap: () => _openForm(context, person),
+                        ),
+                    ],
+                  ),
                 ],
                 if (inactive.isNotEmpty) ...[
                   SectionHeader(title: 'Pasif', count: inactive.length),
-                  for (final person in inactive)
-                    _PersonTile(
-                      person: person,
-                      onTap: () => _openForm(context, person),
-                    ),
+                  GroupCard(
+                    dividerIndent: 72,
+                    children: [
+                      for (final person in inactive)
+                        _PersonTile(
+                          person: person,
+                          onTap: () => _openForm(context, person),
+                        ),
+                    ],
+                  ),
                 ],
               ],
             ),
@@ -122,12 +149,19 @@ class _PersonTile extends ConsumerWidget {
         ? null
         : '${person.role.label} · pasif: '
               '${inactivePeriodText(from, person.inactiveUntil)}';
+    final brand = context.brand;
     final tile = ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       leading: CircleAvatar(
+        radius: 22,
         backgroundColor: person.colorValue != null
             ? Color(person.colorValue!)
-            : theme.colorScheme.primaryContainer,
-        child: Text(initial),
+            : brand.pill,
+        foregroundColor: brand.onPill,
+        child: Text(
+          initial,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
       ),
       title: Text(person.name),
       subtitle: period != null
@@ -149,6 +183,8 @@ class _PersonTile extends ConsumerWidget {
               icon: const Icon(Icons.restart_alt),
               onPressed: () => endInactivityWithDate(context, ref, person),
             )
+          : person.isChargeNurse
+          ? const _Tag('Sorumlu')
           : null,
       onTap: onTap,
     );
@@ -168,6 +204,32 @@ class _PersonTile extends ConsumerWidget {
       confirmDismiss: (_) => _confirm(context, ref),
       onDismissed: (_) => _delete(context, ref),
       child: activeNow ? tile : Opacity(opacity: 0.5, child: tile),
+    );
+  }
+}
+
+/// Satır sonundaki küçük nane etiket ("Sorumlu").
+class _Tag extends StatelessWidget {
+  const _Tag(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final brand = context.brand;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: brand.pill,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        text,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: brand.onPill,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }

@@ -11,6 +11,10 @@ const _alphabet = 'abcçdefgğhıijklmnoöprsştuüvyz';
 String turkishLowerCase(String text) =>
     text.replaceAll('I', 'ı').replaceAll('İ', 'i').toLowerCase();
 
+/// Türkçe kurallarla büyük harfe çevirir (i→İ, ı→I).
+String turkishUpperCase(String text) =>
+    text.replaceAll('i', 'İ').replaceAll('ı', 'I').toUpperCase();
+
 /// Karşılaştırma ve tekrar kontrolü için: kırpılmış, boşlukları tekleşmiş,
 /// Türkçe küçük harfli metin.
 String normalizeName(String name) =>

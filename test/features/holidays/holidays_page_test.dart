@@ -41,8 +41,13 @@ void main() {
     expect(find.text('Cumhuriyet Bayramı'), findsOneWidget);
     expect(find.text('Cumhuriyet Bayramı Arifesi'), findsOneWidget);
     expect(find.text('Resmi tatil · Yarım gün'), findsOneWidget);
-    expect(find.text('Bu ay çalışılması gereken: 145 saat'), findsOneWidget);
-    expect(find.text('20 iş günü × 7 saat + 1 arife × 5 saat'), findsOneWidget);
+    expect(find.text('145 saat'), findsOneWidget);
+    expect(
+      find.text(
+        'Bu ay çalışılması gereken · 20 iş günü × 7 saat + 1 arife × 5 saat',
+      ),
+      findsOneWidget,
+    );
     expect(find.textContaining('tanımlı değil'), findsNothing);
   });
 
@@ -56,7 +61,7 @@ void main() {
 
     expect(find.text('Kasım 2026'), findsOneWidget);
     expect(find.text('Bu ay resmi tatil yok.'), findsOneWidget);
-    expect(find.text('Bu ay çalışılması gereken: 147 saat'), findsOneWidget);
+    expect(find.text('147 saat'), findsOneWidget);
   });
 
   testWidgets('yeni yıla geçince hazır tatiller yüklenir', (tester) async {
@@ -91,7 +96,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Resmi tatil · Yarım gün'), findsNWidgets(2));
-    expect(find.text('Bu ay çalışılması gereken: 150 saat'), findsOneWidget);
+    expect(find.text('150 saat'), findsOneWidget);
     expect(boxes.holidays.get('2026-10-29')!.isHalfDay, isTrue);
   });
 
@@ -108,7 +113,7 @@ void main() {
 
     expect(find.text('Cumhuriyet Bayramı'), findsNothing);
     expect(boxes.holidays.get('2026-10-29'), isNull);
-    expect(find.text('Bu ay çalışılması gereken: 152 saat'), findsOneWidget);
+    expect(find.text('152 saat'), findsOneWidget);
   });
 
   testWidgets('elle tatil eklenir', (tester) async {
@@ -139,7 +144,7 @@ void main() {
     final saved = boxes.holidays.get('2026-10-02')!;
     expect(saved.isPredefined, isFalse);
     expect(saved.isHalfDay, isFalse);
-    expect(find.text('Bu ay çalışılması gereken: 138 saat'), findsOneWidget);
+    expect(find.text('138 saat'), findsOneWidget);
   });
 
   testWidgets('dini bayram ve resmi tatil ayrı gösterilir, değiştirilebilir', (
@@ -155,6 +160,8 @@ void main() {
     expect(find.text('Dini bayram · Yarım gün'), findsOneWidget);
 
     // Son satır (22 Mart) resmi tatile çevrilir.
+    await tester.ensureVisible(find.byTooltip('Seçenekler').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Seçenekler').last);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Resmi tatil yap'));

@@ -7,7 +7,8 @@ import '../../logic/feasibility_checker.dart';
 import '../../logic/next_month_reminder.dart';
 import '../../logic/turkish_dates.dart';
 import '../../models/models.dart';
-import '../../shared/widgets/month_selector.dart';
+import '../../shared/brand.dart';
+import '../../shared/widgets/brand_widgets.dart';
 import '../../shared/widgets/section_header.dart';
 import '../people/people_controller.dart';
 import '../roster/manual_entry_flow.dart';
@@ -55,28 +56,34 @@ class MonthPage extends ConsumerWidget {
         .get(next.year, next.month);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Ay Planı')),
+      appBar: BrandHeader(
+        title: 'Ay Planı',
+        bottom: HeaderMonthSelector(
+          month: month,
+          onChanged: ref.read(planMonthProvider.notifier).select,
+        ),
+      ),
       floatingActionButton: active.isEmpty
           ? null
           : plan.hasRoster
           ? FloatingActionButton.extended(
+              // Sekmeler birlikte durduğu için kahraman geçişi yok.
+              heroTag: null,
               onPressed: () => _openRoster(context),
               icon: const Icon(Icons.table_chart_outlined),
               label: const Text('Listeyi Gör'),
             )
           : FloatingActionButton.extended(
+              // Sekmeler birlikte durduğu için kahraman geçişi yok.
+              heroTag: null,
               onPressed: () => _create(context, ref),
               icon: const Icon(Icons.auto_awesome),
               label: const Text('Listeyi Oluştur'),
             ),
       body: ListView(
         // FAB son kartı örtmesin.
-        padding: const EdgeInsets.only(bottom: 96),
+        padding: const EdgeInsets.only(top: 8, bottom: 96),
         children: [
-          MonthSelector(
-            month: month,
-            onChanged: ref.read(planMonthProvider.notifier).select,
-          ),
           if (BackupReminder.isDue(
             today: ref.watch(todayProvider),
             hasData: ref.watch(peopleProvider).isNotEmpty,
@@ -121,27 +128,31 @@ class MonthPage extends ConsumerWidget {
           if (active.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 4,
+              child: Row(
                 children: [
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      // Elle girilen liste dokunarak düzenlenmeye hazır açılır.
-                      if (await manualEntryFlow(context, ref) &&
-                          context.mounted) {
-                        _openRoster(context, freeEdit: true);
-                      }
-                    },
-                    icon: const Icon(Icons.edit_note),
-                    label: const Text('Listeyi elle gir'),
-                  ),
-                  if (plan.hasRoster)
-                    OutlinedButton.icon(
-                      onPressed: () => resetRosterFlow(context, ref),
-                      icon: const Icon(Icons.delete_sweep_outlined),
-                      label: const Text('Listeyi sıfırla'),
+                  Expanded(
+                    child: _CardButton(
+                      onPressed: () async {
+                        // Elle girilen liste dokunarak düzenlenmeye hazır açılır.
+                        if (await manualEntryFlow(context, ref) &&
+                            context.mounted) {
+                          _openRoster(context, freeEdit: true);
+                        }
+                      },
+                      icon: Icons.edit_note,
+                      label: 'Listeyi elle gir',
                     ),
+                  ),
+                  if (plan.hasRoster) ...[
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _CardButton(
+                        onPressed: () => resetRosterFlow(context, ref),
+                        icon: Icons.delete_outline,
+                        label: 'Listeyi sıfırla',
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -160,19 +171,60 @@ class MonthPage extends ConsumerWidget {
                 title: role.pluralLabel,
                 count: active.where((p) => p.role == role).length,
               ),
-              for (final person in active.where((p) => p.role == role))
-                _PersonRow(
-                  person: person,
-                  unavailableCount: plan.unavailableDaysOf(person.id).length,
-                  annualLeaveCount: plan.annualLeaveOf(person.id).length,
-                  radiationLeaveCount: plan.radiationLeaveOf(person.id).length,
-                  sickLeaveCount: plan.sickLeaveOf(person.id).length,
-                  wantsOvertime: plan.wantsOvertime(person.id),
-                  requestedCount: plan.requestedShiftsOf(person.id).length,
-                ),
+              GroupCard(
+                children: [
+                  for (final person in active.where((p) => p.role == role))
+                    _PersonRow(
+                      person: person,
+                      unavailableCount: plan
+                          .unavailableDaysOf(person.id)
+                          .length,
+                      annualLeaveCount: plan.annualLeaveOf(person.id).length,
+                      radiationLeaveCount: plan
+                          .radiationLeaveOf(person.id)
+                          .length,
+                      sickLeaveCount: plan.sickLeaveOf(person.id).length,
+                      wantsOvertime: plan.wantsOvertime(person.id),
+                      requestedCount: plan.requestedShiftsOf(person.id).length,
+                    ),
+                ],
+              ),
             ],
           _FeasibilitySection(report: report),
         ],
+      ),
+    );
+  }
+}
+
+/// Beyaz kart görünümlü düğme ("Listeyi elle gir").
+class _CardButton extends StatelessWidget {
+  const _CardButton({
+    required this.onPressed,
+    required this.icon,
+    required this.label,
+  });
+
+  final VoidCallback onPressed;
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 20),
+      label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+      style: OutlinedButton.styleFrom(
+        backgroundColor: context.brand.card,
+        foregroundColor: theme.colorScheme.onSurface,
+        side: BorderSide(color: context.brand.divider),
+        minimumSize: const Size.fromHeight(48),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        textStyle: theme.textTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

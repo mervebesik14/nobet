@@ -5,6 +5,7 @@ import 'package:hive_ce/hive_ce.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/features/people/people_page.dart';
+import 'package:nobet_listesi/logic/turkish_collation.dart';
 import 'package:nobet_listesi/models/models.dart';
 import 'package:nobet_listesi/shared/providers.dart';
 
@@ -43,8 +44,10 @@ void main() {
     }
   }
 
-  Finder header(String title) =>
-      find.ancestor(of: find.text(title), matching: find.byType(Row));
+  Finder header(String title) => find.ancestor(
+    of: find.text(turkishUpperCase(title)),
+    matching: find.byType(Row),
+  );
 
   testWidgets('boşken yönlendirme mesajı gösterir', (tester) async {
     await pumpPage(tester);
@@ -63,18 +66,18 @@ void main() {
     await pumpPage(tester);
 
     expect(
-      find.descendant(of: header('Hemşireler'), matching: find.text('2')),
+      find.descendant(of: header('Hemşireler'), matching: find.text('2 kişi')),
       findsOneWidget,
     );
     expect(
       find.descendant(
         of: header('Radyoloji Teknikerleri'),
-        matching: find.text('1'),
+        matching: find.text('1 kişi'),
       ),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: header('Pasif'), matching: find.text('1')),
+      find.descendant(of: header('Pasif'), matching: find.text('1 kişi')),
       findsOneWidget,
     );
 
@@ -245,7 +248,7 @@ void main() {
       find.text('Hemşire · pasif: 20 Ekim 2026 – 25 Ekim 2026'),
       findsOneWidget,
     );
-    expect(find.text('Pasif'), findsNothing); // Pasif bölümü yok
+    expect(find.text('PASİF'), findsNothing); // Pasif bölümü yok
   });
 
   testWidgets('listede pasif dönemi sonlandırılır', (tester) async {
@@ -259,7 +262,7 @@ void main() {
       ),
     ]);
     await pumpPage(tester);
-    expect(find.text('Pasif'), findsOneWidget); // Pasif bölümünde
+    expect(find.text('PASİF'), findsOneWidget); // Pasif bölümünde
 
     await tester.tap(find.byTooltip('Pasif dönemi sonlandır'));
     await tester.pumpAndSettle();
@@ -270,7 +273,7 @@ void main() {
     final p = boxes.people.get('1')!;
     expect(p.inactiveUntil, DateTime(2026, 10, 10));
     expect(p.isActiveOn(DateTime(2026, 10, 11)), isTrue);
-    expect(find.text('Pasif'), findsNothing); // artık aktiflerde
+    expect(find.text('PASİF'), findsNothing); // artık aktiflerde
     expect(find.byTooltip('Pasif dönemi sonlandır'), findsNothing);
     expect(
       find.text('Ayşe 11 Ekim 2026 itibarıyla yeniden aktif.'),

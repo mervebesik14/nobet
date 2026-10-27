@@ -197,6 +197,11 @@ void main() {
     expect(cell(n1, 8), '${(15 + n1October) * 24}'); // çalışılan saat
 
     // Aylara göre karşılaştırma: Eylül ve Ekim sütunları, ölçü değişir.
+    await tester.dragUntilVisible(
+      find.text('Aylara göre'),
+      find.byType(ListView).first,
+      const Offset(0, -300),
+    );
     expect(find.text('Aylara göre'), findsOneWidget);
     final sepCell = find.byKey(const ValueKey('cmp-n1-9'));
     await tester.ensureVisible(sepCell);

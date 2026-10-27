@@ -10,6 +10,7 @@ import '../../logic/next_month_reminder.dart';
 import '../../models/models.dart';
 import '../../shared/notification_service.dart';
 import '../../shared/platform_services.dart';
+import '../../shared/widgets/brand_widgets.dart';
 import '../month/month_reminder_notifications.dart';
 import 'auto_backups_page.dart';
 import 'backup_actions.dart';
@@ -35,252 +36,281 @@ class SettingsPage extends ConsumerWidget {
     void update(RosterSettings next) => controller.update(next);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Ayarlar')),
+      appBar: const BrandHeader(
+        title: 'Ayarlar',
+        subtitle: 'Nöbet planının kuralları',
+      ),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
+        padding: brandListPadding,
         children: [
-          const _Header('Nöbet kuralları'),
-          _NumberSetting(
-            title: 'Günlük hemşire sayısı',
-            value: s.nursesPerDay,
-            min: 1,
-            max: 4,
-            onChanged: (v) => update(s.copyWith(nursesPerDay: v.toInt())),
-          ),
-          _NumberSetting(
-            title: 'Günlük radyoloji teknikeri sayısı',
-            subtitle: s.techsPerDay >= 2
-                ? 'İki tekniker: biri 24, biri 16B. 24 çalışan ertesi gün '
-                      'çalışamaz; 16B çalışabilir.'
-                : null,
-            value: s.techsPerDay,
-            min: 0,
-            max: 2,
-            onChanged: (v) => update(s.copyWith(techsPerDay: v.toInt())),
-          ),
-          if (s.techsPerDay >= 2)
-            _NumberSetting(
-              title: '16B vardiyası çalışma saati',
-              value: s.secondaryTechShiftHours,
-              min: 1,
-              max: 24,
-              suffix: 'saat',
-              onChanged: (v) =>
-                  update(s.copyWith(secondaryTechShiftHours: v.toInt())),
-            ),
-          SwitchListTile(
-            title: const Text('Art arda gün yasağı'),
-            subtitle: const Text(
-              'Aynı kişiye art arda iki gün nöbet verilmez.',
-            ),
-            value: s.forbidConsecutiveDays,
-            onChanged: (v) => update(s.copyWith(forbidConsecutiveDays: v)),
-          ),
-          _NumberSetting(
-            title: 'Gün aşırı zincir: en fazla',
-            subtitle: s.maxEveryOtherDayChain == 2
-                ? '3-5 olur, 3-5-7 olmaz.'
-                : 'Gün aşırı art arda en fazla ${s.maxEveryOtherDayChain} '
-                      'nöbet.',
-            value: s.maxEveryOtherDayChain,
-            min: 1,
-            max: 6,
-            suffix: 'nöbet',
-            onChanged: (v) =>
-                update(s.copyWith(maxEveryOtherDayChain: v.toInt())),
-          ),
-          SwitchListTile(
-            title: const Text('Fazla nöbet sınırı'),
-            subtitle: Text(
-              s.maxExtraOverAverage == null
-                  ? 'Kapalı.'
-                  : 'Kişi, grup ortalamasından en fazla '
-                        '${s.maxExtraOverAverage} fazla nöbet tutar.',
-            ),
-            value: s.maxExtraOverAverage != null,
-            onChanged: (v) => update(
-              v
-                  ? s.copyWith(maxExtraOverAverage: 2)
-                  : s.copyWith(clearMaxExtraOverAverage: true),
-            ),
-          ),
-          if (s.maxExtraOverAverage != null)
-            _NumberSetting(
-              title: 'Ortalamanın üstünde en fazla',
-              value: s.maxExtraOverAverage!,
-              min: 0,
-              max: 5,
-              suffix: 'nöbet',
-              onChanged: (v) =>
-                  update(s.copyWith(maxExtraOverAverage: v.toInt())),
-            ),
-          SwitchListTile(
-            title: const Text('Resmi tatili hafta sonu say'),
-            subtitle: const Text(
-              'Tam gün tatiller hafta sonu nöbeti olarak sayılır.',
-            ),
-            value: s.holidayCountsAsWeekend,
-            onChanged: (v) => update(s.copyWith(holidayCountsAsWeekend: v)),
-          ),
-          const _Header('Mesai hesabı'),
-          _NumberSetting(
-            title: 'Nöbet süresi',
-            value: s.shiftHours,
-            min: 1,
-            max: 24,
-            suffix: 'saat',
-            onChanged: (v) => update(s.copyWith(shiftHours: v.toInt())),
-          ),
-          _NumberSetting(
-            title: 'Günlük çalışma saati',
-            subtitle: 'Tatil olmayan her hafta içi gün için.',
-            value: s.dailyRequiredHours,
-            min: 0.5,
-            max: 12,
-            step: 0.5,
-            suffix: 'saat',
-            format: _hours,
-            onChanged: (v) => update(s.copyWith(dailyRequiredHours: v)),
-          ),
-          SwitchListTile(
-            title: const Text('Arifeyi yarım gün say'),
-            subtitle: Text(
-              s.halfDayHolidayIsHalfWorkday
-                  ? 'Arife günü ${_hours(s.halfDayRequiredHours)} saat sayılır.'
-                  : 'Arife tam iş günü sayılır.',
-            ),
-            value: s.halfDayHolidayIsHalfWorkday,
-            onChanged: (v) =>
-                update(s.copyWith(halfDayHolidayIsHalfWorkday: v)),
-          ),
-          if (s.halfDayHolidayIsHalfWorkday)
-            _NumberSetting(
-              title: 'Arife günü çalışma saati',
-              value: s.halfDayRequiredHours,
-              min: 0,
-              max: 12,
-              step: 0.5,
-              suffix: 'saat',
-              format: _hours,
-              onChanged: (v) => update(s.copyWith(halfDayRequiredHours: v)),
-            ),
-          ListTile(
-            leading: const Icon(Icons.restart_alt),
-            title: const Text('Varsayılanlara dön'),
-            onTap: () => controller.reset(),
-          ),
-          const _Header('Görünüm'),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: SegmentedButton<ThemeMode>(
-              segments: const [
-                ButtonSegment(
-                  value: ThemeMode.system,
-                  label: Text('Sistem'),
-                  icon: Icon(Icons.brightness_auto),
+          const PillHeader('Nöbet kuralları'),
+          GroupCard(
+            children: [
+              _NumberSetting(
+                title: 'Günlük hemşire sayısı',
+                value: s.nursesPerDay,
+                min: 1,
+                max: 4,
+                onChanged: (v) => update(s.copyWith(nursesPerDay: v.toInt())),
+              ),
+              _NumberSetting(
+                title: 'Günlük radyoloji teknikeri sayısı',
+                subtitle: s.techsPerDay >= 2
+                    ? 'İki tekniker: biri 24, biri 16B. 24 çalışan ertesi gün '
+                          'çalışamaz; 16B çalışabilir.'
+                    : null,
+                value: s.techsPerDay,
+                min: 0,
+                max: 2,
+                onChanged: (v) => update(s.copyWith(techsPerDay: v.toInt())),
+              ),
+              if (s.techsPerDay >= 2)
+                _NumberSetting(
+                  title: '16B vardiyası çalışma saati',
+                  value: s.secondaryTechShiftHours,
+                  min: 1,
+                  max: 24,
+                  suffix: 'sa',
+                  onChanged: (v) =>
+                      update(s.copyWith(secondaryTechShiftHours: v.toInt())),
                 ),
-                ButtonSegment(
-                  value: ThemeMode.light,
-                  label: Text('Açık'),
-                  icon: Icon(Icons.light_mode),
+              SwitchListTile(
+                title: const Text('Art arda gün yasağı'),
+                subtitle: const Text(
+                  'Aynı kişiye art arda iki gün nöbet verilmez.',
                 ),
-                ButtonSegment(
-                  value: ThemeMode.dark,
-                  label: Text('Koyu'),
-                  icon: Icon(Icons.dark_mode),
+                value: s.forbidConsecutiveDays,
+                onChanged: (v) => update(s.copyWith(forbidConsecutiveDays: v)),
+              ),
+              _NumberSetting(
+                title: 'Gün aşırı zincir: en fazla',
+                subtitle: s.maxEveryOtherDayChain == 2
+                    ? '3-5 olur, 3-5-7 olmaz.'
+                    : 'Gün aşırı art arda en fazla ${s.maxEveryOtherDayChain} '
+                          'nöbet.',
+                value: s.maxEveryOtherDayChain,
+                min: 1,
+                max: 6,
+                suffix: 'nöbet',
+                onChanged: (v) =>
+                    update(s.copyWith(maxEveryOtherDayChain: v.toInt())),
+              ),
+              SwitchListTile(
+                title: const Text('Fazla nöbet sınırı'),
+                subtitle: Text(
+                  s.maxExtraOverAverage == null
+                      ? 'Kapalı.'
+                      : 'Kişi, grup ortalamasından en fazla '
+                            '${s.maxExtraOverAverage} fazla nöbet tutar.',
                 ),
-              ],
-              selected: {themeMode},
-              onSelectionChanged: (v) =>
-                  ref.read(themeModeProvider.notifier).set(v.single),
-            ),
+                value: s.maxExtraOverAverage != null,
+                onChanged: (v) => update(
+                  v
+                      ? s.copyWith(maxExtraOverAverage: 2)
+                      : s.copyWith(clearMaxExtraOverAverage: true),
+                ),
+              ),
+              if (s.maxExtraOverAverage != null)
+                _NumberSetting(
+                  title: 'Ortalamanın üstünde en fazla',
+                  value: s.maxExtraOverAverage!,
+                  min: 0,
+                  max: 5,
+                  suffix: 'nöbet',
+                  onChanged: (v) =>
+                      update(s.copyWith(maxExtraOverAverage: v.toInt())),
+                ),
+              SwitchListTile(
+                title: const Text('Resmi tatili hafta sonu say'),
+                subtitle: const Text(
+                  'Tam gün tatiller hafta sonu nöbeti olarak sayılır.',
+                ),
+                value: s.holidayCountsAsWeekend,
+                onChanged: (v) => update(s.copyWith(holidayCountsAsWeekend: v)),
+              ),
+            ],
           ),
-          const _Header('Bildirimler'),
-          SwitchListTile(
-            key: const ValueKey('month-reminder-switch'),
-            secondary: const Icon(Icons.notifications_active_outlined),
-            title: const Text('Ay başı hatırlatması'),
-            subtitle: Text(
-              'Her ayın ${NextMonthReminder.dayLabel(reminderDay)} saat '
-              '$reminderTimeLabel\'da, gelecek ayın listesi henüz oluşturulmadıysa '
-              'elektroşok sesiyle bildirim gelir.',
-            ),
-            isThreeLine: true,
-            value: ref.watch(monthReminderEnabledProvider),
-            onChanged: (v) =>
-                ref.read(monthReminderEnabledProvider.notifier).set(v),
+          const PillHeader('Mesai hesabı'),
+          GroupCard(
+            children: [
+              _NumberSetting(
+                title: 'Nöbet süresi',
+                value: s.shiftHours,
+                min: 1,
+                max: 24,
+                suffix: 'sa',
+                onChanged: (v) => update(s.copyWith(shiftHours: v.toInt())),
+              ),
+              _NumberSetting(
+                title: 'Günlük çalışma saati',
+                subtitle: 'Tatil olmayan her hafta içi gün için.',
+                value: s.dailyRequiredHours,
+                min: 0.5,
+                max: 12,
+                step: 0.5,
+                suffix: 'sa',
+                format: _hours,
+                onChanged: (v) => update(s.copyWith(dailyRequiredHours: v)),
+              ),
+              SwitchListTile(
+                title: const Text('Arifeyi yarım gün say'),
+                subtitle: Text(
+                  s.halfDayHolidayIsHalfWorkday
+                      ? 'Arife günü ${_hours(s.halfDayRequiredHours)} saat sayılır.'
+                      : 'Arife tam iş günü sayılır.',
+                ),
+                value: s.halfDayHolidayIsHalfWorkday,
+                onChanged: (v) =>
+                    update(s.copyWith(halfDayHolidayIsHalfWorkday: v)),
+              ),
+              if (s.halfDayHolidayIsHalfWorkday)
+                _NumberSetting(
+                  title: 'Arife günü çalışma saati',
+                  value: s.halfDayRequiredHours,
+                  min: 0,
+                  max: 12,
+                  step: 0.5,
+                  suffix: 'sa',
+                  format: _hours,
+                  onChanged: (v) => update(s.copyWith(halfDayRequiredHours: v)),
+                ),
+              ListTile(
+                leading: const Icon(Icons.restart_alt),
+                title: const Text('Varsayılanlara dön'),
+                onTap: () => controller.reset(),
+              ),
+            ],
           ),
-          ListTile(
-            key: const ValueKey('month-reminder-day'),
-            leading: const Icon(Icons.event_outlined),
-            title: const Text('Bildirim günü'),
-            subtitle: Text(
-              'Her ayın ${NextMonthReminder.dayLabel(reminderDay)}. Ay '
-              'ekranındaki hatırlatma da bu günden itibaren çıkar.',
-            ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _pickReminderDay(context, ref, reminderDay),
+          const PillHeader('Görünüm'),
+          GroupCard(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                child: SegmentedButton<ThemeMode>(
+                  segments: const [
+                    ButtonSegment(
+                      value: ThemeMode.system,
+                      label: Text('Sistem'),
+                      icon: Icon(Icons.brightness_auto),
+                    ),
+                    ButtonSegment(
+                      value: ThemeMode.light,
+                      label: Text('Açık'),
+                      icon: Icon(Icons.light_mode),
+                    ),
+                    ButtonSegment(
+                      value: ThemeMode.dark,
+                      label: Text('Koyu'),
+                      icon: Icon(Icons.dark_mode),
+                    ),
+                  ],
+                  selected: {themeMode},
+                  onSelectionChanged: (v) =>
+                      ref.read(themeModeProvider.notifier).set(v.single),
+                ),
+              ),
+            ],
           ),
-          ListTile(
-            key: const ValueKey('month-reminder-time'),
-            leading: const Icon(Icons.schedule),
-            title: const Text('Bildirim saati'),
-            subtitle: Text(reminderTimeLabel),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _pickReminderTime(context, ref, reminderTime),
+          const PillHeader('Bildirimler'),
+          GroupCard(
+            children: [
+              SwitchListTile(
+                key: const ValueKey('month-reminder-switch'),
+                secondary: const Icon(Icons.notifications_active_outlined),
+                title: const Text('Ay başı hatırlatması'),
+                subtitle: Text(
+                  'Her ayın ${NextMonthReminder.dayLabel(reminderDay)} saat '
+                  '$reminderTimeLabel\'da, gelecek ayın listesi henüz oluşturulmadıysa '
+                  'elektroşok sesiyle bildirim gelir.',
+                ),
+                isThreeLine: true,
+                value: ref.watch(monthReminderEnabledProvider),
+                onChanged: (v) =>
+                    ref.read(monthReminderEnabledProvider.notifier).set(v),
+              ),
+              ListTile(
+                key: const ValueKey('month-reminder-day'),
+                leading: const Icon(Icons.event_outlined),
+                title: const Text('Bildirim günü'),
+                subtitle: Text(
+                  'Her ayın ${NextMonthReminder.dayLabel(reminderDay)}. Ay '
+                  'ekranındaki hatırlatma da bu günden itibaren çıkar.',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _pickReminderDay(context, ref, reminderDay),
+              ),
+              ListTile(
+                key: const ValueKey('month-reminder-time'),
+                leading: const Icon(Icons.schedule),
+                title: const Text('Bildirim saati'),
+                subtitle: Text(reminderTimeLabel),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _pickReminderTime(context, ref, reminderTime),
+              ),
+              ListTile(
+                key: const ValueKey('month-reminder-interval'),
+                leading: const Icon(Icons.repeat),
+                title: const Text('Tekrar aralığı'),
+                subtitle: Text(
+                  '${NextMonthReminder.intervalLabel(reminderInterval)}, '
+                  '"Başladım" deyene ya da liste oluşturulana kadar.',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () =>
+                    _pickReminderInterval(context, ref, reminderInterval),
+              ),
+              ListTile(
+                leading: const Icon(Icons.volume_up_outlined),
+                title: const Text('Bildirimi dene'),
+                subtitle: const Text('Şimdi bir deneme bildirimi gelir.'),
+                onTap: () => _testNotification(context, ref),
+              ),
+            ],
           ),
-          ListTile(
-            key: const ValueKey('month-reminder-interval'),
-            leading: const Icon(Icons.repeat),
-            title: const Text('Tekrar aralığı'),
-            subtitle: Text(
-              '${NextMonthReminder.intervalLabel(reminderInterval)}, '
-              '"Başladım" deyene ya da liste oluşturulana kadar.',
-            ),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _pickReminderInterval(context, ref, reminderInterval),
-          ),
-          ListTile(
-            leading: const Icon(Icons.volume_up_outlined),
-            title: const Text('Bildirimi dene'),
-            subtitle: const Text('Şimdi bir deneme bildirimi gelir.'),
-            onTap: () => _testNotification(context, ref),
-          ),
-          const _Header('Yedekleme'),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Text(
-              'Veriler yalnızca bu telefonda saklanır. Telefon değişirse ya da '
-              'uygulama silinirse kaybolmasın diye düzenli yedek alın.',
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.upload_file),
-            title: const Text('Yedeği dışa aktar'),
-            subtitle: Text(
-              'Tüm veriler tek bir JSON dosyası olarak.\n'
-              '${_lastBackupText(ref.watch(backupStatusProvider).lastBackup)}',
-            ),
-            isThreeLine: true,
-            onTap: () => exportBackup(context, ref),
-          ),
-          ListTile(
-            leading: const Icon(Icons.restore),
-            title: const Text('Yedekten geri yükle'),
-            subtitle: const Text('Mevcut verilerin üzerine yazar.'),
-            onTap: () => _restore(context, ref),
-          ),
-          ListTile(
-            leading: const Icon(Icons.history_toggle_off),
-            title: const Text('Otomatik yedekler'),
-            subtitle: const Text(
-              'Her değişiklikte telefona kendiliğinden alınır; yanlışlıkla '
-              'silinen ya da bozulan veriyi geri getirir.',
-            ),
-            isThreeLine: true,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const AutoBackupsPage()),
-            ),
+          const PillHeader('Yedekleme'),
+          GroupCard(
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 14, 16, 10),
+                child: Text(
+                  'Veriler yalnızca bu telefonda saklanır. Telefon değişirse ya da '
+                  'uygulama silinirse kaybolmasın diye düzenli yedek alın.',
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.upload_file),
+                title: const Text('Yedeği dışa aktar'),
+                subtitle: Text(
+                  'Tüm veriler tek bir JSON dosyası olarak.\n'
+                  '${_lastBackupText(ref.watch(backupStatusProvider).lastBackup)}',
+                ),
+                isThreeLine: true,
+                onTap: () => exportBackup(context, ref),
+              ),
+              ListTile(
+                leading: const Icon(Icons.restore),
+                title: const Text('Yedekten geri yükle'),
+                subtitle: const Text('Mevcut verilerin üzerine yazar.'),
+                onTap: () => _restore(context, ref),
+              ),
+              ListTile(
+                leading: const Icon(Icons.history_toggle_off),
+                title: const Text('Otomatik yedekler'),
+                subtitle: const Text(
+                  'Her değişiklikte telefona kendiliğinden alınır; yanlışlıkla '
+                  'silinen ya da bozulan veriyi geri getirir.',
+                ),
+                isThreeLine: true,
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const AutoBackupsPage(),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -440,26 +470,6 @@ class SettingsPage extends ConsumerWidget {
   }
 }
 
-class _Header extends StatelessWidget {
-  const _Header(this.title);
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
-      child: Text(
-        title,
-        style: theme.textTheme.titleSmall?.copyWith(
-          color: theme.colorScheme.primary,
-        ),
-      ),
-    );
-  }
-}
-
 /// − değer + biçiminde sayı ayarı.
 class _NumberSetting extends StatelessWidget {
   const _NumberSetting({
@@ -490,31 +500,16 @@ class _NumberSetting extends StatelessWidget {
     return ListTile(
       title: Text(title),
       subtitle: subtitle == null ? null : Text(subtitle!),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          IconButton(
-            tooltip: '$title azalt',
-            icon: const Icon(Icons.remove_circle_outline),
-            onPressed: value - step < min
-                ? null
-                : () => onChanged((value - step).toDouble()),
-          ),
-          SizedBox(
-            width: 64,
-            child: Text(
-              suffix == null ? text : '$text $suffix',
-              textAlign: TextAlign.center,
-            ),
-          ),
-          IconButton(
-            tooltip: '$title artır',
-            icon: const Icon(Icons.add_circle_outline),
-            onPressed: value + step > max
-                ? null
-                : () => onChanged((value + step).toDouble()),
-          ),
-        ],
+      trailing: BrandStepper(
+        label: suffix == null ? text : '$text $suffix',
+        decrementTooltip: '$title azalt',
+        incrementTooltip: '$title artır',
+        onDecrement: value - step < min
+            ? null
+            : () => onChanged((value - step).toDouble()),
+        onIncrement: value + step > max
+            ? null
+            : () => onChanged((value + step).toDouble()),
       ),
     );
   }

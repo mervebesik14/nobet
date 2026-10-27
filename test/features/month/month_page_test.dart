@@ -89,8 +89,8 @@ void main() {
     );
     await pumpPage(tester);
 
-    expect(find.text('Hemşireler'), findsOneWidget);
-    expect(find.text('Radyoloji Teknikerleri'), findsOneWidget);
+    expect(find.text('HEMŞİRELER'), findsOneWidget);
+    expect(find.text('RADYOLOJİ TEKNİKERLERİ'), findsOneWidget);
     expect(find.text('Pasif'), findsNothing);
     expect(find.text('2 gün istemiyor'), findsOneWidget);
     expect(find.text('İstenmeyen gün yok'), findsNWidgets(10));

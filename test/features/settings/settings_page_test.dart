@@ -100,10 +100,13 @@ void main() {
     await tester.tap(find.byTooltip('Günlük radyoloji teknikeri sayısı azalt'));
     await tester.pumpAndSettle();
     expect(saved().techsPerDay, 0);
-    final dec = tester.widget<IconButton>(
-      find.widgetWithIcon(IconButton, Icons.remove_circle_outline).at(1),
+    final dec = tester.widget<InkWell>(
+      find.descendant(
+        of: find.byTooltip('Günlük radyoloji teknikeri sayısı azalt'),
+        matching: find.byType(InkWell),
+      ),
     );
-    expect(dec.onPressed, isNull);
+    expect(dec.onTap, isNull);
   });
 
   testWidgets('tema seçimi uygulamaya yansır ve saklanır', (tester) async {
@@ -181,8 +184,8 @@ void main() {
 
     expect(find.text('Yedek geri yüklendi.'), findsOneWidget);
     expect(boxes.people.keys, ['x']);
-    expect(find.text('24 saat'), findsNothing);
-    expect(find.text('16 saat'), findsOneWidget); // Ayarlar ekranı güncel
+    expect(find.text('24 sa'), findsNothing);
+    expect(find.text('16 sa'), findsOneWidget); // Ayarlar ekranı güncel
 
     await tester.tap(find.text('Kişiler').last);
     await tester.pumpAndSettle();

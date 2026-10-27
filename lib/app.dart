@@ -7,18 +7,17 @@ import 'data/providers.dart';
 import 'features/month/month_reminder_notifications.dart';
 
 import 'features/shell/main_shell.dart';
+import 'shared/brand.dart';
 
 /// Uygulamanın kökü: tema, Türkçe locale ve ana iskelet.
 class NobetApp extends ConsumerWidget {
   const NobetApp({super.key});
 
-  static const _seedColor = Colors.teal;
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     // Veri değiştikçe telefona sessizce yedek alınır.
     ref.watch(autoBackupWatcherProvider);
-    // Her ayın 16'sı, gelecek ayın listesi yoksa telefon bildirimi.
+    // Gelecek ayın listesi yoksa ayın seçilen günü telefon bildirimi.
     ref.watch(monthReminderWatcherProvider);
     return MaterialApp(
       themeMode: ref.watch(themeModeProvider),
@@ -31,17 +30,8 @@ class NobetApp extends ConsumerWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: _seedColor),
-      ),
-      darkTheme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _seedColor,
-          brightness: Brightness.dark,
-        ),
-      ),
+      theme: brandTheme(Brightness.light),
+      darkTheme: brandTheme(Brightness.dark),
       home: const MainShell(),
     );
   }
