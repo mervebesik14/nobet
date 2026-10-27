@@ -75,12 +75,38 @@ void main() {
       Set<String> rosters = const {},
       int count = 3,
       int day = 16,
+      int hour = 10,
+      int minute = 0,
     }) => NextMonthReminder.notifications(
       now: now,
       hasRoster: (y, m) => rosters.contains('$y-$m'),
       count: count,
       day: day,
+      hour: hour,
+      minute: minute,
     );
+
+    test('seçilen saat ve dakika; saat etiketi', () {
+      expect(
+        plan(
+          DateTime(2026, 10, 16, 8),
+          hour: 8,
+          minute: 30,
+          count: 1,
+        ).single.at,
+        DateTime(2026, 10, 16, 8, 30),
+      );
+      expect(
+        plan(
+          DateTime(2026, 10, 16, 8, 30),
+          hour: 8,
+          minute: 30,
+          count: 1,
+        ).single.at,
+        DateTime(2026, 11, 16, 8, 30),
+      );
+      expect(NextMonthReminder.timeLabel(9, 5), '09:05');
+    });
 
     test('her ayın 16sı 10:00, ertesi ay için', () {
       expect(plan(DateTime(2026, 10, 27)), [

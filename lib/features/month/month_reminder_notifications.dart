@@ -45,6 +45,30 @@ final monthReminderDayProvider = NotifierProvider<MonthReminderDay, int>(
   MonthReminderDay.new,
 );
 
+/// Ay başı bildiriminin saati (`app_meta`, gün içindeki dakika; varsayılan
+/// 10:00).
+class MonthReminderTime extends Notifier<({int hour, int minute})> {
+  static const _key = 'monthReminderMinutes';
+
+  @override
+  ({int hour, int minute}) build() {
+    final m =
+        ref.watch(hiveBoxesProvider).meta.get(_key) as int? ??
+        NextMonthReminder.notifyHour * 60;
+    return (hour: m ~/ 60 % 24, minute: m % 60);
+  }
+
+  Future<void> set(int hour, int minute) async {
+    state = (hour: hour, minute: minute);
+    await ref.read(hiveBoxesProvider).meta.put(_key, hour * 60 + minute);
+  }
+}
+
+final monthReminderTimeProvider =
+    NotifierProvider<MonthReminderTime, ({int hour, int minute})>(
+      MonthReminderTime.new,
+    );
+
 /// Bildirim kimlikleri: [firstId] … [firstId] + 11.
 const monthReminderFirstId = 1600;
 const _maxReminders = 12;
@@ -62,13 +86,14 @@ ScheduledNotification monthReminderNotification(
       'İstenmeyen günleri ve izinleri toplamaya başla.',
 );
 
-/// Ay başı bildirimlerini kurar: her ayın seçilen günü 10:00, ertesi ayın listesi
+/// Ay başı bildirimlerini kurar: her ayın seçilen günü ve saatinde, ertesi ayın listesi
 /// yoksa (ileriye 3 ay). Açılışta ve ay planları değişince (kısa bir
 /// beklemeyle) yeniden kurulur; kapatılınca hepsi iptal edilir. Uygulama
 /// kökünde izlenir.
 final monthReminderWatcherProvider = Provider<void>((ref) {
   final enabled = ref.watch(monthReminderEnabledProvider);
   final day = ref.watch(monthReminderDayProvider);
+  final time = ref.watch(monthReminderTimeProvider);
   final service = ref.watch(notificationServiceProvider);
   final repo = ref.watch(monthPlanRepositoryProvider);
   final boxes = ref.watch(hiveBoxesProvider);
@@ -91,6 +116,8 @@ final monthReminderWatcherProvider = Provider<void>((ref) {
         now: ref.read(clockProvider)(),
         hasRoster: (y, m) => repo.get(y, m)?.hasRoster ?? false,
         day: day,
+        hour: time.hour,
+        minute: time.minute,
       );
       await service.schedule([
         for (var i = 0; i < upcoming.length; i++)

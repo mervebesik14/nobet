@@ -352,6 +352,33 @@ void main() {
       ]);
     });
 
+    testWidgets('bildirim saati seçilir', (tester) async {
+      await openApp(tester);
+      await tester.tap(find.text('Ayarlar'));
+      await tester.pumpAndSettle();
+      final tile = find.byKey(const ValueKey('month-reminder-time'));
+      await tester.scrollUntilVisible(tile, 200);
+      expect(
+        find.descendant(of: tile, matching: find.text('10:00')),
+        findsOneWidget,
+      );
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+      // Klavyeyle gir: 08:30.
+      await tester.tap(find.byIcon(Icons.keyboard_outlined));
+      await tester.pumpAndSettle();
+      final fields = find.byType(TextField);
+      await tester.enterText(fields.at(0), '08');
+      await tester.enterText(fields.at(1), '30');
+      await tester.tap(find.text('Tamam'));
+      await tester.pump(const Duration(seconds: 3));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+      expect(boxes.meta.get('monthReminderMinutes'), 8 * 60 + 30);
+      expect(find.textContaining("16'sı saat 08:30'da"), findsOneWidget);
+      expect(notifications.scheduled.first.at, DateTime(2026, 10, 16, 8, 30));
+    });
+
     testWidgets('ayarlardan kapatılır; deneme bildirimi gönderilir', (
       tester,
     ) async {

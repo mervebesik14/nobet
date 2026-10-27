@@ -26,6 +26,11 @@ class SettingsPage extends ConsumerWidget {
     final controller = ref.read(rosterSettingsProvider.notifier);
     final themeMode = ref.watch(themeModeProvider);
     final reminderDay = ref.watch(monthReminderDayProvider);
+    final reminderTime = ref.watch(monthReminderTimeProvider);
+    final reminderTimeLabel = NextMonthReminder.timeLabel(
+      reminderTime.hour,
+      reminderTime.minute,
+    );
     void update(RosterSettings next) => controller.update(next);
 
     return Scaffold(
@@ -196,7 +201,7 @@ class SettingsPage extends ConsumerWidget {
             title: const Text('Ay başı hatırlatması'),
             subtitle: Text(
               'Her ayın ${NextMonthReminder.dayLabel(reminderDay)} saat '
-              '10:00\'da, gelecek ayın listesi henüz oluşturulmadıysa '
+              '$reminderTimeLabel\'da, gelecek ayın listesi henüz oluşturulmadıysa '
               'elektroşok sesiyle bildirim gelir.',
             ),
             isThreeLine: true,
@@ -214,6 +219,14 @@ class SettingsPage extends ConsumerWidget {
             ),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _pickReminderDay(context, ref, reminderDay),
+          ),
+          ListTile(
+            key: const ValueKey('month-reminder-time'),
+            leading: const Icon(Icons.schedule),
+            title: const Text('Bildirim saati'),
+            subtitle: Text(reminderTimeLabel),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _pickReminderTime(context, ref, reminderTime),
           ),
           ListTile(
             leading: const Icon(Icons.volume_up_outlined),
@@ -303,6 +316,29 @@ class SettingsPage extends ConsumerWidget {
       ),
     );
     if (day != null) await ref.read(monthReminderDayProvider.notifier).set(day);
+  }
+
+  static Future<void> _pickReminderTime(
+    BuildContext context,
+    WidgetRef ref,
+    ({int hour, int minute}) current,
+  ) async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay(hour: current.hour, minute: current.minute),
+      helpText: 'Bildirim saati',
+      cancelText: 'Vazgeç',
+      confirmText: 'Tamam',
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+        child: child!,
+      ),
+    );
+    if (picked != null) {
+      await ref
+          .read(monthReminderTimeProvider.notifier)
+          .set(picked.hour, picked.minute);
+    }
   }
 
   static Future<void> _testNotification(

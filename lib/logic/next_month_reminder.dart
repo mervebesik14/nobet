@@ -30,8 +30,12 @@ class NextMonthReminder {
     return "$day'$suffix";
   }
 
-  /// Bildirimin saati (yerel saat).
+  /// Bildirimin varsayılan saati (yerel saat, 10:00).
   static const notifyHour = 10;
+
+  /// "09:05" gibi.
+  static String timeLabel(int hour, int minute) =>
+      '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
 
   /// "Sonra" denince susma süresi.
   static const snooze = Duration(days: 3);
@@ -58,7 +62,7 @@ class NextMonthReminder {
   }
 
   /// [now]'dan sonraki bildirimler, en fazla [count] tane: her ayın
-  /// [day]. günü [notifyHour]'da, ertesi ayın ([month]) listesi
+  /// [day]. günü [hour]:[minute]'da, ertesi ayın ([month]) listesi
   /// oluşturulmadıysa. Uygulama açılınca ve listeler değişince yeniden
   /// kurulur; listesi oluşturulan ayın bildirimi düşer.
   static List<({DateTime at, DateTime month})> notifications({
@@ -66,10 +70,12 @@ class NextMonthReminder {
     required bool Function(int year, int month) hasRoster,
     int count = 3,
     int day = defaultDay,
+    int hour = notifyHour,
+    int minute = 0,
   }) {
     final result = <({DateTime at, DateTime month})>[];
     for (var i = 0; i < 24 && result.length < count; i++) {
-      final at = DateTime(now.year, now.month + i, clampDay(day), notifyHour);
+      final at = DateTime(now.year, now.month + i, clampDay(day), hour, minute);
       if (!at.isAfter(now)) continue;
       final month = DateTime(at.year, at.month + 1);
       if (hasRoster(month.year, month.month)) continue;
