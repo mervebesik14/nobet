@@ -24,6 +24,8 @@ import '../../models/models.dart';
 import '../holidays/holidays_controller.dart';
 import '../month/month_plan_controller.dart';
 import '../people/people_controller.dart';
+import '../../data/providers.dart';
+import '../../shared/calendar_service.dart';
 import '../../shared/platform_services.dart';
 import '../../shared/providers.dart';
 import 'edit_sheet.dart';
@@ -1138,7 +1140,17 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         'nobet-${fileSlug(person.name)}-${plan.year}-'
         '${plan.month.toString().padLeft(2, '0')}';
     try {
-      if (format == _ShareAction.personalCalendar) {
+      if (format == _ShareAction.addToCalendar) {
+        await _addToCalendar(
+          PersonalRoster.build(
+            plan: plan,
+            person: person,
+            people: ref.read(peopleProvider),
+            dayShifts: dayShifts,
+          ),
+          dayShifts,
+        );
+      } else if (format == _ShareAction.personalCalendar) {
         // Telefon takvimine eklenecek dosya (.ics).
         final ics = RosterCalendar.ics(
           data: PersonalRoster.build(
@@ -1186,6 +1198,60 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     } catch (e) {
       if (mounted) _notify('Paylaşılamadı: $e');
     }
+  }
+
+  /// Kişinin nöbetlerini ve 7A'larını doğrudan bu telefonun takvimine yazar
+  /// (önceki akşam 20:00 hatırlatmalı). Aynı kişinin aynı ayı daha önce
+  /// eklendiyse eski etkinlikler silinip güncelleri yazılır.
+  Future<void> _addToCalendar(
+    PersonalRosterData data,
+    Iterable<DayShift> dayShifts,
+  ) async {
+    final events = RosterCalendar.events(data: data, dayShifts: dayShifts);
+    if (events.isEmpty) {
+      _notify('${data.person.name}: bu ay takvime eklenecek nöbet yok.');
+      return;
+    }
+    final calendar = ref.read(calendarServiceProvider);
+    final access = await calendar.requestAccess();
+    if (access == CalendarAccess.none) {
+      _notify(
+        'Takvim izni yok. Telefonun Ayarlar > Nöbetçi > Takvimler bölümünden '
+        'izin verin.',
+      );
+      return;
+    }
+    final meta = ref.read(hiveBoxesProvider).meta;
+    final key =
+        'calendarEvents/${data.person.id}/${data.year}-'
+        '${data.month.toString().padLeft(2, '0')}';
+    final old = (meta.get(key) as List?)?.cast<String>() ?? const <String>[];
+    if (access == CalendarAccess.full) {
+      for (final id in old) {
+        await calendar.delete(id);
+      }
+    }
+    final ids = <String>[];
+    try {
+      for (final e in events) {
+        ids.add(await calendar.add(e));
+      }
+    } catch (e) {
+      if (mounted) _notify('Takvime eklenemedi: $e');
+      return;
+    } finally {
+      await meta.put(key, [
+        ...ids,
+        // Silinemeyenler bir sonraki tam izinde silinsin.
+        if (access != CalendarAccess.full) ...old,
+      ]);
+    }
+    if (!mounted) return;
+    final replaced = old.isNotEmpty && access == CalendarAccess.full;
+    _notify(
+      '${data.person.name}: ${ids.length} etkinlik takvime eklendi'
+      '${replaced ? ' (eskiler güncellendi)' : ''}.',
+    );
   }
 
   /// Herkesin kişiye özel PDF'ini ayrı dosyalar olarak tek seferde paylaşır.
@@ -1359,6 +1425,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         case _ShareAction.personal ||
             _ShareAction.personalPdf ||
             _ShareAction.personalCalendar ||
+            _ShareAction.addToCalendar ||
             _ShareAction.allPersonalPdf ||
             _ShareAction.allPersonalCalendar ||
             _ShareAction.excel:
@@ -1464,6 +1531,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             onSelected: (action) => switch (action) {
               _ShareAction.personal ||
               _ShareAction.personalPdf ||
+              _ShareAction.addToCalendar ||
               _ShareAction.personalCalendar => _sharePersonal(
                 rows,
                 dayShifts,
@@ -1539,6 +1607,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 child: ListTile(
                   leading: Icon(Icons.person_outline),
                   title: Text('Kişiye özel liste (mesaj)'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.addToCalendar,
+                child: ListTile(
+                  leading: Icon(Icons.edit_calendar_outlined),
+                  title: Text('Bu telefonun takvimine ekle'),
                 ),
               ),
               PopupMenuItem(
@@ -1885,6 +1960,7 @@ enum _ShareAction {
   personalPdf,
   allPersonalPdf,
   personal,
+  addToCalendar,
   personalCalendar,
   allPersonalCalendar,
 }

@@ -11,6 +11,7 @@ import 'package:nobet_listesi/data/holiday_repository.dart';
 import 'package:nobet_listesi/features/roster/roster_page.dart';
 import 'package:nobet_listesi/logic/xlsx_writer.dart';
 import 'package:nobet_listesi/models/models.dart';
+import 'package:nobet_listesi/shared/calendar_service.dart';
 import 'package:nobet_listesi/shared/platform_services.dart';
 import 'package:nobet_listesi/shared/providers.dart';
 
@@ -19,12 +20,14 @@ import '../../helpers.dart';
 void main() {
   late HiveBoxes boxes;
   late FakePlatformServices services;
+  late FakeCalendarService calendar;
 
   setUpAll(() => initializeDateFormatting('tr_TR'));
 
   setUp(() async {
     boxes = await openTestBoxes();
     services = FakePlatformServices();
+    calendar = FakeCalendarService();
     await HolidayRepository(boxes.holidays, boxes.meta).ensureYearSeeded(2026);
     await boxes.people.putAll({
       'a': const Person(id: 'a', name: 'Ayşe', role: Role.nurse),
@@ -55,6 +58,7 @@ void main() {
           ...boxOverrides(boxes),
           todayProvider.overrideWithValue(DateTime(2026, 10, 11)),
           platformServicesProvider.overrideWithValue(services),
+          calendarServiceProvider.overrideWithValue(calendar),
         ],
         child: const MaterialApp(home: RosterPage()),
       ),
@@ -209,6 +213,56 @@ void main() {
       services.sharedFiles.map((f) => f.name),
       isNot(contains('nobet-bos-2026-10.ics')),
     );
+  });
+
+  group('bu telefonun takvimine ekle', () {
+    Future<void> addFor(WidgetTester tester, String name) async {
+      await choose(tester, 'Bu telefonun takvimine ekle');
+      await tester.tap(
+        find.descendant(
+          of: find.byType(SimpleDialog),
+          matching: find.text(name),
+        ),
+      );
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('nöbetler doğrudan takvime yazılır', (tester) async {
+      await pump(tester);
+      await addFor(tester, 'Banu');
+      expect(services.calls, isEmpty);
+      final e = calendar.events.values.single;
+      expect(e.title, 'Nöbet (24)');
+      expect(e.start, DateTime(2026, 10, 1, 8));
+      expect(e.end, DateTime(2026, 10, 2, 8));
+      expect(e.description, contains('Ayşe, Banu'));
+      expect(find.text('Banu: 1 etkinlik takvime eklendi.'), findsOneWidget);
+    });
+
+    testWidgets('yeniden eklenince eskiler silinir, çift olmaz', (
+      tester,
+    ) async {
+      await pump(tester);
+      await addFor(tester, 'Banu');
+      await addFor(tester, 'Banu');
+      expect(calendar.events, hasLength(1));
+      expect(
+        find.text('Banu: 1 etkinlik takvime eklendi (eskiler güncellendi).'),
+        findsOneWidget,
+      );
+      // Başka kişinin etkinlikleri ayrı tutulur.
+      await addFor(tester, 'Ali');
+      expect(calendar.events, hasLength(2));
+    });
+
+    testWidgets('izin yoksa yazılmaz, uyarı çıkar', (tester) async {
+      calendar.access = CalendarAccess.none;
+      await pump(tester);
+      await addFor(tester, 'Banu');
+      expect(calendar.events, isEmpty);
+      expect(find.textContaining('Takvim izni yok'), findsOneWidget);
+    });
   });
 
   testWidgets('kişiye özel takvim dosyası (.ics) paylaşılır', (tester) async {

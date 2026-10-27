@@ -1,6 +1,15 @@
 import 'day_shift_planner.dart';
 import 'personal_roster.dart';
 
+/// Takvime yazılacak tek etkinlik (nöbet ya da 7A).
+typedef CalendarEntry = ({
+  String uid,
+  DateTime start,
+  DateTime end,
+  String title,
+  String? description,
+});
+
 /// Kişinin aylık nöbetlerini telefon takvimine eklenecek bir takvim dosyası
 /// (iCalendar, .ics) olarak üretir (saf Dart). iPhone ve Android takvimleri
 /// dosyaya dokununca etkinlikleri ekler.
@@ -66,6 +75,62 @@ class RosterCalendar {
     return out.toString();
   }
 
+  /// [data] kişisinin nöbetleri ve [dayShifts] içindeki kendi 7A'ları,
+  /// güne göre sıralı. Hem dosyaya hem doğrudan telefon takvimine yazılır.
+  static List<CalendarEntry> events({
+    required PersonalRosterData data,
+    Iterable<DayShift> dayShifts = const [],
+  }) {
+    final person = data.person;
+    final out = <(int, CalendarEntry)>[];
+    void add({
+      required String kind,
+      required int day,
+      required Duration length,
+      required String title,
+      String? description,
+    }) {
+      final start = DateTime(data.year, data.month, day, startHour);
+      out.add((
+        day,
+        (
+          uid:
+              'nobetci-${person.id}-${data.year}${_two(data.month)}'
+              '${_two(day)}-$kind@nobetci',
+          start: start,
+          end: start.add(length),
+          title: title,
+          description: description,
+        ),
+      ));
+    }
+
+    for (final s in data.shifts) {
+      final is16 = s.shift == '16B';
+      add(
+        kind: is16 ? '16b' : '24',
+        day: s.day,
+        length: Duration(hours: is16 ? 16 : 24),
+        title: is16 ? 'Nöbet (16B)' : 'Nöbet (24)',
+        description: [
+          'Hemşire: ${s.nurses.join(', ')}',
+          if (s.techs.isNotEmpty) 'Radyoloji: ${s.techs.join(', ')}',
+        ].join('\n'),
+      );
+    }
+    for (final s in dayShifts) {
+      if (s.personId != person.id) continue;
+      add(
+        kind: '7a',
+        day: s.day,
+        length: Duration(minutes: (s.hours * 60).round()),
+        title: '7A (gündüz mesaisi)',
+      );
+    }
+    out.sort((a, b) => a.$1.compareTo(b.$1));
+    return [for (final e in out) e.$2];
+  }
+
   /// [data] kişisinin nöbetleri ve [dayShifts] içindeki kendi 7A'ları.
   /// [now] dosyanın oluşturulma anı (DTSTAMP).
   static String ics({
@@ -83,54 +148,22 @@ class RosterCalendar {
       'X-WR-CALNAME:${_escape('${person.name} nöbetleri')}',
     ];
 
-    void event({
-      required String kind,
-      required int day,
-      required Duration length,
-      required String summary,
-      String? description,
-    }) {
-      final start = DateTime(data.year, data.month, day, startHour);
-      final end = start.add(length);
+    for (final e in events(data: data, dayShifts: dayShifts)) {
       lines.addAll([
         'BEGIN:VEVENT',
-        'UID:nobetci-${person.id}-${data.year}${_two(data.month)}'
-            '${_two(day)}-$kind@nobetci',
+        'UID:${e.uid}',
         'DTSTAMP:${_utc(now)}',
-        'DTSTART:${_local(start)}',
-        'DTEND:${_local(end)}',
-        'SUMMARY:${_escape(summary)}',
-        if (description != null) 'DESCRIPTION:${_escape(description)}',
+        'DTSTART:${_local(e.start)}',
+        'DTEND:${_local(e.end)}',
+        'SUMMARY:${_escape(e.title)}',
+        if (e.description != null) 'DESCRIPTION:${_escape(e.description!)}',
         'BEGIN:VALARM',
         'ACTION:DISPLAY',
-        'DESCRIPTION:${_escape(summary)}',
+        'DESCRIPTION:${_escape(e.title)}',
         'TRIGGER:-PT${reminderBefore.inHours}H',
         'END:VALARM',
         'END:VEVENT',
       ]);
-    }
-
-    for (final s in data.shifts) {
-      final is16 = s.shift == '16B';
-      event(
-        kind: is16 ? '16b' : '24',
-        day: s.day,
-        length: Duration(hours: is16 ? 16 : 24),
-        summary: is16 ? 'Nöbet (16B)' : 'Nöbet (24)',
-        description: [
-          'Hemşire: ${s.nurses.join(', ')}',
-          if (s.techs.isNotEmpty) 'Radyoloji: ${s.techs.join(', ')}',
-        ].join('\n'),
-      );
-    }
-    for (final s in dayShifts) {
-      if (s.personId != person.id) continue;
-      event(
-        kind: '7a',
-        day: s.day,
-        length: Duration(minutes: (s.hours * 60).round()),
-        summary: '7A (gündüz mesaisi)',
-      );
     }
     lines.add('END:VCALENDAR');
     return '${lines.map(_fold).join('\r\n')}\r\n';

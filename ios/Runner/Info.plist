@@ -66,5 +66,11 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Nöbetlerinizi takviminize eklemek için.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Nöbetlerinizi takviminize eklemek ve liste değişince eski nöbet etkinliklerini güncellemek için.</string>
+	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
+	<string>Nöbetlerinizi takviminize eklemek için.</string>
 </dict>
 </plist>

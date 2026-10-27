@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:hive_ce/hive_ce.dart';
 import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/data/providers.dart';
+import 'package:nobet_listesi/logic/roster_calendar.dart';
+import 'package:nobet_listesi/shared/calendar_service.dart';
 import 'package:nobet_listesi/shared/notification_service.dart';
 import 'package:nobet_listesi/shared/platform_services.dart';
 import 'package:nobet_listesi/shared/providers.dart';
@@ -147,4 +149,28 @@ class FakeNotificationService extends NotificationService {
   }) async {
     shown.add(body);
   }
+}
+
+/// Telefon takvimi yerine bellekte tutar.
+class FakeCalendarService extends CalendarService {
+  FakeCalendarService({this.access = CalendarAccess.full});
+
+  CalendarAccess access;
+
+  /// Takvimdeki etkinlikler: kimlik → etkinlik.
+  final events = <String, CalendarEntry>{};
+  var _next = 0;
+
+  @override
+  Future<CalendarAccess> requestAccess() async => access;
+
+  @override
+  Future<String> add(CalendarEntry e) async {
+    final id = 'e${_next++}';
+    events[id] = e;
+    return id;
+  }
+
+  @override
+  Future<void> delete(String id) async => events.remove(id);
 }

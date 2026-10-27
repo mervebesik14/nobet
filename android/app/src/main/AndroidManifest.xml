@@ -2,6 +2,9 @@
     <!-- Ay başı hatırlatması (flutter_local_notifications). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- Nöbetleri doğrudan telefon takvimine ekleme. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR"/>
+    <uses-permission android:name="android.permission.WRITE_CALENDAR"/>
     <application
         android:label="Nöbetçi"
         android:name="${applicationName}"
