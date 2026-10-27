@@ -144,6 +144,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         role: role,
         twoTechs: ref.read(effectiveSettingsProvider).techsPerDay >= 2,
       );
+      if (!await _confirmViolations(result)) return;
       await _apply(
         result,
         message:
@@ -214,6 +215,79 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   Set<String> _currentMessages() => {
     for (final v in ref.read(rosterViolationsProvider)) v.message,
   };
+
+  /// Elle düzenlemede onay istenen kurallar. Boşluk uyarıları listede
+  /// görünür ama onay istemez: liste elle doldurulurken neredeyse her
+  /// adımda geçici olarak çıkarlar.
+  static const _confirmedKinds = {
+    ViolationKind.unavailable,
+    ViolationKind.consecutive,
+    ViolationKind.chain,
+    ViolationKind.overCap,
+    ViolationKind.wrongRole,
+    ViolationKind.chargeNurseUnrequested,
+  };
+
+  /// [after] uygulanırsa yeni çıkacak kural ihlallerini gösterip onay
+  /// ister; ihlal yoksa ya da "Yine de yap" denirse true.
+  Future<bool> _confirmViolations(Map<int, DayAssignment> after) async {
+    final before = _currentMessages();
+    final added = [
+      for (final v in _validate(after))
+        if (_confirmedKinds.contains(v.kind) && !before.contains(v.message))
+          v.message,
+    ];
+    if (added.isEmpty) return true;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+        title: const Text('Kural ihlali'),
+        content: SingleChildScrollView(
+          child: Text(
+            '${added.map((m) => '• $m').join('\n')}\n\nYine de yapılsın mı?',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Yine de yap'),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
+  /// Nöbeti siler (koltuk boş kalır).
+  Future<void> _deleteShift(RosterCell cell, Role role) async {
+    final plan = _plan;
+    try {
+      final result = RosterEditor.replace(
+        plan.assignments,
+        day: cell.day,
+        role: role,
+        oldId: cell.personId,
+        newId: null,
+        nursesPerDay: ref.read(effectiveSettingsProvider).nursesPerDay,
+        secondary:
+            plan.assignments[cell.day]?.isSecondaryTech(cell.personId) ?? false,
+      );
+      if (!await _confirmViolations(result)) return;
+      await _apply(
+        result,
+        message:
+            '${_name(cell.personId)} ${formatDayMonth(cell.day, plan.month)} '
+            'nöbetinden çıkarıldı.',
+      );
+    } on RosterEditException catch (e) {
+      _notify(e.message);
+    }
+  }
 
   bool _ensureUnlocked() {
     if (!_plan.isLocked) return true;
@@ -604,8 +678,14 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             ListTile(
               leading: const Icon(Icons.edit_outlined),
               title: const Text('Değiştir'),
-              subtitle: const Text('Yerine başkasını yaz ya da nöbeti kaldır.'),
+              subtitle: const Text('Yerine başkasını yaz.'),
               onTap: () => Navigator.of(context).pop('edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Sil'),
+              subtitle: const Text('Nöbeti kaldır; koltuk boş kalır.'),
+              onTap: () => Navigator.of(context).pop('delete'),
             ),
             ListTile(
               leading: const Icon(Icons.swap_horiz),
@@ -622,7 +702,17 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     if (!mounted) return;
     switch (choice) {
       case 'edit':
-        await _onCellTap(cell, role);
+        // Serbest düzenleme açıkken dokunmak siler; burada her zaman
+        // değiştirme seçenekleri açılır.
+        final free = _freeEdit;
+        _freeEdit = false;
+        try {
+          await _onCellTap(cell, role);
+        } finally {
+          _freeEdit = free;
+        }
+      case 'delete':
+        await _deleteShift(cell, role);
       case 'swap':
         setState(() => _swapFrom = cell);
     }
@@ -655,6 +745,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         nursesPerDay: ref.read(effectiveSettingsProvider).nursesPerDay,
       );
       setState(() => _swapFrom = null);
+      if (!await _confirmViolations(result)) return;
       await _apply(
         result,
         message:

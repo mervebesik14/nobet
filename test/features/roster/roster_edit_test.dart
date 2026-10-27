@@ -604,4 +604,97 @@ void main() {
     await tester.pumpAndSettle();
     expect(sheet(), findsOneWidget);
   });
+
+  testWidgets('basılı tut → Sil: nöbet doğrudan silinir', (tester) async {
+    await pumpRoster(tester);
+    await tester.longPress(cell('n0', 3));
+    await tester.pumpAndSettle();
+    expect(find.text('Sil'), findsOneWidget);
+    await tester.tap(find.text('Sil'));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.nurseIds, ['n6']);
+    expect(find.text('Ayşe 3 Ekim nöbetinden çıkarıldı.'), findsOneWidget);
+  });
+
+  testWidgets(
+    'serbest düzenlemede basılı tut → Değiştir silmez, seçenek açar',
+    (tester) async {
+      await pumpRoster(tester);
+      await tester.tap(find.text('Serbest düzenleme'));
+      await tester.pumpAndSettle();
+      await tester.longPress(cell('n0', 3));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Değiştir'));
+      await tester.pumpAndSettle();
+      expect(inSheet('Yerine atanabilecekler'), findsOneWidget);
+      expect(saved().assignments[3]!.nurseIds, ['n6', 'n0']);
+      await tester.tap(inSheet('Hale'));
+      await tester.pumpAndSettle();
+      expect(saved().assignments[3]!.nurseIds, ['n6', 'n7']);
+    },
+  );
+
+  testWidgets('kural bozan ekleme: uyarı verir, istenirse yine de yapar', (
+    tester,
+  ) async {
+    await pumpRoster(
+      tester,
+      unavailable: {
+        'n7': [3],
+      },
+    );
+    await tester.tap(find.text('Serbest düzenleme'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(cell('n7', 3));
+    await tester.pumpAndSettle();
+    expect(find.text('Kural ihlali'), findsOneWidget);
+    expect(
+      find.text(
+        '• Hale istemediği güne (3 Ekim) atandı.\n\nYine de yapılsın mı?',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Vazgeç'));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.nurseIds, ['n6', 'n0']);
+
+    await tester.tap(cell('n7', 3));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Yine de yap'));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.nurseIds, ['n6', 'n0', 'n7']);
+    expect(find.text('Hale 3 Ekim nöbetine yazıldı.'), findsOneWidget);
+  });
+
+  testWidgets('kural bozan takas: uyarı verir, istenirse yine de yapar', (
+    tester,
+  ) async {
+    await pumpRoster(tester);
+    // Ayşe 3 ↔ Fatma 6: Ayşe 6–7, Fatma 2–3 art arda olur.
+    await tester.longPress(cell('n0', 3));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Başka bir nöbetle takas et'));
+    await tester.pumpAndSettle();
+    await tester.tap(cell('n5', 6));
+    await tester.pumpAndSettle();
+    expect(find.text('Kural ihlali'), findsOneWidget);
+    expect(find.textContaining('art arda nöbette'), findsOneWidget);
+    await tester.tap(find.text('Yine de yap'));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.nurseIds, contains('n5'));
+    expect(saved().assignments[6]!.nurseIds, contains('n0'));
+  });
+
+  testWidgets('kurala uyan değişiklikte uyarı penceresi çıkmaz', (
+    tester,
+  ) async {
+    await pumpRoster(tester);
+    await tester.tap(find.text('Serbest düzenleme'));
+    await tester.pumpAndSettle();
+    await tester.tap(cell('n0', 3));
+    await tester.pumpAndSettle();
+    expect(find.text('Kural ihlali'), findsNothing);
+    expect(saved().assignments[3]!.nurseIds, ['n6']);
+  });
 }
