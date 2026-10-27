@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -9,6 +10,7 @@ import '../../logic/block_reason.dart';
 import '../../logic/day_shift_planner.dart';
 import '../../logic/file_names.dart';
 import '../../logic/personal_roster.dart';
+import '../../logic/roster_calendar.dart';
 import '../../logic/roster_editor.dart';
 import '../../logic/roster_excel.dart';
 import '../../logic/roster_generator.dart';
@@ -1106,7 +1108,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   Future<void> _sharePersonal(
     List<RosterRow> rows,
     Iterable<DayShift> dayShifts, {
-    required bool asPdf,
+    required _ShareAction format,
     required Set<int> weekendDays,
     required Set<int> holidayDays,
   }) async {
@@ -1132,8 +1134,28 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     final monthLabel = DateFormat.yMMMM(
       'tr_TR',
     ).format(DateTime(plan.year, plan.month));
+    final fileBase =
+        'nobet-${fileSlug(person.name)}-${plan.year}-'
+        '${plan.month.toString().padLeft(2, '0')}';
     try {
-      if (asPdf) {
+      if (format == _ShareAction.personalCalendar) {
+        // Telefon takvimine eklenecek dosya (.ics).
+        final ics = RosterCalendar.ics(
+          data: PersonalRoster.build(
+            plan: plan,
+            person: person,
+            people: ref.read(peopleProvider),
+            dayShifts: dayShifts,
+          ),
+          dayShifts: dayShifts,
+          now: ref.read(clockProvider)(),
+        );
+        await services.shareFile(
+          utf8.encode(ics),
+          '$fileBase.ics',
+          RosterCalendar.mimeType,
+        );
+      } else if (format == _ShareAction.personalPdf) {
         final fonts = await services.loadPdfFonts();
         final pdf = await buildPersonalRosterPdf(
           data: PersonalRoster.build(
@@ -1149,11 +1171,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
           boldFont: fonts.bold,
           createdAt: ref.read(todayProvider),
         );
-        await services.sharePdf(
-          pdf,
-          'nobet-${fileSlug(person.name)}-${plan.year}-'
-          '${plan.month.toString().padLeft(2, '0')}.pdf',
-        );
+        await services.sharePdf(pdf, '$fileBase.pdf');
       } else {
         await services.shareText(
           PersonalRoster.text(
@@ -1307,6 +1325,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       switch (action) {
         case _ShareAction.personal ||
             _ShareAction.personalPdf ||
+            _ShareAction.personalCalendar ||
             _ShareAction.allPersonalPdf ||
             _ShareAction.excel:
           return;
@@ -1410,10 +1429,11 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             icon: const Icon(Icons.share),
             onSelected: (action) => switch (action) {
               _ShareAction.personal ||
-              _ShareAction.personalPdf => _sharePersonal(
+              _ShareAction.personalPdf ||
+              _ShareAction.personalCalendar => _sharePersonal(
                 rows,
                 dayShifts,
-                asPdf: action == _ShareAction.personalPdf,
+                format: action,
                 weekendDays: weekendDays,
                 holidayDays: holidayDays,
               ),
@@ -1483,6 +1503,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 child: ListTile(
                   leading: Icon(Icons.person_outline),
                   title: Text('Kişiye özel liste (mesaj)'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.personalCalendar,
+                child: ListTile(
+                  leading: Icon(Icons.event_outlined),
+                  title: Text('Takvim dosyası (kişiye özel)'),
                 ),
               ),
             ],
@@ -1815,6 +1842,7 @@ enum _ShareAction {
   personalPdf,
   allPersonalPdf,
   personal,
+  personalCalendar,
 }
 
 /// Vurgulanan kişinin özeti: tablonun üstünde, kapatılabilir.

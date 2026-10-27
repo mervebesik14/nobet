@@ -182,6 +182,30 @@ void main() {
     expect(text, endsWith('Toplam: 1 nöbet'));
   });
 
+  testWidgets('kişiye özel takvim dosyası (.ics) paylaşılır', (tester) async {
+    await pump(tester);
+    await choose(tester, 'Takvim dosyası (kişiye özel)');
+    expect(find.text('Kimin listesi?'), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(SimpleDialog),
+        matching: find.text('Banu'),
+      ),
+    );
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+
+    expect(services.calls, ['shareFile:nobet-banu-2026-10.ics']);
+    final file = services.sharedFiles.single;
+    expect(file.mime, 'text/calendar');
+    final ics = utf8.decode(file.bytes);
+    expect(ics, startsWith('BEGIN:VCALENDAR'));
+    // Banu 1 Ekim'de 24 nöbette: 08:00 → 2 Ekim 08:00.
+    expect(ics, contains('DTSTART:20261001T080000'));
+    expect(ics, contains('DTEND:20261002T080000'));
+    expect(ics, contains('X-WR-CALNAME:Banu nöbetleri'));
+  });
+
   testWidgets('kişiye özel liste PDF olarak paylaşılır', (tester) async {
     await pump(tester);
     await choose(tester, 'Kişiye özel liste (PDF)');
