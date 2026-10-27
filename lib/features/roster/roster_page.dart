@@ -1627,7 +1627,10 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                       ),
                     ),
                   ),
-                _ViolationList(violations: violations),
+                _ViolationList(
+                  key: const ValueKey('violations'),
+                  violations: violations,
+                ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: Text('Özet', style: theme.textTheme.titleMedium),
@@ -1644,13 +1647,23 @@ class _RosterPageState extends ConsumerState<RosterPage> {
 
 /// Kural ihlalleri, önem sırasıyla ayrı kutularda: boş günler (en üstte),
 /// izinli ya da istemediği günde çalışanlar ve (elle düzenlemeden doğan) diğer ihlaller.
-class _ViolationList extends StatelessWidget {
-  const _ViolationList({required this.violations});
+/// Kural ihlalleri: kapalıyken uyarı işaretli bir düğme (sayıyla), basınca
+/// türlerine göre kutular açılır.
+class _ViolationList extends StatefulWidget {
+  const _ViolationList({super.key, required this.violations});
 
   final List<RuleViolation> violations;
 
   @override
+  State<_ViolationList> createState() => _ViolationListState();
+}
+
+class _ViolationListState extends State<_ViolationList> {
+  var _open = false;
+
+  @override
   Widget build(BuildContext context) {
+    final violations = widget.violations;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     if (violations.isEmpty) {
@@ -1674,8 +1687,35 @@ class _ViolationList extends StatelessWidget {
           v,
     ];
     const warning = Color(0xFFB26A00);
+    // Boş koltuk varsa kırmızı, yoksa turuncu uyarı.
+    final color = missing.isNotEmpty ? scheme.error : warning;
+    final toggle = Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: OutlinedButton.icon(
+          key: const ValueKey('violations-toggle'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: color,
+            side: BorderSide(color: color),
+          ),
+          onPressed: () => setState(() => _open = !_open),
+          icon: const Icon(Icons.warning_amber_rounded),
+          label: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Kural ihlalleri (${violations.length})'),
+              const SizedBox(width: 4),
+              Icon(_open ? Icons.expand_less : Icons.expand_more, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!_open) return toggle;
     return Column(
       children: [
+        toggle,
         if (missing.isNotEmpty)
           _ViolationCard(
             key: const ValueKey('violations-missing'),

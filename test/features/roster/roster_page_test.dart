@@ -183,6 +183,10 @@ void main() {
       ),
       findsOneWidget,
     );
+    final toggle = find.byKey(const ValueKey('violations-toggle'));
+    await tester.ensureVisible(toggle);
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
     expect(
       find.text('• 18 Ekim: 1 radyoloji teknikeri eksik.'),
       findsOneWidget,

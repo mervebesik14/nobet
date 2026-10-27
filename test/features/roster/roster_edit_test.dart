@@ -94,6 +94,15 @@ void main() {
   }
 
   MonthPlan saved() => boxes.monthPlans.get('2026-10')!;
+
+  /// Liste altındaki kural ihlali kutularını açar (kapalı gelir).
+  Future<void> openViolations(WidgetTester tester) async {
+    final toggle = find.byKey(const ValueKey('violations-toggle'));
+    await tester.ensureVisible(toggle);
+    await tester.tap(toggle);
+    await tester.pumpAndSettle();
+  }
+
   Finder cell(String id, int day) => find.byKey(ValueKey('cell-$id-$day'));
   Finder sheet() => find.byType(BottomSheet);
   Finder inSheet(String text) =>
@@ -167,6 +176,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(saved().assignments[7]!.nurseIds, ['n3', 'n1']);
+    await openViolations(tester);
     expect(find.text('Diğer kural ihlalleri (2)'), findsOneWidget);
     expect(find.text('• Derya 7 ve 8 Ekim art arda nöbette.'), findsOneWidget);
     // Ayşe'nin 7 Ekim nöbeti kalkınca 3 ile 10 arası 6 gün boş kalır.
@@ -189,6 +199,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(saved().assignments[4]!.techId, isNull);
+    await openViolations(tester);
     expect(find.text('• 4 Ekim: 1 radyoloji teknikeri eksik.'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('missing-4')));
@@ -220,6 +231,7 @@ void main() {
     await tester.tap(inSheet('Nöbeti kaldır'));
     await tester.pumpAndSettle();
 
+    await openViolations(tester);
     expect(find.text('Boş günler (1)'), findsOneWidget);
     expect(find.text('• 4 Ekim: 1 hemşire eksik.'), findsOneWidget);
     // Boş günün altında kimin neden yazılamadığı açıklanır; nöbeti
@@ -274,6 +286,7 @@ void main() {
     await tester.tap(inSheet('Ayşe yerine ata'));
     await tester.pumpAndSettle();
     expect(saved().assignments[3]!.nurseIds, ['n6', 'n7']);
+    await openViolations(tester);
     expect(
       find.text('• Hale istemediği güne (3 Ekim) atandı.'),
       findsOneWidget,
@@ -293,6 +306,8 @@ void main() {
       },
     );
     final name = boxes.people.get(id)!.name;
+    await tester.pumpAndSettle();
+    await openViolations(tester);
     expect(
       find.textContaining('$name yıllık izninden hemen önceki güne (16 Ekim)'),
       findsOneWidget,
@@ -589,6 +604,7 @@ void main() {
     expect(sheet(), findsNothing);
     expect(saved().assignments[3]!.nurseIds, ['n6', 'n0', 'n7']);
     expect(find.text('Hale 3 Ekim nöbetine yazıldı.'), findsOneWidget);
+    await openViolations(tester);
     expect(find.text('• 3 Ekim: 1 fazla hemşire yazılı.'), findsOneWidget);
 
     // Ayşe'nin nöbetine dokununca silinir.
@@ -1006,5 +1022,39 @@ void main() {
     await tester.pumpAndSettle();
     expect(saved().dayShiftOverrides, isEmpty);
     expect(sevenA('c', 15), findsOneWidget);
+  });
+
+  testWidgets('kural ihlalleri düğmeyle açılır; kapalıyken uyarı ve sayı', (
+    tester,
+  ) async {
+    await pumpRoster(
+      tester,
+      unavailable: {
+        'n0': [3],
+      },
+    );
+    await tester.pumpAndSettle();
+    final toggle = find.byKey(const ValueKey('violations-toggle'));
+    // Kapalı: yalnız uyarı işaretli düğme ve sayı.
+    expect(
+      find.descendant(of: toggle, matching: find.text('Kural ihlalleri (1)')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: toggle,
+        matching: find.byIcon(Icons.warning_amber_rounded),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('• Ayşe istemediği güne (3 Ekim) atandı.'), findsNothing);
+
+    await openViolations(tester);
+    expect(
+      find.text('• Ayşe istemediği güne (3 Ekim) atandı.'),
+      findsOneWidget,
+    );
+    await openViolations(tester);
+    expect(find.text('• Ayşe istemediği güne (3 Ekim) atandı.'), findsNothing);
   });
 }
