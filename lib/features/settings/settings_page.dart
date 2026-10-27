@@ -27,6 +27,7 @@ class SettingsPage extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
     final reminderDay = ref.watch(monthReminderDayProvider);
     final reminderTime = ref.watch(monthReminderTimeProvider);
+    final reminderInterval = ref.watch(monthReminderIntervalProvider);
     final reminderTimeLabel = NextMonthReminder.timeLabel(
       reminderTime.hour,
       reminderTime.minute,
@@ -229,6 +230,17 @@ class SettingsPage extends ConsumerWidget {
             onTap: () => _pickReminderTime(context, ref, reminderTime),
           ),
           ListTile(
+            key: const ValueKey('month-reminder-interval'),
+            leading: const Icon(Icons.repeat),
+            title: const Text('Tekrar aralığı'),
+            subtitle: Text(
+              '${NextMonthReminder.intervalLabel(reminderInterval)}, '
+              '"Başladım" deyene ya da liste oluşturulana kadar.',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _pickReminderInterval(context, ref, reminderInterval),
+          ),
+          ListTile(
             leading: const Icon(Icons.volume_up_outlined),
             title: const Text('Bildirimi dene'),
             subtitle: const Text('Şimdi bir deneme bildirimi gelir.'),
@@ -316,6 +328,41 @@ class SettingsPage extends ConsumerWidget {
       ),
     );
     if (day != null) await ref.read(monthReminderDayProvider.notifier).set(day);
+  }
+
+  static Future<void> _pickReminderInterval(
+    BuildContext context,
+    WidgetRef ref,
+    int current,
+  ) async {
+    final hours = await showDialog<int>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Tekrar aralığı'),
+        children: [
+          RadioGroup<int>(
+            groupValue: current,
+            onChanged: (v) => Navigator.of(context).pop(v),
+            child: Column(
+              children: [
+                for (final h in NextMonthReminder.intervals)
+                  RadioListTile<int>(
+                    key: ValueKey('reminder-interval-$h'),
+                    value: h,
+                    title: Text(NextMonthReminder.intervalLabel(h)),
+                    subtitle: h < 24
+                        ? const Text('Gece 22:00\'den sonra susar.')
+                        : null,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    if (hours != null) {
+      await ref.read(monthReminderIntervalProvider.notifier).set(hours);
+    }
   }
 
   static Future<void> _pickReminderTime(

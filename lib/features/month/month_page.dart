@@ -88,6 +88,9 @@ class MonthPage extends ConsumerWidget {
             today: today,
             hasPeople: ref.watch(peopleProvider).any((p) => p.isActive),
             nextMonthHasRoster: nextPlan?.hasRoster ?? false,
+            acknowledged: ref
+                .watch(monthReminderStartedProvider)
+                .contains(MonthReminderStarted.keyOf(next.year, next.month)),
             viewingNextMonth:
                 month.year == next.year && month.month == next.month,
             snoozedUntil: ref.watch(nextMonthReminderSnoozeProvider),
@@ -404,7 +407,8 @@ class _BackupReminderCard extends ConsumerWidget {
 }
 
 /// Ay başı hatırlatması: gelecek ayın listesi henüz yoksa istekleri
-/// toplamaya başlatır. "Sonra" birkaç gün susturur.
+/// toplamaya başlatır. "Sonra" birkaç gün susturur, "Başladım" o ay için
+/// kartı ve tekrarlayan bildirimleri kapatır.
 class _NextMonthReminderCard extends ConsumerWidget {
   const _NextMonthReminderCard({required this.month, required this.plan});
 
@@ -442,8 +446,9 @@ class _NextMonthReminderCard extends ConsumerWidget {
                 ),
               ],
             ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            // Dar ekranda düğmeler alt satıra kayar.
+            Wrap(
+              alignment: WrapAlignment.end,
               children: [
                 TextButton(
                   onPressed: () => ref
@@ -452,6 +457,21 @@ class _NextMonthReminderCard extends ConsumerWidget {
                         ref.read(todayProvider).add(NextMonthReminder.snooze),
                       ),
                   child: const Text('Sonra'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    ref
+                        .read(monthReminderStartedProvider.notifier)
+                        .markStarted(month.year, month.month);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          '$name hatırlatması kapandı. Kolay gelsin!',
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text('Başladım'),
                 ),
                 FilledButton.tonal(
                   onPressed: () =>

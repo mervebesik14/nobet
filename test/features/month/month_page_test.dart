@@ -579,6 +579,21 @@ void main() {
       expect(reminder, findsNothing);
     });
 
+    testWidgets('"Başladım" o ayın kartını kapatır', (tester) async {
+      await seedTeam();
+      await pumpPage(tester, today: DateTime(2026, 10, 20));
+      await tester.tap(
+        find.descendant(of: reminder, matching: find.text('Başladım')),
+      );
+      await tester.pumpAndSettle();
+      expect(reminder, findsNothing);
+      expect(boxes.meta.get('monthReminderStartedMonths'), ['2026-11']);
+      expect(
+        find.text('Kasım hatırlatması kapandı. Kolay gelsin!'),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('"Sonra" 3 gün susturur', (tester) async {
       await seedTeam();
       await pumpPage(tester, today: DateTime(2026, 10, 20));

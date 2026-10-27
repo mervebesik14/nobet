@@ -69,9 +69,61 @@ final monthReminderTimeProvider =
       MonthReminderTime.new,
     );
 
-/// Bildirim kimlikleri: [firstId] … [firstId] + 11.
+/// Hatırlatmanın tekrar aralığı, saat (`app_meta`, varsayılan her gün).
+class MonthReminderInterval extends Notifier<int> {
+  static const _key = 'monthReminderIntervalHours';
+
+  @override
+  int build() {
+    final v = ref.watch(hiveBoxesProvider).meta.get(_key);
+    return NextMonthReminder.intervals.contains(v)
+        ? v as int
+        : NextMonthReminder.defaultInterval;
+  }
+
+  Future<void> set(int hours) async {
+    state = hours;
+    await ref.read(hiveBoxesProvider).meta.put(_key, hours);
+  }
+}
+
+final monthReminderIntervalProvider =
+    NotifierProvider<MonthReminderInterval, int>(MonthReminderInterval.new);
+
+/// "Başladım" denen aylar (`app_meta`, "2026-11" gibi): o ayın hatırlatması
+/// (bildirim ve kart) durur.
+class MonthReminderStarted extends Notifier<Set<String>> {
+  static const _key = 'monthReminderStartedMonths';
+
+  static String keyOf(int year, int month) => '$year-$month';
+
+  @override
+  Set<String> build() =>
+      ((ref.watch(hiveBoxesProvider).meta.get(_key) as List?) ?? const [])
+          .cast<String>()
+          .toSet();
+
+  bool contains(int year, int month) => state.contains(keyOf(year, month));
+
+  Future<void> markStarted(int year, int month) async {
+    final key = keyOf(year, month);
+    if (state.contains(key)) return;
+    // Son bir yıl yeter.
+    final all = [...state, key];
+    state = all.skip(all.length > 12 ? all.length - 12 : 0).toSet();
+    await ref.read(hiveBoxesProvider).meta.put(_key, state.toList());
+  }
+}
+
+final monthReminderStartedProvider =
+    NotifierProvider<MonthReminderStarted, Set<String>>(
+      MonthReminderStarted.new,
+    );
+
+/// Bildirim kimlikleri: [firstId] … [firstId] + 47 (iOS en fazla 64 bekleyen
+/// bildirim tutar).
 const monthReminderFirstId = 1600;
-const _maxReminders = 12;
+const _maxReminders = 48;
 
 /// Bildirim metni: "Aralık listesi henüz oluşturulmadı…".
 ScheduledNotification monthReminderNotification(
@@ -84,16 +136,20 @@ ScheduledNotification monthReminderNotification(
   body:
       '${turkishMonthNames[n.month.month - 1]} listesi henüz oluşturulmadı. '
       'İstenmeyen günleri ve izinleri toplamaya başla.',
+  payload: MonthReminderStarted.keyOf(n.month.year, n.month.month),
 );
 
-/// Ay başı bildirimlerini kurar: her ayın seçilen günü ve saatinde, ertesi ayın listesi
-/// yoksa (ileriye 3 ay). Açılışta ve ay planları değişince (kısa bir
-/// beklemeyle) yeniden kurulur; kapatılınca hepsi iptal edilir. Uygulama
-/// kökünde izlenir.
+/// Ay başı bildirimlerini kurar: her ayın seçilen günü ve saatinde başlar,
+/// ertesi ayın listesi oluşturulana ya da "Başladım" denene kadar seçilen
+/// aralıkla tekrarlar. Açılışta ve ay planları değişince (kısa bir
+/// beklemeyle) yeniden kurulur; kapatılınca hepsi iptal edilir. Bildirimdeki
+/// "Başladım" düğmesi o ayı onaylar. Uygulama kökünde izlenir.
 final monthReminderWatcherProvider = Provider<void>((ref) {
   final enabled = ref.watch(monthReminderEnabledProvider);
   final day = ref.watch(monthReminderDayProvider);
   final time = ref.watch(monthReminderTimeProvider);
+  final interval = ref.watch(monthReminderIntervalProvider);
+  final started = ref.watch(monthReminderStartedProvider);
   final service = ref.watch(notificationServiceProvider);
   final repo = ref.watch(monthPlanRepositoryProvider);
   final boxes = ref.watch(hiveBoxesProvider);
@@ -101,6 +157,16 @@ final monthReminderWatcherProvider = Provider<void>((ref) {
     for (var i = 0; i < _maxReminders; i++) monthReminderFirstId + i,
   ];
   var askedPermission = false;
+
+  service.onAction = (action, payload) {
+    if (action != NotificationService.startedAction) return;
+    if (payload?.split('-').map(int.tryParse).toList() case [
+      final int y,
+      final int m,
+    ]) {
+      ref.read(monthReminderStartedProvider.notifier).markStarted(y, m);
+    }
+  };
 
   Future<void> sync() async {
     try {
@@ -115,9 +181,13 @@ final monthReminderWatcherProvider = Provider<void>((ref) {
       final upcoming = NextMonthReminder.notifications(
         now: ref.read(clockProvider)(),
         hasRoster: (y, m) => repo.get(y, m)?.hasRoster ?? false,
+        acknowledged: (y, m) =>
+            started.contains(MonthReminderStarted.keyOf(y, m)),
+        count: _maxReminders,
         day: day,
         hour: time.hour,
         minute: time.minute,
+        intervalHours: interval,
       );
       await service.schedule([
         for (var i = 0; i < upcoming.length; i++)

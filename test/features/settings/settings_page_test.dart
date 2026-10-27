@@ -290,11 +290,15 @@ void main() {
     testWidgets('açılışta her ayın 16sı 10:00 için kurulur', (tester) async {
       await openApp(tester);
       expect(notifications.permissionRequests, 1);
-      expect(notifications.scheduled.map((n) => n.at), [
+      // 16'sından ay sonuna kadar her gün; sonra gelecek ayın 16'sı.
+      final times = notifications.scheduled.map((n) => n.at).toList();
+      expect(times.take(3), [
         DateTime(2026, 10, 16, 10),
-        DateTime(2026, 11, 16, 10),
-        DateTime(2026, 12, 16, 10),
+        DateTime(2026, 10, 17, 10),
+        DateTime(2026, 10, 18, 10),
       ]);
+      expect(times[16], DateTime(2026, 11, 16, 10));
+      expect(times, hasLength(48));
       expect(
         notifications.scheduled.first.body,
         'Kasım listesi henüz oluşturulmadı. İstenmeyen günleri ve izinleri '
@@ -344,11 +348,11 @@ void main() {
       await tester.pumpAndSettle();
       expect(boxes.meta.get('monthReminderDay'), 20);
       expect(find.textContaining("Her ayın 20'si"), findsNWidgets(2));
-      // Saat 2026-10-11 09:00: bu ayın 20'si de girer.
-      expect(notifications.scheduled.map((n) => n.at), [
+      // Saat 2026-10-11 09:00: bu ayın 20'sinden başlar.
+      expect(notifications.scheduled.take(3).map((n) => n.at), [
         DateTime(2026, 10, 20, 10),
-        DateTime(2026, 11, 20, 10),
-        DateTime(2026, 12, 20, 10),
+        DateTime(2026, 10, 21, 10),
+        DateTime(2026, 10, 22, 10),
       ]);
     });
 
@@ -377,6 +381,52 @@ void main() {
       expect(boxes.meta.get('monthReminderMinutes'), 8 * 60 + 30);
       expect(find.textContaining("16'sı saat 08:30'da"), findsOneWidget);
       expect(notifications.scheduled.first.at, DateTime(2026, 10, 16, 8, 30));
+    });
+
+    testWidgets('tekrar aralığı seçilir; her gün tekrarlar', (tester) async {
+      await openApp(tester);
+      // Varsayılan: 16'sından başlayıp her gün 10:00.
+      expect(notifications.scheduled.take(3).map((n) => n.at), [
+        DateTime(2026, 10, 16, 10),
+        DateTime(2026, 10, 17, 10),
+        DateTime(2026, 10, 18, 10),
+      ]);
+      expect(notifications.scheduled.first.payload, '2026-11');
+      await tester.tap(find.text('Ayarlar'));
+      await tester.pumpAndSettle();
+      final tile = find.byKey(const ValueKey('month-reminder-interval'));
+      await tester.scrollUntilVisible(tile, 200);
+      expect(
+        find.descendant(of: tile, matching: find.textContaining('Her gün')),
+        findsOneWidget,
+      );
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('reminder-interval-6')));
+      await tester.pump(const Duration(seconds: 3));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+      expect(boxes.meta.get('monthReminderIntervalHours'), 6);
+      expect(notifications.scheduled.take(3).map((n) => n.at), [
+        DateTime(2026, 10, 16, 10),
+        DateTime(2026, 10, 16, 16),
+        DateTime(2026, 10, 17, 10),
+      ]);
+    });
+
+    testWidgets('bildirimdeki "Başladım" o ayın tekrarlarını durdurur', (
+      tester,
+    ) async {
+      await openApp(tester);
+      expect(notifications.scheduled.first.payload, '2026-11');
+      notifications.onAction!(NotificationService.startedAction, '2026-11');
+      await tester.pump(const Duration(seconds: 3));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pump();
+      expect(boxes.meta.get('monthReminderStartedMonths'), ['2026-11']);
+      // Kasım için olanlar düştü; sıradaki Aralık için (16 Kasım'dan).
+      expect(notifications.scheduled.first.at, DateTime(2026, 11, 16, 10));
+      expect(notifications.scheduled.first.payload, '2026-12');
     });
 
     testWidgets('ayarlardan kapatılır; deneme bildirimi gönderilir', (
