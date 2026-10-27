@@ -432,6 +432,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             icon: Icons.remove_circle_outline,
             result: replace(id, null, secondary: secondary),
           ),
+          ..._dayShiftOptions(cell, role),
         ],
         candidatesTitle: 'Yerine atanabilecekler',
         candidates: [
@@ -511,6 +512,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
               result: best.option.result,
               warnings: best.option.warnings,
             ),
+          ..._dayShiftOptions(cell, role),
         ],
         candidatesTitle: 'Koltuk seç',
         candidates: [for (final s in seats) s.option],
@@ -663,6 +665,66 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       candidates: candidates,
     );
     await _apply(result);
+  }
+
+  /// Teknikerin [cell] gününde elle 7A'sı var mı (o gün nöbette değilken)?
+  bool _techHas7A(RosterCell cell, Role role) =>
+      role == Role.radiologyTech &&
+      !(_plan.assignments[cell.day]?.includes(cell.personId) ?? false) &&
+      (_plan.techDayShifts[cell.personId]?.contains(cell.day) ?? false);
+
+  /// [cell] kişisine o gün 7A yazılabilir mi? Hemşire: sorumlu hemşire
+  /// tanımlıyken mesai günü ve o günün 7A'sı zaten onda değilse. Tekniker:
+  /// mesai günü ve henüz 7A'sı yoksa.
+  bool _can7A(RosterCell cell, Role role) {
+    final plan = _plan;
+    if (role == Role.nurse) {
+      final isDayShift =
+          ref.read(dayShiftsProvider)[cell.day]?.personId == cell.personId;
+      return !isDayShift && _hasDayShiftSlot(cell.day);
+    }
+    final workday =
+        DayShiftPlanner.workdayHours(
+          year: plan.year,
+          month: plan.month,
+          day: cell.day,
+          holidays: ref.read(holidaysProvider),
+          settings: ref.read(effectiveSettingsProvider),
+        ) !=
+        null;
+    return workday && !_techHas7A(cell, role);
+  }
+
+  /// Dokununca açılan sayfadaki 7A seçenekleri.
+  List<EditOption> _dayShiftOptions(RosterCell cell, Role role) {
+    final plan = _plan;
+    final onShift =
+        plan.assignments[cell.day]?.includes(cell.personId) ?? false;
+    final nurse = role == Role.nurse;
+    return [
+      if (_techHas7A(cell, role))
+        EditOption(
+          title: "7A'yı kaldır",
+          icon: Icons.wb_sunny_outlined,
+          result: plan.assignments,
+          onSelected: () => _removeTechDayShift(cell),
+        ),
+      if (_can7A(cell, role))
+        EditOption(
+          title: onShift ? "7A'ya çevir" : '7A yaz',
+          subtitle: onShift
+              ? (nurse
+                    ? '24 nöbeti kalkar, bu günün 7A\'sına yazılır.'
+                    : 'Nöbeti kalkar, bu gün 7A (gündüz) çalışır.')
+              : (nurse
+                    ? 'Bu günün 7A\'sı bu kişiye geçer.'
+                    : 'Gündüz mesaisi, günün mesai saati kadar.'),
+          icon: Icons.wb_sunny_outlined,
+          result: plan.assignments,
+          onSelected: () =>
+              nurse ? _writeDayShift(cell) : _writeTechDayShift(cell),
+        ),
+    ];
   }
 
   /// [day] gününde 7A var mı? Sorumlu hemşire tanımlıyken mesai günleri
@@ -837,23 +899,9 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         ref.read(dayShiftsProvider)[cell.day]?.personId == cell.personId;
     final nurse = role == Role.nurse;
     final tech = role == Role.radiologyTech;
-    final workday =
-        DayShiftPlanner.workdayHours(
-          year: plan.year,
-          month: plan.month,
-          day: cell.day,
-          holidays: ref.read(holidaysProvider),
-          settings: ref.read(effectiveSettingsProvider),
-        ) !=
-        null;
     // Teknikerin elle 7A'sı (hücrede 7A yazar).
-    final techHas7A =
-        tech &&
-        !onShift &&
-        (plan.techDayShifts[cell.personId]?.contains(cell.day) ?? false);
-    final can7A =
-        (nurse && !isDayShift && _hasDayShiftSlot(cell.day)) ||
-        (tech && workday && !techHas7A);
+    final techHas7A = _techHas7A(cell, role);
+    final can7A = _can7A(cell, role);
     if (!onShift && (isDayShift || (nurse && !can7A))) {
       return _onCellTap(cell, role);
     }

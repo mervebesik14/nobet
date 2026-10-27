@@ -906,4 +906,74 @@ void main() {
       expect(saved().techDayShifts, isEmpty);
     });
   });
+
+  group('dokununca 7A seçeneği', () {
+    testWidgets('tekniker: boş hücrede 7A yaz, 7A hücresinde kaldır', (
+      tester,
+    ) async {
+      await pumpRoster(tester);
+      await tester.tap(cell('t2', 5));
+      await tester.pumpAndSettle();
+      expect(inSheet('Bu güne ata'), findsOneWidget);
+      await tester.tap(inSheet('7A yaz'));
+      await tester.pumpAndSettle();
+      expect(sheet(), findsNothing);
+      expect(saved().techDayShifts, {
+        't2': [5],
+      });
+      expect(saved().assignments, _rotation());
+
+      await tester.tap(cell('t2', 5));
+      await tester.pumpAndSettle();
+      expect(inSheet('7A yaz'), findsNothing);
+      await tester.tap(inSheet("7A'yı kaldır"));
+      await tester.pumpAndSettle();
+      expect(saved().techDayShifts, isEmpty);
+    });
+
+    testWidgets("tekniker: nöbetteki hücrede 7A'ya çevir; hafta sonu yok", (
+      tester,
+    ) async {
+      await pumpRoster(tester);
+      await tester.tap(cell('t2', 6));
+      await tester.pumpAndSettle();
+      expect(inSheet('Nöbeti kaldır'), findsOneWidget);
+      await tester.tap(inSheet("7A'ya çevir"));
+      await tester.pumpAndSettle();
+      expect(saved().assignments[6]!.techId, isNull);
+      expect(saved().techDayShifts, {
+        't2': [6],
+      });
+
+      // 4 Ekim Pazar: 7A seçeneği yok.
+      await tester.tap(cell('t3', 4));
+      await tester.pumpAndSettle();
+      expect(inSheet('Bu güne ata'), findsOneWidget);
+      expect(inSheet('7A yaz'), findsNothing);
+    });
+
+    testWidgets('hemşire: sorumlu hemşire varken boş hücrede 7A yaz', (
+      tester,
+    ) async {
+      await boxes.people.put(
+        'c',
+        const Person(
+          id: 'c',
+          name: 'Sorumlu',
+          role: Role.nurse,
+          isChargeNurse: true,
+        ),
+      );
+      await pumpRoster(tester);
+      // Ayşe 8 Ekim Perşembe boş (7'sinde nöbet → nöbet ertesi uyarısı).
+      await tester.tap(cell('n0', 8));
+      await tester.pumpAndSettle();
+      await tester.tap(inSheet('7A yaz'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Ayşe 8 Ekim nöbet ertesi.'), findsOneWidget);
+      await tester.tap(find.text('Yine de yap'));
+      await tester.pumpAndSettle();
+      expect(saved().dayShiftOverrides, {8: 'n0'});
+    });
+  });
 }

@@ -11,6 +11,7 @@ class EditOption {
     this.warnings = const [],
     this.subtitle,
     this.icon,
+    this.onSelected,
   });
 
   final String title;
@@ -20,6 +21,10 @@ class EditOption {
   final List<String> warnings;
   final String? subtitle;
   final IconData? icon;
+
+  /// Atama dışı bir işlem (ör. 7A yaz): seçilince sayfa kapanır, [result]
+  /// yerine bu çalışır (kendi uyarı ve onayıyla).
+  final Future<void> Function()? onSelected;
 
   bool get isValid => warnings.isEmpty;
 }
@@ -55,7 +60,10 @@ Future<Map<int, DayAssignment>?> showEditSheet(
         subtitle: o.warnings.isEmpty && o.subtitle == null
             ? null
             : Text([?o.subtitle, ...o.warnings].join('\n')),
-        onTap: () => Navigator.of(context).pop(o.result),
+        onTap: () {
+          Navigator.of(context).pop(o.onSelected == null ? o.result : null);
+          o.onSelected?.call();
+        },
       );
       return DraggableScrollableSheet(
         expand: false,
