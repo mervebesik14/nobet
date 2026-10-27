@@ -1057,4 +1057,79 @@ void main() {
     await openViolations(tester);
     expect(find.text('• Ayşe istemediği güne (3 Ekim) atandı.'), findsNothing);
   });
+
+  group('yeniden oluşturmadan önce elle yapılanlar', () {
+    testWidgets('elle değişiklik yoksa doğrudan mod sorulur', (tester) async {
+      await pumpRoster(tester);
+      await tester.tap(find.byTooltip('Yeniden oluştur'));
+      await tester.pumpAndSettle();
+      expect(find.text('Elle yapılanlar silinecek'), findsNothing);
+      expect(find.text('Liste kimler için?'), findsOneWidget);
+    });
+
+    testWidgets('elle değişiklik varsa uyarır; düzelt ya da yine de oluştur', (
+      tester,
+    ) async {
+      await pumpRoster(tester);
+      // Elle değişiklik: Ayşe'nin 3 Ekim nöbeti silinir.
+      await tester.longPress(cell('n0', 3));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sil'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byTooltip('Yeniden oluştur'));
+      await tester.pumpAndSettle();
+      expect(find.text('Elle yapılanlar silinecek'), findsOneWidget);
+      expect(
+        find.textContaining(
+          'elle yapılmış 1 değişiklik var:\n• 3 Ekim: Ayşe '
+          'çıkarıldı',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Vazgeç'));
+      await tester.pumpAndSettle();
+      expect(saved().assignments[3]!.nurseIds, ['n6']);
+
+      // Kurallara göre düzelt: liste baştan kurulmaz, boş koltuk dolar.
+      await tester.tap(find.byTooltip('Yeniden oluştur'));
+      await tester.pumpAndSettle();
+      // Sayfadaki aynı adlı düğme değil, penceredeki.
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Kurallara göre düzelt'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.textContaining('elle yapılanlar korundu'), findsOneWidget);
+      expect(find.text('Liste kimler için?'), findsNothing);
+      expect(saved().assignments[3]!.nurseIds, hasLength(2));
+      expect(saved().assignments[3]!.nurseIds, isNot(contains('n0')));
+
+      // Yine de oluştur: her zamanki akış (mod sorusu).
+      await tester.tap(find.byTooltip('Yeniden oluştur'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Yine de oluştur'));
+      await tester.pumpAndSettle();
+      expect(find.text('Liste kimler için?'), findsOneWidget);
+    });
+
+    testWidgets("Excel'den alınan liste için daha güçlü uyarı", (tester) async {
+      await pumpRoster(tester);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(RosterPage)),
+      );
+      await container
+          .read(monthPlanProvider.notifier)
+          .startEmptyRoster(nurseOnly: false);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Yeniden oluştur'));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining("elle girildi ya da Excel'den alındı"),
+        findsOneWidget,
+      );
+    });
+  });
 }

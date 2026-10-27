@@ -35,6 +35,15 @@ void main() {
         Person(id: 'n$i', name: 'Hemşire $i', role: Role.nurse),
       );
     }
+    // Uzun isimli hemşire (n0'ın yerine).
+    await boxes.people.put(
+      'n0',
+      const Person(
+        id: 'n0',
+        name: 'Muhammed Emin Polatkaraman',
+        role: Role.nurse,
+      ),
+    );
     for (var i = 0; i < 4; i++) {
       await boxes.people.put(
         't$i',
@@ -106,5 +115,26 @@ void main() {
       tester.getCenter(headerDay(10)).dx,
       moreOrLessEquals(tester.getCenter(cell('n0', 10)).dx, epsilon: 0.5),
     );
+  });
+
+  testWidgets('uzun isim iki satıra kayar; satır yüksekliği aynı', (
+    tester,
+  ) async {
+    await pump(tester);
+    final name = find.byKey(const ValueKey('name-text-n0'));
+    expect(tester.widget<Text>(name).data, 'Muhammed Emin Polatkaraman');
+    // En az iki satır (tek satır 14 × 1,15 ≈ 16) ve satıra sığar.
+    expect(tester.getSize(name).height, greaterThanOrEqualTo(30));
+    expect(
+      tester.getSize(name).height,
+      lessThanOrEqualTo(
+        tester.getSize(find.byKey(const ValueKey('name-n0'))).height,
+      ),
+    );
+    expect(
+      tester.getSize(find.byKey(const ValueKey('name-n0'))).height,
+      tester.getSize(find.byKey(const ValueKey('name-n1'))).height,
+    );
+    expect(tester.takeException(), isNull);
   });
 }

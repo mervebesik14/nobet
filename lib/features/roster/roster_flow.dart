@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../logic/feasibility_checker.dart';
+import '../../logic/manual_edits.dart';
 import '../people/people_controller.dart';
 import '../month/month_plan_controller.dart';
 
@@ -25,6 +26,46 @@ Future<bool> generateRoster(BuildContext context, WidgetRef ref) async {
     );
     if (!ok || !context.mounted) return false;
   }
+
+  // Elle yapılanlar yeniden oluşturmada silinir: önce sor, düzeltmeyi öner.
+  if (plan.hasRoster) {
+    final manual = ManualEdits.since(
+      ref.read(rosterHistoryRepositoryProvider).load(plan.year, plan.month),
+    );
+    if (!manual.isEmpty) {
+      final choice = await _confirmManualEdits(
+        context,
+        manual,
+        canFix: !plan.isLocked,
+      );
+      if (!context.mounted) return false;
+      switch (choice) {
+        case _Regenerate.cancel:
+          return false;
+        case _Regenerate.fix:
+          final outcome = await controller.fixRoster();
+          if (context.mounted && outcome != null) {
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(
+                    outcome.changed == 0
+                        ? 'Değiştirilecek nöbet bulunamadı; elle yapılanlar '
+                              'korundu.'
+                        : '${outcome.changed} nöbet değişti; elle yapılanlar '
+                              'korundu.',
+                  ),
+                ),
+              );
+          }
+          return false;
+        case _Regenerate.regenerate:
+          break;
+      }
+    }
+  }
+  if (!context.mounted) return false;
 
   // Mod: yalnızca tekniker tanımlıysa sor; değilse zaten yalnız hemşire.
   final bool nurseOnly;
@@ -211,4 +252,55 @@ Future<bool> _confirm(
     ),
   );
   return result ?? false;
+}
+
+enum _Regenerate { cancel, fix, regenerate }
+
+/// Elle yapılmış değişiklikler varken yeniden oluşturma onayı.
+Future<_Regenerate> _confirmManualEdits(
+  BuildContext context,
+  ManualEdits manual, {
+  required bool canFix,
+}) async {
+  final more = manual.count - manual.samples.length;
+  final result = await showDialog<_Regenerate>(
+    context: context,
+    builder: (context) => AlertDialog(
+      icon: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+      title: const Text('Elle yapılanlar silinecek'),
+      content: SingleChildScrollView(
+        child: Text(
+          [
+            if (manual.manualList)
+              'Bu liste elle girildi ya da Excel\'den alındı. Yeniden '
+                  'oluşturulursa liste baştan kurulur; girdiklerin silinir.',
+            if (manual.count > 0) ...[
+              'Bu listede elle yapılmış ${manual.count} değişiklik var:',
+              for (final line in manual.samples) '• $line',
+              if (more > 0) '… ve $more değişiklik daha.',
+            ],
+            if (canFix)
+              '\nYalnız kural ihlallerini gidermek istiyorsan "Kurallara göre '
+                  'düzelt" elle yapılanları korur.',
+          ].join('\n'),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(_Regenerate.cancel),
+          child: const Text('Vazgeç'),
+        ),
+        if (canFix)
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(_Regenerate.fix),
+            child: const Text('Kurallara göre düzelt'),
+          ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_Regenerate.regenerate),
+          child: const Text('Yine de oluştur'),
+        ),
+      ],
+    ),
+  );
+  return result ?? _Regenerate.cancel;
 }

@@ -227,11 +227,14 @@ class _RosterTableState extends State<RosterTable> {
             height: _rowHeight,
             alignment: Alignment.centerLeft,
             color: highlighted ? scheme.primaryContainer : null,
+            // Uzun isim iki satıra kayar (satır yüksekliği yeter).
             child: Text(
               row.name,
-              maxLines: 1,
+              key: ValueKey('name-text-${row.id}'),
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodyMedium?.copyWith(
+                height: 1.15,
                 fontWeight: highlighted ? FontWeight.w700 : null,
                 color: highlighted ? scheme.onPrimaryContainer : null,
               ),

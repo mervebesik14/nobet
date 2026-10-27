@@ -172,9 +172,10 @@ pw.Widget _rosterTable({
       pw.Container(
         color: color,
         padding: const pw.EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+        // Uzun isim iki satıra kayar.
         child: pw.Text(
           text,
-          maxLines: 1,
+          maxLines: 2,
           style: pw.TextStyle(fontSize: 7, font: bold ? boldFont : null),
         ),
       );
