@@ -789,4 +789,121 @@ void main() {
       expect(saved().assignments[4]!.tech16bId, 't1');
     });
   });
+
+  group('basılı tut → teknikere 7A', () {
+    // Ekim 2026: 5 Pzt, 6 Sal; 3–4 hafta sonu. Can (t2): 2, 6, 10…;
+    // Burak (t1): 1, 5, 9…
+    testWidgets('boş hücreye 7A yazılır ve kaldırılır', (tester) async {
+      await pumpRoster(tester);
+      await tester.longPress(cell('t2', 5));
+      await tester.pumpAndSettle();
+      expect(find.text('16B yaz'), findsOneWidget);
+      await tester.tap(find.text('7A yaz'));
+      await tester.pumpAndSettle();
+      expect(find.text('Kural ihlali'), findsNothing);
+      expect(saved().techDayShifts, {
+        't2': [5],
+      });
+      expect(find.text("Can 5 Ekim 7A'ya yazıldı."), findsOneWidget);
+      expect(
+        find.descendant(of: cell('t2', 5), matching: find.text('7A')),
+        findsOneWidget,
+      );
+
+      await tester.longPress(cell('t2', 5));
+      await tester.pumpAndSettle();
+      expect(find.text('7A yaz'), findsNothing);
+      await tester.tap(find.text("7A'yı kaldır"));
+      await tester.pumpAndSettle();
+      expect(saved().techDayShifts, isEmpty);
+      expect(find.text('Can 5 Ekim 7A kaldırıldı.'), findsOneWidget);
+    });
+
+    testWidgets("nöbet 7A'ya çevrilir; geri al ikisini geri alır", (
+      tester,
+    ) async {
+      await pumpRoster(tester);
+      await tester.longPress(cell('t2', 6));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text("7A'ya çevir"));
+      await tester.pumpAndSettle();
+      expect(saved().assignments[6]!.techId, isNull);
+      expect(saved().techDayShifts, {
+        't2': [6],
+      });
+      expect(
+        find.text("Can 6 Ekim nöbet yerine 7A'ya yazıldı."),
+        findsOneWidget,
+      );
+      await tester.tap(find.text('Geri al'));
+      await tester.pumpAndSettle();
+      expect(saved().assignments[6]!.techId, 't2');
+      expect(saved().techDayShifts, isEmpty);
+    });
+
+    testWidgets('24 nöbet ertesi 7A uyarır; hafta sonu seçenek yok', (
+      tester,
+    ) async {
+      await pumpRoster(tester);
+      // Burak 5 Ekim 24 nöbette → 6 Ekim nöbet ertesi.
+      await tester.longPress(cell('t1', 6));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('7A yaz'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Burak 6 Ekim nöbet ertesi.'), findsOneWidget);
+      await tester.tap(find.text('Vazgeç'));
+      await tester.pumpAndSettle();
+      expect(saved().techDayShifts, isEmpty);
+
+      // 4 Ekim Pazar: 7A yok.
+      await tester.longPress(cell('t3', 4));
+      await tester.pumpAndSettle();
+      expect(find.text('16B yaz'), findsOneWidget);
+      expect(find.text('7A yaz'), findsNothing);
+    });
+
+    testWidgets("7A'lı güne 24 yazılınca 7A düşer", (tester) async {
+      // 5 Ekim'in tekniker koltuğu boş.
+      final rotation = _rotation();
+      await boxes.monthPlans.put(
+        '2026-10',
+        MonthPlan(
+          year: 2026,
+          month: 10,
+          assignments: {
+            ...rotation,
+            5: DayAssignment(day: 5, nurseIds: rotation[5]!.nurseIds),
+          },
+          techDayShifts: const {
+            't2': [5],
+          },
+        ),
+      );
+      tester.view.physicalSize = const Size(3400, 4000);
+      tester.view.devicePixelRatio = 2;
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            ...boxOverrides(boxes),
+            todayProvider.overrideWithValue(DateTime(2026, 10, 11)),
+          ],
+          child: const MaterialApp(home: RosterPage(freeEdit: true)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.descendant(of: cell('t2', 5), matching: find.text('7A')),
+        findsOneWidget,
+      );
+      // Serbest düzenlemede 7A hücresine dokununca 24 yazılır, 7A düşer
+      // (Can 6'sında da nöbetçi: art arda uyarısı onaylanır).
+      await tester.tap(cell('t2', 5));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Yine de yap'));
+      await tester.pumpAndSettle();
+      expect(saved().assignments[5]!.personIds, contains('t2'));
+      expect(saved().techDayShifts, isEmpty);
+    });
+  });
 }

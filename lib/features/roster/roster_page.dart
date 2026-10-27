@@ -102,7 +102,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   List<String> _personStats(
     String id,
     Set<int> weekendDays,
-    Map<int, DayShift> dayShifts,
+    Iterable<DayShift> dayShifts,
   ) {
     final plan = _plan;
     final days = {
@@ -118,9 +118,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       absent: absent,
       monthEnd: plan.daysInMonth,
     );
-    final dayShiftCount = dayShifts.values
-        .where((s) => s.personId == id)
-        .length;
+    final dayShiftCount = dayShifts.where((s) => s.personId == id).length;
     return [
       '${days.length} nöbet',
       '${days.where(weekendDays.contains).length} hafta sonu',
@@ -307,12 +305,14 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     Map<int, DayAssignment>? result, {
     String message = 'Değişiklik kaydedildi.',
     Map<int, String>? dayShiftOverrides,
+    Map<String, List<int>>? techDayShifts,
   }) async {
     if (result == null) return;
     final controller = ref.read(monthPlanProvider.notifier);
     await controller.setAssignments(
       result,
       dayShiftOverrides: dayShiftOverrides,
+      techDayShifts: techDayShifts,
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -698,10 +698,14 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     bool onDuty(int d) => d < 1
         ? tail.isNotEmpty && tail.last.contains(id)
         : assignments[d]?.includes(id) ?? false;
+    // 16B ertesi çalışmaya engel değil; yalnız 24 nöbetin ertesi.
+    bool afterHeavy(int d) =>
+        onDuty(d) &&
+        !(d >= 1 && (assignments[d]?.isSecondaryTech(id) ?? false));
     final who = '${_name(id)} ${formatDayMonth(day, plan.month)}';
     return [
       if (onDuty(day)) '$who nöbetçi.',
-      if (onDuty(day - 1)) '$who nöbet ertesi.',
+      if (afterHeavy(day - 1)) '$who nöbet ertesi.',
       if (ref.read(blockReasonsProvider)[id]?[day] case final reason?
           when reason != BlockReason.beforeAnnualLeave &&
               reason != BlockReason.afterAnnualLeave &&
@@ -736,6 +740,60 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       message:
           '${_name(id)} ${formatDayMonth(day, plan.month)} '
           '${onShift ? '24 yerine ' : ''}7A\'ya yazıldı.',
+    );
+  }
+
+  /// Teknikere [cell] gününde 7A yazar ([MonthPlan.techDayShifts]); o gün
+  /// 24 / 16B nöbetindeyse nöbeti kalkar. Nöbet ertesi, izinli ya da
+  /// istemediği günse önce uyarır.
+  Future<void> _writeTechDayShift(RosterCell cell) async {
+    final plan = _plan;
+    final day = cell.day;
+    final id = cell.personId;
+    var after = plan.assignments;
+    final current = after[day];
+    final onShift = current?.includes(id) ?? false;
+    if (onShift) {
+      after = RosterEditor.replace(
+        after,
+        day: day,
+        role: Role.radiologyTech,
+        oldId: id,
+        newId: null,
+        nursesPerDay: ref.read(effectiveSettingsProvider).nursesPerDay,
+        secondary: current!.isSecondaryTech(id),
+      );
+    }
+    if (!await _confirmWarnings(_dayShiftWarnings(id, day, after))) return;
+    await _apply(
+      after,
+      techDayShifts: {
+        ...plan.techDayShifts,
+        id: {...?plan.techDayShifts[id], day}.toList()..sort(),
+      },
+      message:
+          '${_name(id)} ${formatDayMonth(day, plan.month)} '
+          '${onShift ? 'nöbet yerine ' : ''}7A\'ya yazıldı.',
+    );
+  }
+
+  /// Teknikerin [cell] günündeki elle 7A'sını kaldırır.
+  Future<void> _removeTechDayShift(RosterCell cell) async {
+    final plan = _plan;
+    final days = [
+      for (final d in plan.techDayShifts[cell.personId] ?? const <int>[])
+        if (d != cell.day) d,
+    ];
+    await _apply(
+      plan.assignments,
+      techDayShifts: {
+        for (final e in plan.techDayShifts.entries)
+          if (e.key != cell.personId) e.key: e.value,
+        if (days.isNotEmpty) cell.personId: days,
+      },
+      message:
+          '${_name(cell.personId)} ${formatDayMonth(cell.day, plan.month)} '
+          '7A kaldırıldı.',
     );
   }
 
@@ -778,8 +836,24 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     final isDayShift =
         ref.read(dayShiftsProvider)[cell.day]?.personId == cell.personId;
     final nurse = role == Role.nurse;
-    final can7A = nurse && !isDayShift && _hasDayShiftSlot(cell.day);
     final tech = role == Role.radiologyTech;
+    final workday =
+        DayShiftPlanner.workdayHours(
+          year: plan.year,
+          month: plan.month,
+          day: cell.day,
+          holidays: ref.read(holidaysProvider),
+          settings: ref.read(effectiveSettingsProvider),
+        ) !=
+        null;
+    // Teknikerin elle 7A'sı (hücrede 7A yazar).
+    final techHas7A =
+        tech &&
+        !onShift &&
+        (plan.techDayShifts[cell.personId]?.contains(cell.day) ?? false);
+    final can7A =
+        (nurse && !isDayShift && _hasDayShiftSlot(cell.day)) ||
+        (tech && workday && !techHas7A);
     if (!onShift && (isDayShift || (nurse && !can7A))) {
       return _onCellTap(cell, role);
     }
@@ -814,8 +888,10 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 ListTile(
                   leading: const Icon(Icons.wb_sunny_outlined),
                   title: const Text("7A'ya çevir"),
-                  subtitle: const Text(
-                    '24 nöbeti kalkar, bu günün 7A\'sına yazılır.',
+                  subtitle: Text(
+                    nurse
+                        ? '24 nöbeti kalkar, bu günün 7A\'sına yazılır.'
+                        : 'Nöbeti kalkar, bu gün 7A (gündüz) çalışır.',
                   ),
                   onTap: () => Navigator.of(context).pop('7a'),
                 ),
@@ -840,6 +916,12 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 onTap: () => Navigator.of(context).pop('swap'),
               ),
             ] else ...[
+              if (techHas7A)
+                ListTile(
+                  leading: const Icon(Icons.wb_sunny_outlined),
+                  title: const Text("7A'yı kaldır"),
+                  onTap: () => Navigator.of(context).pop('no7a'),
+                ),
               ListTile(
                 leading: const Icon(Icons.add_circle_outline),
                 title: const Text('24 nöbet yaz'),
@@ -849,7 +931,11 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 ListTile(
                   leading: const Icon(Icons.wb_sunny_outlined),
                   title: const Text('7A yaz'),
-                  subtitle: const Text('Bu günün 7A\'sı bu kişiye geçer.'),
+                  subtitle: Text(
+                    nurse
+                        ? 'Bu günün 7A\'sı bu kişiye geçer.'
+                        : 'Gündüz mesaisi, günün mesai saati kadar.',
+                  ),
                   onTap: () => Navigator.of(context).pop('7a'),
                 ),
               if (tech)
@@ -881,7 +967,9 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       case 'delete':
         await _deleteShift(cell, role);
       case '7a':
-        await _writeDayShift(cell);
+        await (nurse ? _writeDayShift(cell) : _writeTechDayShift(cell));
+      case 'no7a':
+        await _removeTechDayShift(cell);
       case '16b':
         await _writeTechSeat(cell, secondary: true);
       case '24':
@@ -936,7 +1024,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   /// hemşire ve radyoloji nöbetçileriyle birlikte metin olarak paylaşır.
   Future<void> _sharePersonal(
     List<RosterRow> rows,
-    Map<int, DayShift> dayShifts, {
+    Iterable<DayShift> dayShifts, {
     required bool asPdf,
     required Set<int> weekendDays,
     required Set<int> holidayDays,
@@ -1004,7 +1092,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   /// Herkesin kişiye özel PDF'ini ayrı dosyalar olarak tek seferde paylaşır.
   Future<void> _shareAllPersonal(
     List<RosterRow> rows,
-    Map<int, DayShift> dayShifts, {
+    Iterable<DayShift> dayShifts, {
     required Set<int> weekendDays,
     required Set<int> holidayDays,
   }) async {
@@ -1094,7 +1182,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     required Set<int> holidayDays,
     required Map<int, int> missingByDay,
     required int shiftHours,
-    required Map<int, DayShift> dayShifts,
+    required Iterable<DayShift> dayShifts,
   }) async {
     final services = ref.read(platformServicesProvider);
     final fileBase =
@@ -1170,7 +1258,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     // Yalnız hemşire ayında teknikeri kapatılmış etkin ayarlar kullanılır.
     final settings = ref.watch(effectiveSettingsProvider);
     final violations = ref.watch(rosterViolationsProvider);
-    final dayShifts = ref.watch(dayShiftsProvider);
+    final dayShifts = ref.watch(allDayShiftsProvider);
     final holidays = ref
         .watch(holidaysProvider)
         .where((h) => h.date.year == plan.year && h.date.month == plan.month)

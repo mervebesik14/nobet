@@ -36,9 +36,9 @@ void main() {
       plan: plan,
       person: people.first,
       people: people,
-      dayShifts: const {
-        9: DayShift(day: 9, personId: 'a', hours: 7, isSubstitute: true),
-      },
+      dayShifts: const [
+        DayShift(day: 9, personId: 'a', hours: 7, isSubstitute: true),
+      ],
     );
     expect(
       text,
@@ -89,9 +89,9 @@ void main() {
       plan: plan,
       person: people.first,
       people: people,
-      dayShifts: const {
-        9: DayShift(day: 9, personId: 'a', hours: 7, isSubstitute: true),
-      },
+      dayShifts: const [
+        DayShift(day: 9, personId: 'a', hours: 7, isSubstitute: true),
+      ],
       weekendDays: const {3, 4},
     );
     expect(data.monthLabel, 'Ekim 2026');

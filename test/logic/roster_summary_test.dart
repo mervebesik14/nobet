@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nobet_listesi/data/turkish_holidays.dart';
+import 'package:nobet_listesi/logic/day_shift_planner.dart';
 import 'package:nobet_listesi/logic/roster_summary.dart';
 import 'package:nobet_listesi/models/models.dart';
 
@@ -220,5 +221,24 @@ void main() {
       ).longGaps,
       1,
     );
+  });
+
+  test('teknikerin elle 7A saatleri çalışılan saate eklenir', () {
+    final s = RosterSummary.build(
+      year: 2026,
+      month: 10,
+      assignments: assignments(),
+      people: people,
+      holidays: holidays,
+      settings: settings,
+      dayShifts: [
+        for (final d in [5, 6])
+          DayShift(day: d, personId: 't', hours: 7, isSubstitute: false),
+      ],
+    );
+    final ali = s.people.firstWhere((r) => r.personId == 't');
+    expect(ali.shifts, 3);
+    expect(ali.dayShifts, 2);
+    expect(ali.workedHours, 3 * 24 + 2 * 7);
   });
 }

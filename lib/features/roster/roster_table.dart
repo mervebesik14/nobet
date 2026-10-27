@@ -27,7 +27,7 @@ class RosterTable extends StatefulWidget {
     required this.holidayDays,
     required this.shiftHours,
     this.missingByDay = const {},
-    this.dayShifts = const {},
+    this.dayShifts = const [],
     this.violationCells = const {},
     this.selectedCell,
     this.onCellTap,
@@ -49,7 +49,7 @@ class RosterTable extends StatefulWidget {
   final Map<int, int> missingByDay;
 
   /// Gün → 7A (gündüz mesaisi) çalışanı; o kişinin hücresinde "7A" yazar.
-  final Map<int, DayShift> dayShifts;
+  final Iterable<DayShift> dayShifts;
 
   /// Kural ihlali olan hücreler.
   final Set<RosterCell> violationCells;
@@ -117,7 +117,7 @@ class _RosterTableState extends State<RosterTable> {
   Set<int> get holidayDays => widget.holidayDays;
   int get shiftHours => widget.shiftHours;
   Map<int, int> get missingByDay => widget.missingByDay;
-  Map<int, DayShift> get dayShifts => widget.dayShifts;
+  Iterable<DayShift> get dayShifts => widget.dayShifts;
   Set<RosterCell> get violationCells => widget.violationCells;
   RosterCell? get selectedCell => widget.selectedCell;
   void Function(RosterCell cell)? get onCellTap => widget.onCellTap;
@@ -133,6 +133,7 @@ class _RosterTableState extends State<RosterTable> {
     final dayFormat = DateFormat.E('tr_TR');
     final border = BorderSide(color: theme.dividerColor);
     final days = [for (var d = 1; d <= plan.daysInMonth; d++) d];
+    final onDayShift = {for (final s in dayShifts) (s.personId, s.day)};
 
     // Kişi → nöbet günleri.
     final worked = <String, Set<int>>{};
@@ -264,10 +265,10 @@ class _RosterTableState extends State<RosterTable> {
                   leave: personDays.contains(d) ? null : leaveOn[d],
                   label:
                       _labelFor(row.id, d, personDays.contains(d)) ??
-                      (dayShifts[d]?.personId == row.id ? '7A' : null),
+                      (onDayShift.contains((row.id, d)) ? '7A' : null),
                   isDayShift:
                       !personDays.contains(d) &&
-                      dayShifts[d]?.personId == row.id,
+                      onDayShift.contains((row.id, d)),
                   columnColor: highlighted
                       ? Color.alphaBlend(
                           scheme.primary.withValues(alpha: 0.06),

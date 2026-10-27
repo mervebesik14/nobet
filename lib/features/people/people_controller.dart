@@ -286,6 +286,7 @@ class PeopleController extends Notifier<List<Person>> {
             lines: lines,
             before: plan.assignments,
             beforeOverrides: plan.dayShiftOverrides,
+            beforeTechDayShifts: plan.techDayShifts,
             beforeGeneratedAt: plan.generatedAt,
             beforeSeed: plan.seed,
           ),

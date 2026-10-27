@@ -9,6 +9,7 @@ class RosterEdit {
     this.lines = const [],
     this.before = const {},
     this.beforeOverrides = const {},
+    this.beforeTechDayShifts = const {},
     this.beforeGeneratedAt,
     this.beforeSeed,
   });
@@ -27,6 +28,9 @@ class RosterEdit {
   /// Değişiklikten önceki elle 7A seçimleri.
   final Map<int, String> beforeOverrides;
 
+  /// Değişiklikten önceki teknikerlerin elle 7A günleri.
+  final Map<String, List<int>> beforeTechDayShifts;
+
   final DateTime? beforeGeneratedAt;
   final int? beforeSeed;
 
@@ -38,6 +42,7 @@ class RosterEdit {
     'beforeOverrides': {
       for (final e in beforeOverrides.entries) '${e.key}': e.value,
     },
+    'beforeTechDayShifts': beforeTechDayShifts,
     'beforeGeneratedAt': beforeGeneratedAt?.toIso8601String(),
     'beforeSeed': beforeSeed,
   };
@@ -55,6 +60,10 @@ class RosterEdit {
     beforeOverrides: {
       for (final e in (json['beforeOverrides'] as Map? ?? const {}).entries)
         int.parse(e.key as String): e.value as String,
+    },
+    beforeTechDayShifts: {
+      for (final e in (json['beforeTechDayShifts'] as Map? ?? const {}).entries)
+        e.key as String: (e.value as List).cast<int>(),
     },
     beforeGeneratedAt: switch (json['beforeGeneratedAt']) {
       final String s => DateTime.parse(s),

@@ -35,7 +35,7 @@ class RosterExcel {
     required Set<int> holidayDays,
     required int shiftHours,
     Map<int, int> missingByDay = const {},
-    Map<int, DayShift> dayShifts = const {},
+    Iterable<DayShift> dayShifts = const [],
     bool includeSummary = true,
   }) => XlsxWriter.build([
     _rosterSheet(
@@ -60,9 +60,10 @@ class RosterExcel {
     required Set<int> holidayDays,
     required int shiftHours,
     required Map<int, int> missingByDay,
-    required Map<int, DayShift> dayShifts,
+    required Iterable<DayShift> dayShifts,
   }) {
     final days = [for (var d = 1; d <= plan.daysInMonth; d++) d];
+    final onDayShift = {for (final s in dayShifts) (s.personId, s.day)};
     int? columnFill(int d) => holidayDays.contains(d)
         ? _holiday
         : weekendDays.contains(d)
@@ -127,7 +128,7 @@ class RosterExcel {
             (plan.assignments[d]?.isSecondaryTech(row.id) ?? false)
                 ? dayCell('16B', d, strong: true)
                 : dayCell(shiftHours, d, strong: true)
-          else if (dayShifts[d]?.personId == row.id)
+          else if (onDayShift.contains((row.id, d)))
             dayCell('7A', d, fill: _dayShift, strong: true)
           else if (leaveOn[d] case final type?)
             dayCell(type.shortLabel, d, fill: _leave[type], strong: true)

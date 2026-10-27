@@ -170,8 +170,15 @@ void main() {
         't3': [7, 8],
       },
       dayShiftOverrides: const {14: 'n2'},
+      techDayShifts: const {
+        't4': [6, 13],
+      },
     );
     expect(MonthPlan.fromJson(plan.toJson()), plan);
+    expect(MonthPlan.fromJson(plan.toJson()).techDayShifts, {
+      't4': [6, 13],
+    });
+    expect(plan.references('t4'), isTrue);
     expect(plan.sickLeaveOf('t3'), [7, 8]);
     expect(plan.leaveOf('t3', LeaveType.sick), [7, 8]);
     expect(plan.blockedDays['t3'], [7, 8]);

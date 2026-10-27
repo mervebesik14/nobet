@@ -53,4 +53,22 @@ void main() {
       isEmpty,
     );
   });
+
+  test('teknikerin elle 7A günleri', () {
+    expect(
+      RosterDiff.describe(
+        month: 10,
+        before: const {},
+        after: const {},
+        techDayShiftsBefore: const {
+          't': [5, 9],
+        },
+        techDayShiftsAfter: const {
+          't': [9, 12],
+        },
+        name: (id) => 'Ali',
+      ),
+      ['7A 5 Ekim: Ali kaldırıldı', '7A 12 Ekim: Ali yazıldı'],
+    );
+  });
 }

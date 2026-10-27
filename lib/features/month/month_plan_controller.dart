@@ -290,6 +290,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       // Yeni listede eski 7A seçimleri ve nöbet devirleri geçersiz olur.
       dayShiftOverrides: const {},
       handovers: const {},
+      techDayShifts: const {},
       generatedAt: DateTime.now(),
       seed: result.seed,
       nurseOnly: onlyNurses,
@@ -330,6 +331,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
     return _replaceRoster(
       imported.assignments,
       nurseOnly: nurseOnly,
+      techDayShifts: imported.techDayShifts,
       title: "Liste Excel'den alındı",
     );
   }
@@ -338,6 +340,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
     Map<int, DayAssignment> assignments, {
     required bool nurseOnly,
     required String title,
+    Map<String, List<int>> techDayShifts = const {},
   }) async {
     if (state.isLocked) return false;
     final before = state;
@@ -346,6 +349,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       // Yeni listede eski 7A seçimleri ve nöbet devirleri geçersiz olur.
       dayShiftOverrides: const {},
       handovers: const {},
+      techDayShifts: techDayShifts,
       generatedAt: DateTime.now(),
       nurseOnly: nurseOnly,
     );
@@ -435,6 +439,8 @@ class MonthPlanController extends Notifier<MonthPlan> {
             after: state.assignments,
             overridesBefore: before.dayShiftOverrides,
             overridesAfter: state.dayShiftOverrides,
+            techDayShiftsBefore: before.techDayShifts,
+            techDayShiftsAfter: state.techDayShifts,
             name: (id) => names[id] ?? 'Silinmiş kişi',
           )
         : const <String>[];
@@ -450,6 +456,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
             lines: lines,
             before: before.assignments,
             beforeOverrides: before.dayShiftOverrides,
+            beforeTechDayShifts: before.techDayShifts,
             beforeGeneratedAt: before.generatedAt,
             beforeSeed: before.seed,
           ),
@@ -468,6 +475,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
     state = state.copyWith(
       assignments: edit.before,
       dayShiftOverrides: edit.beforeOverrides,
+      techDayShifts: edit.beforeTechDayShifts,
       generatedAt: edit.beforeGeneratedAt,
       seed: edit.beforeSeed,
       clearGenerated: edit.before.isEmpty,
@@ -508,16 +516,29 @@ class MonthPlanController extends Notifier<MonthPlan> {
   /// yapılmaz ve false döner.
   /// [dayShiftOverrides] verilirse 7A seçimleri de aynı değişiklikte
   /// güncellenir (tek geri alma).
+  /// [techDayShifts] verilirse teknikerlerin elle 7A günleri de. Aynı gün
+  /// 24 / 16B nöbetine yazılan teknikerin o günkü 7A'sı düşer.
   Future<bool> setAssignments(
     Map<int, DayAssignment> assignments, {
     String title = 'Elle değişiklik',
     Map<int, String>? dayShiftOverrides,
+    Map<String, List<int>>? techDayShifts,
   }) async {
     if (state.isLocked) return false;
     final before = state;
+    final tech = techDayShifts ?? state.techDayShifts;
     state = state.copyWith(
       assignments: assignments,
       dayShiftOverrides: dayShiftOverrides,
+      techDayShifts: {
+        for (final MapEntry(key: id, value: days) in tech.entries)
+          if ([
+                for (final d in days)
+                  if (!(assignments[d]?.includes(id) ?? false)) d,
+              ]
+              case final kept when kept.isNotEmpty)
+            id: kept..sort(),
+      },
     );
     await ref.read(monthPlanRepositoryProvider).save(state);
     await _record(title, before);
@@ -751,6 +772,25 @@ Map<String, List<int>> computeEffectiveBlockedDays(
 }) => BlockReason.days(
   computeBlockReasons(plan, holidays, repository: repository, people: people),
 );
+
+/// Seçili ayın tüm 7A'ları: sorumlu hemşire planı ([dayShiftsProvider]) ve
+/// teknikerlerin elle yazılan 7A günleri. Tablo, özet ve paylaşımlar bunu
+/// kullanır.
+final allDayShiftsProvider = Provider<List<DayShift>>((ref) {
+  final plan = ref.watch(monthPlanProvider);
+  if (!plan.hasRoster) return const [];
+  return [
+    ...ref.watch(dayShiftsProvider).values,
+    ...DayShiftPlanner.manual(
+      year: plan.year,
+      month: plan.month,
+      days: plan.techDayShifts,
+      assignments: plan.assignments,
+      holidays: ref.watch(holidaysProvider),
+      settings: ref.watch(effectiveSettingsProvider),
+    ),
+  ];
+});
 
 /// Seçili ayın 7A (gündüz mesaisi) planı: sorumlu hemşire ya da yerine
 /// çalışan hemşire. Liste yoksa boş.

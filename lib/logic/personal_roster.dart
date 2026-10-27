@@ -75,7 +75,7 @@ class PersonalRoster {
     required MonthPlan plan,
     required Person person,
     required Iterable<Person> people,
-    Map<int, DayShift> dayShifts = const {},
+    Iterable<DayShift> dayShifts = const [],
     Set<int> weekendDays = const {},
   }) {
     final names = {for (final p in people) p.id: p.name};
@@ -102,7 +102,7 @@ class PersonalRoster {
       person: person,
       shifts: shifts,
       dayShiftDays: [
-        for (final s in dayShifts.values)
+        for (final s in dayShifts)
           if (s.personId == person.id) s.day,
       ]..sort(),
       leaves: {
@@ -117,7 +117,7 @@ class PersonalRoster {
     required MonthPlan plan,
     required Person person,
     required Iterable<Person> people,
-    Map<int, DayShift> dayShifts = const {},
+    Iterable<DayShift> dayShifts = const [],
   }) {
     final data = build(
       plan: plan,

@@ -25,7 +25,7 @@ Future<Uint8List> buildRosterPdf({
   required pw.Font font,
   required pw.Font boldFont,
   Map<int, int> missingByDay = const {},
-  Map<int, DayShift> dayShifts = const {},
+  Iterable<DayShift> dayShifts = const [],
   bool singlePage = false,
   bool includeSummary = true,
 }) async {
@@ -137,11 +137,12 @@ pw.Widget _rosterTable({
   required Set<int> holidayDays,
   required int shiftHours,
   required Map<int, int> missingByDay,
-  required Map<int, DayShift> dayShifts,
+  required Iterable<DayShift> dayShifts,
   required pw.Font boldFont,
 }) {
   final days = [for (var d = 1; d <= plan.daysInMonth; d++) d];
   final weekday = DateFormat.E('tr_TR');
+  final onDayShift = {for (final s in dayShifts) (s.personId, s.day)};
   final worked = <String, Set<int>>{};
   for (final a in plan.assignments.values) {
     for (final id in a.personIds) {
@@ -224,7 +225,7 @@ pw.Widget _rosterTable({
                 color: columnColor(d),
                 bold: true,
               )
-            else if (dayShifts[d]?.personId == row.id)
+            else if (onDayShift.contains((row.id, d)))
               cell('7A', color: _dayShiftColor, bold: true)
             else if (leaveOn[d] case final type?)
               cell(type.shortLabel, color: _leaveColors[type], bold: true)

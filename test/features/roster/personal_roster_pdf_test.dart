@@ -43,10 +43,10 @@ void main() {
         plan: plan,
         person: people.first,
         people: people,
-        dayShifts: const {
-          1: DayShift(day: 1, personId: 'a', hours: 7, isSubstitute: false),
-          2: DayShift(day: 2, personId: 'a', hours: 7, isSubstitute: false),
-        },
+        dayShifts: const [
+          DayShift(day: 1, personId: 'a', hours: 7, isSubstitute: false),
+          DayShift(day: 2, personId: 'a', hours: 7, isSubstitute: false),
+        ],
         weekendDays: const {3, 4, 10, 11, 17, 18, 24, 25, 29, 31},
       ),
       weekendDays: const {3, 4, 10, 11, 17, 18, 24, 25, 29, 31},

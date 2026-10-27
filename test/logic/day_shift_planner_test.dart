@@ -138,4 +138,41 @@ void main() {
     // Hafta sonuna (mesai günü olmayan) elle seçim yok sayılır.
     expect(p.containsKey(3), isFalse);
   });
+
+  group('elle 7A (tekniker)', () {
+    test(
+      'mesai saati: hafta içi 7, arife yarım gün, hafta sonu / tatil yok',
+      () {
+        double? hours(int d) => DayShiftPlanner.workdayHours(
+          year: 2026,
+          month: 10,
+          day: d,
+          holidays: holidays,
+          settings: settings,
+        );
+        expect(hours(5), settings.dailyRequiredHours);
+        expect(hours(3), isNull); // Cumartesi
+        expect(hours(29), isNull); // Cumhuriyet Bayramı
+        expect(hours(28), settings.halfDayRequiredHours); // arife
+      },
+    );
+
+    test('hafta sonu ve nöbet günü atlanır, günler sıralı', () {
+      final shifts = DayShiftPlanner.manual(
+        year: 2026,
+        month: 10,
+        days: const {
+          't1': [6, 3, 5],
+          't2': [28],
+        },
+        assignments: const {5: DayAssignment(day: 5, techId: 't1')},
+        holidays: holidays,
+        settings: settings,
+      );
+      expect(shifts.map((s) => (s.personId, s.day, s.hours)), [
+        ('t1', 6, settings.dailyRequiredHours),
+        ('t2', 28, settings.halfDayRequiredHours),
+      ]);
+    });
+  });
 }

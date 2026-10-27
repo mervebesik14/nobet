@@ -15,6 +15,7 @@
 - Çalışılan saat = nöbet × 24; fazla mesai = max(0, çalışılan − gereken).
 - Liste sonunda kişi başı: toplam nöbet, hafta sonu nöbet, çalışılan saat, gereken saat, fazla mesai.
 - Sorumlu hemşire (tek kişi): nöbet ortalamasına eşitlenmez; yalnızca seçtiği nöbet günlerine 24 yazılır (başka kimse olmasa da otomatik yazılmaz; seçmediği güne elle yazılırsa uyarı çıkar). Nöbet tutmadığı her mesai gününde 7A (gündüz, günün mesai saati kadar) çalışır; nöbet günü, nöbet ertesi ve izin günlerinde 7A'ya başka bir hemşire (adil sırayla) yazılır.
+- Radyoloji teknikerine elle 7A yazılabilir (yalnız mesai günü, günün mesai saati kadar çalışılan saate eklenir); aynı gün 24 / 16B yazılırsa o günün 7A'sı düşer, liste yeniden oluşturulunca temizlenir.
 - Algoritma ve hesaplar lib/logic altında saf Dart, birim testli; arayüz metinleri Türkçe.
 
 # Mimari ve kod kuralları

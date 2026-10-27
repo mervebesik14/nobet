@@ -3,7 +3,7 @@ import 'turkish_dates.dart';
 
 /// İki liste arasındaki farkı okunur satırlara çevirir (saf Dart):
 /// "3 Ekim: Ayşe yerine Hale", "4 Ekim: Banu çıkarıldı", "5 Ekim: Hale
-/// eklendi", "7A 9 Ekim: Ayşe yerine Hale".
+/// eklendi", "7A 9 Ekim: Ayşe yerine Hale", "7A 4 Ekim: Ali yazıldı".
 class RosterDiff {
   const RosterDiff._();
 
@@ -13,6 +13,8 @@ class RosterDiff {
     required Map<int, DayAssignment> after,
     Map<int, String> overridesBefore = const {},
     Map<int, String> overridesAfter = const {},
+    Map<String, List<int>> techDayShiftsBefore = const {},
+    Map<String, List<int>> techDayShiftsAfter = const {},
     required String Function(String id) name,
   }) {
     final lines = <String>[];
@@ -58,6 +60,32 @@ class RosterDiff {
         _ => '7A $date',
       });
     }
+    // Teknikerlerin elle 7A günleri.
+    final techLines = <(int, String)>[];
+    for (final id in {
+      ...techDayShiftsBefore.keys,
+      ...techDayShiftsAfter.keys,
+    }) {
+      final was = {...?techDayShiftsBefore[id]};
+      final now = {...?techDayShiftsAfter[id]};
+      for (final d in now.difference(was)) {
+        techLines.add((
+          d,
+          '7A ${formatDayMonth(d, month)}: ${name(id)} yazıldı',
+        ));
+      }
+      for (final d in was.difference(now)) {
+        techLines.add((
+          d,
+          '7A ${formatDayMonth(d, month)}: ${name(id)} kaldırıldı',
+        ));
+      }
+    }
+    techLines.sort((a, b) {
+      final c = a.$1.compareTo(b.$1);
+      return c != 0 ? c : a.$2.compareTo(b.$2);
+    });
+    lines.addAll(techLines.map((l) => l.$2));
     return lines;
   }
 }

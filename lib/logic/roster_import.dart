@@ -21,6 +21,7 @@ class RosterImportResult {
     required this.matchedPeople,
     required this.hasTechShifts,
     required this.warnings,
+    this.techDayShifts = const {},
   });
 
   /// Ayın her günü (boş günler dahil) → nöbetçiler.
@@ -41,6 +42,9 @@ class RosterImportResult {
   /// Okurken atlanan / anlaşılamayan şeyler, kullanıcıya gösterilir.
   final List<String> warnings;
 
+  /// Teknikerlerin 7A günleri: kişi → günler.
+  final Map<String, List<int>> techDayShifts;
+
   int get leaveDayCount => leaves.values.fold(
     0,
     (s, byPerson) => s + byPerson.values.fold(0, (a, d) => a + d.length),
@@ -55,7 +59,8 @@ class RosterImportResult {
 ///   olabilir), hemen solundaki sütunda kişi adları.
 /// - Hücreler: `24`, `X`, `✓`, `N`, `Nöbet` → nöbet; `16B` → günde iki
 ///   tekniker varken 16B vardiyası; `Y.İ.` / `Ş.İ.` / `R.` (ya da `Yıllık`,
-///   `Şua`, `Rapor`) → izin; `7A` yok sayılır (otomatik hesaplanır).
+///   `Şua`, `Rapor`) → izin; `7A` teknikerde 7A günü, hemşirede yok
+///   sayılır (sorumlu hemşire planından otomatik hesaplanır).
 /// - İsimler Türkçe büyük/küçük harf ve fazla boşluk gözetmeden eşlenir;
 ///   grup başlıkları ("Hemşireler") ve açıklama satırları kendiliğinden
 ///   atlanır.
@@ -165,6 +170,7 @@ class RosterImport {
     final tech24 = {for (var d = 1; d <= days; d++) d: <String>[]};
     final tech16 = {for (var d = 1; d <= days; d++) d: <String>[]};
     final leaves = <LeaveType, Map<String, List<int>>>{};
+    final techDayShifts = <String, List<int>>{};
     final matched = <String>{};
     final unknownValues = <String, int>{};
     final seenRows = <String>{};
@@ -200,7 +206,14 @@ class RosterImport {
       }
       for (var d = 1; d <= days; d++) {
         final code = _code(cells[d - 1]);
-        if (code.isEmpty || code == '7A') continue;
+        if (code.isEmpty) continue;
+        if (code == '7A') {
+          if (person.role == Role.radiologyTech) {
+            (techDayShifts[person.id] ??= []).add(d);
+            matched.add(person.id);
+          }
+          continue;
+        }
         if (_leaveCodes[code] case final type?) {
           ((leaves[type] ??= {})[person.id] ??= []).add(d);
           matched.add(person.id);
@@ -264,6 +277,7 @@ class RosterImport {
         (a) => a.techId != null || a.tech16bId != null,
       ),
       warnings: warnings,
+      techDayShifts: techDayShifts,
     );
   }
 }

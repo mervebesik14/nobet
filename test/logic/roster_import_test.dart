@@ -176,4 +176,24 @@ void main() {
       throwsA(isA<RosterImportException>()),
     );
   });
+
+  test('7A: teknikerde 7A günü olarak okunur, hemşirede yok sayılır', () {
+    final r = RosterImport.fromRows(
+      rows: [
+        ['Ad', for (var d = 1; d <= 31; d++) d],
+        ['Tekniker 1', '7A', '24', '7a'],
+        ['Hemşire 1', '7A', 'X'],
+      ],
+      year: 2026,
+      month: 10,
+      people: people,
+    );
+    expect(r.techDayShifts, {
+      't1': [1, 3],
+    });
+    expect(r.assignments[2]!.techId, 't1');
+    expect(r.assignments[1]!.nurseIds, isEmpty);
+    expect(r.assignments[2]!.nurseIds, ['n1']);
+    expect(r.warnings, isEmpty);
+  });
 }

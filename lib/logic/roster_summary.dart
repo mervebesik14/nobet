@@ -128,7 +128,7 @@ class RosterSummary {
     required RosterSettings settings,
     Set<Role>? onlyRoles,
     Map<String, List<int>> leaveDays = const {},
-    Map<int, DayShift> dayShifts = const {},
+    Iterable<DayShift> dayShifts = const [],
   }) {
     final calc = WorkHoursCalculator(settings);
     final required = calc.requiredHours(year, month, holidays);
@@ -174,7 +174,7 @@ class RosterSummary {
     // Kişi → 7A gün sayısı ve saati.
     final dayCount = <String, int>{};
     final dayHours = <String, double>{};
-    for (final s in dayShifts.values) {
+    for (final s in dayShifts) {
       dayCount[s.personId] = (dayCount[s.personId] ?? 0) + 1;
       dayHours[s.personId] = (dayHours[s.personId] ?? 0) + s.hours;
     }

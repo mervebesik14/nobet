@@ -120,6 +120,17 @@ class YearlySummary {
         },
         overrides: plan.dayShiftOverrides,
       );
+      final allDayShifts = [
+        ...dayShifts.values,
+        ...DayShiftPlanner.manual(
+          year: plan.year,
+          month: plan.month,
+          days: plan.techDayShifts,
+          assignments: plan.assignments,
+          holidays: monthHolidays,
+          settings: settings,
+        ),
+      ];
       final summary = RosterSummary.build(
         year: plan.year,
         month: plan.month,
@@ -130,7 +141,7 @@ class YearlySummary {
         ),
         settings: settings,
         leaveDays: plan.leaveDays,
-        dayShifts: dayShifts,
+        dayShifts: allDayShifts,
         // Yalnız hemşire listesinde teknikerler o ay sayılmaz.
         onlyRoles: plan.nurseOnly ? const {Role.nurse} : null,
       );

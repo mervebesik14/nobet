@@ -81,24 +81,13 @@ class DayShiftPlanner {
     if (charge == null) return const {};
 
     final daysInMonth = DateTime(year, month + 1, 0).day;
-    final byDay = <int, Holiday>{
-      for (final h in holidays)
-        if (h.date.year == year && h.date.month == month) h.date.day: h,
-    };
-
-    /// Mesai saati; mesai günü değilse null.
-    double? hoursOn(int d) {
-      final weekday = DateTime(year, month, d).weekday;
-      if (weekday == DateTime.saturday || weekday == DateTime.sunday) {
-        return null;
-      }
-      final h = byDay[d];
-      if (h == null) return settings.dailyRequiredHours;
-      if (!h.isHalfDay) return null;
-      return settings.halfDayHolidayIsHalfWorkday
-          ? settings.halfDayRequiredHours
-          : settings.dailyRequiredHours;
-    }
+    double? hoursOn(int d) => workdayHours(
+      year: year,
+      month: month,
+      day: d,
+      holidays: holidays,
+      settings: settings,
+    );
 
     bool onDuty(String id, int d) {
       if (d == 0) return previousMonthLastDay.contains(id);
@@ -179,4 +168,55 @@ class DayShiftPlanner {
     }
     return result;
   }
+
+  /// [day] gününün mesai saati (7A süresi): hafta içi günlük saat, arife
+  /// ayara göre yarım gün; hafta sonu ya da tam gün tatilse null.
+  static double? workdayHours({
+    required int year,
+    required int month,
+    required int day,
+    required Iterable<Holiday> holidays,
+    required RosterSettings settings,
+  }) {
+    final weekday = DateTime(year, month, day).weekday;
+    if (weekday == DateTime.saturday || weekday == DateTime.sunday) {
+      return null;
+    }
+    Holiday? h;
+    for (final x in holidays) {
+      if (x.date.year == year && x.date.month == month && x.date.day == day) {
+        h = x;
+        break;
+      }
+    }
+    if (h == null) return settings.dailyRequiredHours;
+    if (!h.isHalfDay) return null;
+    return settings.halfDayHolidayIsHalfWorkday
+        ? settings.halfDayRequiredHours
+        : settings.dailyRequiredHours;
+  }
+
+  /// Elle yazılan 7A'lar ([MonthPlan.techDayShifts]): kişi → günler. Mesai
+  /// günü olmayan ya da o gün 24 / 16B nöbetinde olunan günler atlanır.
+  static List<DayShift> manual({
+    required int year,
+    required int month,
+    required Map<String, List<int>> days,
+    required Map<int, DayAssignment> assignments,
+    required Iterable<Holiday> holidays,
+    required RosterSettings settings,
+  }) => [
+    for (final MapEntry(key: id, value: list) in days.entries)
+      for (final d in list)
+        if (!(assignments[d]?.includes(id) ?? false))
+          if (workdayHours(
+                year: year,
+                month: month,
+                day: d,
+                holidays: holidays,
+                settings: settings,
+              )
+              case final hours?)
+            DayShift(day: d, personId: id, hours: hours, isSubstitute: false),
+  ]..sort((a, b) => a.day.compareTo(b.day));
 }
