@@ -50,7 +50,8 @@ class DayShift {
 /// Yerine yazılacak hemşire de o gün nöbetli, nöbet ertesi, izinli ya da
 /// nöbet istemediği günde olmamalı. Adaylar arasında bu ay en az 7A yerine
 /// geçmiş, eşitlikte en az nöbeti olan seçilir. [overrides] ile elle
-/// seçilen kişi o günün 7A'sına yazılır. Sorumlu hemşire yoksa
+/// seçilen kişi o günün 7A'sına yazılır; boş metin ("") o günün 7A'sını
+/// siler (kimseye yazılmaz). Sorumlu hemşire yoksa
 /// 7A planı boştur.
 class DayShiftPlanner {
   const DayShiftPlanner._();
@@ -121,6 +122,8 @@ class DayShiftPlanner {
       if (hours == null) continue;
       // Elle seçilen kişi otomatik seçimin önüne geçer.
       if (overrides[d] case final id?) {
+        // Boş seçim: o günün 7A'sı elle silindi, kimseye yazılmaz.
+        if (id.isEmpty) continue;
         final substitute = id != charge.id;
         if (substitute) {
           substituteCount[id] = (substituteCount[id] ?? 0) + 1;

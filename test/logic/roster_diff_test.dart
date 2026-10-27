@@ -71,4 +71,22 @@ void main() {
       ['7A 5 Ekim: Ali kaldırıldı', '7A 12 Ekim: Ali yazıldı'],
     );
   });
+
+  test('silinen 7A', () {
+    expect(
+      RosterDiff.describe(
+        month: 10,
+        before: const {},
+        after: const {},
+        overridesBefore: const {20: 'n1', 21: ''},
+        overridesAfter: const {20: '', 22: ''},
+        name: (id) => 'Songül',
+      ),
+      [
+        '7A 20 Ekim: silindi',
+        '7A 21 Ekim: otomatik seçime dönüldü',
+        '7A 22 Ekim: silindi',
+      ],
+    );
+  });
 }

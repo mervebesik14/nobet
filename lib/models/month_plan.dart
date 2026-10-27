@@ -88,7 +88,8 @@ class MonthPlan {
   final Map<String, List<int>> requestedShifts;
 
   /// Gün → 7A'ya elle yazılan kişi. Otomatik seçimin (sorumlu hemşire ya da
-  /// yerine geçen) yerine geçer. Liste yeniden oluşturulunca temizlenir.
+  /// yerine geçen) yerine geçer; boş metin ("") o günün 7A'sını siler.
+  /// Liste yeniden oluşturulunca temizlenir.
   final Map<int, String> dayShiftOverrides;
 
   /// Pasif yapılan kişinin başkasına devredilen nöbetleri:

@@ -54,6 +54,9 @@ class RosterDiff {
       if (was == now) continue;
       final date = formatDayMonth(d, month);
       lines.add(switch ((was, now)) {
+        (_, '') => '7A $date: silindi',
+        ('', null) => '7A $date: otomatik seçime dönüldü',
+        ('', final n?) => '7A $date: ${name(n)} yazıldı',
         (null, final n?) => '7A $date: ${name(n)} yazıldı',
         (final w?, null) => '7A $date: ${name(w)} yerine otomatik seçim',
         (final w?, final n?) => '7A $date: ${name(w)} yerine ${name(n)}',

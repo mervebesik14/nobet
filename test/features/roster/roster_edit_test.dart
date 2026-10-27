@@ -976,4 +976,35 @@ void main() {
       expect(saved().dayShiftOverrides, {8: 'n0'});
     });
   });
+
+  testWidgets("otomatik 7A silinir; geri alınabilir", (tester) async {
+    await boxes.people.put(
+      'c',
+      const Person(
+        id: 'c',
+        name: 'Sorumlu',
+        role: Role.nurse,
+        isChargeNurse: true,
+      ),
+    );
+    await pumpRoster(tester);
+    Finder sevenA(String id, int d) =>
+        find.descendant(of: cell(id, d), matching: find.text('7A'));
+    // Sorumlu 15 Ekim Perşembe 7A'da (kendiliğinden).
+    expect(sevenA('c', 15), findsOneWidget);
+    await tester.tap(cell('c', 15));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text("7A'yı sil"));
+    await tester.pumpAndSettle();
+    expect(saved().dayShiftOverrides, {15: ''});
+    expect(sevenA('c', 15), findsNothing);
+    expect(find.text('Sorumlu 15 Ekim 7A silindi.'), findsOneWidget);
+    // Başka günler etkilenmez.
+    expect(sevenA('c', 16), findsOneWidget);
+
+    await tester.tap(find.text('Geri al'));
+    await tester.pumpAndSettle();
+    expect(saved().dayShiftOverrides, isEmpty);
+    expect(sevenA('c', 15), findsOneWidget);
+  });
 }

@@ -370,11 +370,21 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 title: const Text('24 nöbete yaz'),
                 onTap: () => Navigator.of(context).pop('24'),
               ),
+              ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text("7A'yı sil"),
+                subtitle: const Text(
+                  'O gün 7A kimseye yazılmaz; istersen sonra bir hemşirenin '
+                  'hücresine dokunup 7A yazabilirsin.',
+                ),
+                onTap: () => Navigator.of(context).pop('delete'),
+              ),
             ],
           ),
         ),
       );
       if (choice == '7a') return _chooseDayShift(cell.day);
+      if (choice == 'delete') return _deleteDayShift(cell);
       if (choice != '24' || !mounted) return;
     }
 
@@ -519,6 +529,29 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       );
     }
     await _apply(result);
+  }
+
+  /// [cell] gününün (sorumlu hemşire planından gelen) 7A'sını siler: o gün
+  /// 7A kimseye yazılmaz.
+  Future<void> _deleteDayShift(RosterCell cell) async {
+    final plan = _plan;
+    final controller = ref.read(monthPlanProvider.notifier);
+    if (!await controller.setDayShiftOverride(cell.day, '')) return;
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            '${_name(cell.personId)} ${formatDayMonth(cell.day, plan.month)} '
+            '7A silindi.',
+          ),
+          action: SnackBarAction(
+            label: 'Geri al',
+            onPressed: () => controller.undoLast(),
+          ),
+        ),
+      );
   }
 
   /// [day] gününün 7A'sını elle başka bir hemşireye verir (ya da otomatik

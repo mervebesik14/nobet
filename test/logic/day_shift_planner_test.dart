@@ -139,6 +139,25 @@ void main() {
     expect(p.containsKey(3), isFalse);
   });
 
+  test('boş elle seçim o günün 7A\'sını siler', () {
+    final p = DayShiftPlanner.plan(
+      year: 2026,
+      month: 10,
+      // 14'ünde sorumlu nöbette → 14 ve 15 normalde yerine biri yazılır.
+      assignments: const {
+        14: DayAssignment(day: 14, nurseIds: ['c', 'n1']),
+      },
+      people: [charge, ...nurses],
+      holidays: holidays,
+      settings: settings,
+      overrides: const {15: '', 16: ''},
+    );
+    expect(p.containsKey(14), isTrue);
+    expect(p.containsKey(15), isFalse);
+    expect(p.containsKey(16), isFalse, reason: 'sorumlunun kendi 7A\'sı da');
+    expect(p[19]!.personId, 'c');
+  });
+
   group('elle 7A (tekniker)', () {
     test(
       'mesai saati: hafta içi 7, arife yarım gün, hafta sonu / tatil yok',
