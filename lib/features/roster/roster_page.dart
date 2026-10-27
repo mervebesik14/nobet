@@ -1337,77 +1337,82 @@ class _RosterPageState extends ConsumerState<RosterPage> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
-        children: [
-          if (plan.isLocked)
-            ListTile(
-              leading: const Icon(Icons.lock),
-              title: const Text('Liste kilitli'),
-              subtitle: const Text(
-                'Düzenleme kapalı; yeniden oluşturmak onay ister.',
-              ),
-              tileColor: theme.colorScheme.headerTint,
-            )
-          else if (_swapFrom case final from?)
-            MaterialBanner(
-              leading: const Icon(Icons.swap_horiz),
-              content: Text(
-                'Takas: ${_name(from.personId)} – '
-                '${formatDayMonth(from.day, plan.month)} seçildi. '
-                'Takas edilecek ikinci nöbete dokunun.',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => setState(() => _swapFrom = null),
-                  child: const Text('İptal'),
-                ),
-              ],
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FilterChip(
-                    avatar: const Icon(Icons.touch_app_outlined, size: 18),
-                    label: const Text('Serbest düzenleme'),
-                    selected: _freeEdit,
-                    onSelected: (v) => setState(() => _freeEdit = v),
+      // Bölümlü kaydırma: tablonun gün başlıkları aşağı kaydırırken üstte
+      // sabit kalır.
+      body: CustomScrollView(
+        slivers: [
+          SliverList.list(
+            children: [
+              if (plan.isLocked)
+                ListTile(
+                  leading: const Icon(Icons.lock),
+                  title: const Text('Liste kilitli'),
+                  subtitle: const Text(
+                    'Düzenleme kapalı; yeniden oluşturmak onay ister.',
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _freeEdit
-                        ? 'Serbest düzenleme açık: boş hücreye dokununca kişi '
-                              'o güne yazılır, nöbete dokununca silinir. Kurallar '
-                              'engellemez; ihlaller aşağıda uyarı olarak görünür.'
-                        : 'Düzenlemek için hücreye dokunun ya da basılı tutun; '
-                              'basılı tutunca takas da seçilebilir.',
+                  tileColor: theme.colorScheme.headerTint,
+                )
+              else if (_swapFrom case final from?)
+                MaterialBanner(
+                  leading: const Icon(Icons.swap_horiz),
+                  content: Text(
+                    'Takas: ${_name(from.personId)} – '
+                    '${formatDayMonth(from.day, plan.month)} seçildi. '
+                    'Takas edilecek ikinci nöbete dokunun.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => setState(() => _swapFrom = null),
+                      child: const Text('İptal'),
+                    ),
+                  ],
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      FilterChip(
+                        avatar: const Icon(Icons.touch_app_outlined, size: 18),
+                        label: const Text('Serbest düzenleme'),
+                        selected: _freeEdit,
+                        onSelected: (v) => setState(() => _freeEdit = v),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _freeEdit
+                            ? 'Serbest düzenleme açık: boş hücreye dokununca kişi '
+                                  'o güne yazılır, nöbete dokununca silinir. Kurallar '
+                                  'engellemez; ihlaller aşağıda uyarı olarak görünür.'
+                            : 'Düzenlemek için hücreye dokunun ya da basılı tutun; '
+                                  'basılı tutunca takas da seçilebilir.',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              if (plan.generatedAt != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: Text(
+                    'Oluşturulma: '
+                    '${DateFormat('d MMMM y HH:mm', 'tr_TR').format(plan.generatedAt!)}',
                     style: theme.textTheme.bodySmall,
                   ),
-                ],
-              ),
-            ),
-          if (plan.generatedAt != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: Text(
-                'Oluşturulma: '
-                '${DateFormat('d MMMM y HH:mm', 'tr_TR').format(plan.generatedAt!)}',
-                style: theme.textTheme.bodySmall,
-              ),
-            ),
-          if (_highlightId case final id?)
-            _HighlightSummary(
-              key: const ValueKey('highlight-summary'),
-              name: _name(id),
-              stats: _personStats(id, weekendDays, dayShifts),
-              onClose: () => setState(() => _highlightId = null),
-            ),
-          Padding(
+                ),
+              if (_highlightId case final id?)
+                _HighlightSummary(
+                  key: const ValueKey('highlight-summary'),
+                  name: _name(id),
+                  stats: _personStats(id, weekendDays, dayShifts),
+                  onClose: () => setState(() => _highlightId = null),
+                ),
+            ],
+          ),
+          SliverPadding(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            child: RosterTable(
+            sliver: RosterTable(
               plan: plan,
               rows: rows,
               highlightedId: _highlightId,
@@ -1430,29 +1435,38 @@ class _RosterPageState extends ConsumerState<RosterPage> {
               onMissingTap: _onMissingTap,
             ),
           ),
-          if (violations.isNotEmpty && !plan.isLocked)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton.tonalIcon(
-                  onPressed: _fixing ? null : _fixRoster,
-                  icon: _fixing
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.auto_fix_high),
-                  label: const Text('Kurallara göre düzelt'),
+          SliverPadding(
+            padding: const EdgeInsets.only(bottom: 24),
+            sliver: SliverList.list(
+              children: [
+                if (violations.isNotEmpty && !plan.isLocked)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: FilledButton.tonalIcon(
+                        onPressed: _fixing ? null : _fixRoster,
+                        icon: _fixing
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.auto_fix_high),
+                        label: const Text('Kurallara göre düzelt'),
+                      ),
+                    ),
+                  ),
+                _ViolationList(violations: violations),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: Text('Özet', style: theme.textTheme.titleMedium),
                 ),
-              ),
+                SummaryTable(summary: summary),
+              ],
             ),
-          _ViolationList(violations: violations),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-            child: Text('Özet', style: theme.textTheme.titleMedium),
           ),
-          SummaryTable(summary: summary),
         ],
       ),
     );

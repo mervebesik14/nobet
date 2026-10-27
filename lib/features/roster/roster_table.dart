@@ -13,10 +13,12 @@ typedef RosterCell = ({String personId, int day});
 
 /// Nöbet tablosu: sütunlar ayın günleri, satırlar kişiler (rol gruplarına
 /// ayrılmış). Kişinin nöbetçi olduğu günde nöbet süresi ("24") yazar.
-/// Tablo yatay kayar, soldaki isim sütunu sabit kalır. Hücrelere dokunma ve
-/// uzun basma elle düzenleme için dışarı bildirilir; kural ihlali olan
-/// hücreler renklenir.
-class RosterTable extends StatelessWidget {
+/// Tablo yatay kayar, soldaki isim sütunu sabit kalır. Sayfa aşağı
+/// kaydırılırken gün başlıkları (1, 2, … ve gün adı) üstte sabit kalır;
+/// başlık ile tablo birlikte yatay kayar. Bir sliver'dır: [CustomScrollView]
+/// içinde kullanılır. Hücrelere dokunma ve uzun basma elle düzenleme için
+/// dışarı bildirilir; kural ihlali olan hücreler renklenir.
+class RosterTable extends StatefulWidget {
   const RosterTable({
     super.key,
     required this.plan,
@@ -70,6 +72,59 @@ class RosterTable extends StatelessWidget {
   static const _headerHeight = 56.0;
   static const _rowHeight = 36.0;
   static const _groupHeight = 28.0;
+
+  @override
+  State<RosterTable> createState() => _RosterTableState();
+}
+
+class _RosterTableState extends State<RosterTable> {
+  // Başlık ile gövdenin yatay kaydırması birbirini izler.
+  final _header = ScrollController();
+  final _body = ScrollController();
+  var _syncing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _header.addListener(() => _follow(_header, _body));
+    _body.addListener(() => _follow(_body, _header));
+  }
+
+  void _follow(ScrollController from, ScrollController to) {
+    if (_syncing || !to.hasClients || !from.hasClients) return;
+    if (to.offset == from.offset) return;
+    _syncing = true;
+    to.jumpTo(from.offset.clamp(0, to.position.maxScrollExtent));
+    _syncing = false;
+  }
+
+  @override
+  void dispose() {
+    _header.dispose();
+    _body.dispose();
+    super.dispose();
+  }
+
+  static const _labelWidth = RosterTable._labelWidth;
+  static const _cellWidth = RosterTable._cellWidth;
+  static const _headerHeight = RosterTable._headerHeight;
+  static const _rowHeight = RosterTable._rowHeight;
+  static const _groupHeight = RosterTable._groupHeight;
+
+  MonthPlan get plan => widget.plan;
+  List<RosterRow> get rows => widget.rows;
+  Set<int> get weekendDays => widget.weekendDays;
+  Set<int> get holidayDays => widget.holidayDays;
+  int get shiftHours => widget.shiftHours;
+  Map<int, int> get missingByDay => widget.missingByDay;
+  Map<int, DayShift> get dayShifts => widget.dayShifts;
+  Set<RosterCell> get violationCells => widget.violationCells;
+  RosterCell? get selectedCell => widget.selectedCell;
+  void Function(RosterCell cell)? get onCellTap => widget.onCellTap;
+  void Function(RosterCell cell)? get onCellLongPress => widget.onCellLongPress;
+  void Function(int day)? get onMissingTap => widget.onMissingTap;
+  String? get highlightedId => widget.highlightedId;
+  void Function(String personId)? get onNameTap => widget.onNameTap;
 
   @override
   Widget build(BuildContext context) {
@@ -265,54 +320,78 @@ class RosterTable extends StatelessWidget {
       );
     }
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            box(
-              width: _labelWidth,
-              height: _headerHeight,
-              color: scheme.headerTint,
-              alignment: Alignment.centerLeft,
-              child: const Text('Ad Soyad'),
-            ),
-            ...left,
-          ],
-        ),
-        Expanded(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    for (final d in days)
-                      box(
-                        width: _cellWidth,
-                        height: _headerHeight,
-                        color: columnColor(d) ?? scheme.headerTint,
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text('$d', style: theme.textTheme.labelLarge),
-                              Text(
-                                dayFormat.format(
-                                  DateTime(plan.year, plan.month, d),
-                                ),
-                                style: theme.textTheme.labelSmall,
+    // Gün başlıkları: sayfa kaydırılırken üstte sabit kalır.
+    final header = ColoredBox(
+      key: const ValueKey('roster-header'),
+      color: scheme.surface,
+      child: Row(
+        children: [
+          box(
+            width: _labelWidth,
+            height: _headerHeight,
+            color: scheme.headerTint,
+            alignment: Alignment.centerLeft,
+            child: const Text('Ad Soyad'),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              controller: _header,
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final d in days)
+                    box(
+                      width: _cellWidth,
+                      height: _headerHeight,
+                      color: columnColor(d) ?? scheme.headerTint,
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('$d', style: theme.textTheme.labelLarge),
+                            Text(
+                              dayFormat.format(
+                                DateTime(plan.year, plan.month, d),
                               ),
-                            ],
-                          ),
+                              style: theme.textTheme.labelSmall,
+                            ),
+                          ],
                         ),
                       ),
-                  ],
-                ),
-                ...right,
-              ],
+                    ),
+                ],
+              ),
             ),
+          ),
+        ],
+      ),
+    );
+    // Başlık yeniden kurulunca (sabitlenip çözülünce) gövdenin konumuna
+    // gelsin.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _follow(_body, _header);
+    });
+
+    return SliverMainAxisGroup(
+      slivers: [
+        SliverPersistentHeader(
+          pinned: true,
+          delegate: _HeaderDelegate(height: _headerHeight, child: header),
+        ),
+        SliverToBoxAdapter(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Column(children: left),
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _body,
+                  scrollDirection: Axis.horizontal,
+                  child: Column(children: right),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -402,4 +481,28 @@ class RosterTable extends StatelessWidget {
             ),
     );
   }
+}
+
+/// Sabit gün başlığı.
+class _HeaderDelegate extends SliverPersistentHeaderDelegate {
+  const _HeaderDelegate({required this.height, required this.child});
+
+  final double height;
+  final Widget child;
+
+  @override
+  double get minExtent => height;
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) => child;
+
+  @override
+  bool shouldRebuild(_HeaderDelegate oldDelegate) => true;
 }
