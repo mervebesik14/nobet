@@ -1189,11 +1189,14 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   }
 
   /// Herkesin kişiye özel PDF'ini ayrı dosyalar olarak tek seferde paylaşır.
+  /// [calendar] ise PDF yerine herkesin takvim dosyası (.ics); ay içinde
+  /// nöbeti ve 7A'sı olmayanlar atlanır.
   Future<void> _shareAllPersonal(
     List<RosterRow> rows,
     Iterable<DayShift> dayShifts, {
     required Set<int> weekendDays,
     required Set<int> holidayDays,
+    bool calendar = false,
   }) async {
     final plan = _plan;
     final services = ref.read(platformServicesProvider);
@@ -1203,8 +1206,38 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     ).format(DateTime(plan.year, plan.month));
     final month = plan.month.toString().padLeft(2, '0');
     try {
-      final fonts = await services.loadPdfFonts();
       final files = <({Uint8List bytes, String name, String mime})>[];
+      if (calendar) {
+        final now = ref.read(clockProvider)();
+        for (final r in rows) {
+          final person =
+              _peopleById[r.id] ?? Person(id: r.id, name: r.name, role: r.role);
+          final data = PersonalRoster.build(
+            plan: plan,
+            person: person,
+            people: people,
+            dayShifts: dayShifts,
+          );
+          if (data.shifts.isEmpty && data.dayShiftDays.isEmpty) continue;
+          files.add((
+            bytes: utf8.encode(
+              RosterCalendar.ics(data: data, dayShifts: dayShifts, now: now),
+            ),
+            name: 'nobet-${fileSlug(person.name)}-${plan.year}-$month.ics',
+            mime: RosterCalendar.mimeType,
+          ));
+        }
+        if (files.isEmpty) {
+          _notify('Takvime eklenecek nöbet yok.');
+          return;
+        }
+        await services.shareFiles(
+          files,
+          subject: '$monthLabel nöbet takvimleri',
+        );
+        return;
+      }
+      final fonts = await services.loadPdfFonts();
       for (final r in rows) {
         final person =
             _peopleById[r.id] ?? Person(id: r.id, name: r.name, role: r.role);
@@ -1327,6 +1360,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             _ShareAction.personalPdf ||
             _ShareAction.personalCalendar ||
             _ShareAction.allPersonalPdf ||
+            _ShareAction.allPersonalCalendar ||
             _ShareAction.excel:
           return;
         case _ShareAction.pdf:
@@ -1437,11 +1471,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 weekendDays: weekendDays,
                 holidayDays: holidayDays,
               ),
-              _ShareAction.allPersonalPdf => _shareAllPersonal(
+              _ShareAction.allPersonalPdf ||
+              _ShareAction.allPersonalCalendar => _shareAllPersonal(
                 rows,
                 dayShifts,
                 weekendDays: weekendDays,
                 holidayDays: holidayDays,
+                calendar: action == _ShareAction.allPersonalCalendar,
               ),
               _ => _share(
                 action,
@@ -1510,6 +1546,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 child: ListTile(
                   leading: Icon(Icons.event_outlined),
                   title: Text('Takvim dosyası (kişiye özel)'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.allPersonalCalendar,
+                child: ListTile(
+                  leading: Icon(Icons.calendar_month_outlined),
+                  title: Text('Herkesin takvim dosyası'),
                 ),
               ),
             ],
@@ -1843,6 +1886,7 @@ enum _ShareAction {
   allPersonalPdf,
   personal,
   personalCalendar,
+  allPersonalCalendar,
 }
 
 /// Vurgulanan kişinin özeti: tablonun üstünde, kapatılabilir.

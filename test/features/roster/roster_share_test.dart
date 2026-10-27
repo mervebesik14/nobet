@@ -182,6 +182,35 @@ void main() {
     expect(text, endsWith('Toplam: 1 nöbet'));
   });
 
+  testWidgets('herkesin takvim dosyası tek seferde paylaşılır', (tester) async {
+    await pump(tester);
+    await choose(tester, 'Herkesin takvim dosyası');
+    expect(services.calls, ['shareFiles:3']);
+    expect(services.sharedFiles.map((f) => f.name), {
+      'nobet-ayse-2026-10.ics',
+      'nobet-banu-2026-10.ics',
+      'nobet-ali-2026-10.ics',
+    });
+    for (final f in services.sharedFiles) {
+      expect(f.mime, 'text/calendar');
+      expect(utf8.decode(f.bytes), contains('DTSTART:20261001T080000'));
+    }
+  });
+
+  testWidgets('nöbeti olmayanın takvim dosyası atlanır', (tester) async {
+    await boxes.people.put(
+      'x',
+      const Person(id: 'x', name: 'Boş', role: Role.nurse),
+    );
+    await pump(tester);
+    await choose(tester, 'Herkesin takvim dosyası');
+    expect(services.calls, ['shareFiles:3']);
+    expect(
+      services.sharedFiles.map((f) => f.name),
+      isNot(contains('nobet-bos-2026-10.ics')),
+    );
+  });
+
   testWidgets('kişiye özel takvim dosyası (.ics) paylaşılır', (tester) async {
     await pump(tester);
     await choose(tester, 'Takvim dosyası (kişiye özel)');
