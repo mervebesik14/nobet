@@ -257,22 +257,24 @@ class _PersonRow extends StatelessWidget {
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            unavailableCount == 0
-                ? 'İstenmeyen gün yok'
-                : '$unavailableCount gün istemiyor',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: unavailableCount == 0
-                  ? theme.colorScheme.outline
-                  : theme.colorScheme.error,
-            ),
-          ),
-          if (requestedCount > 0)
+          if (unavailableCount == 0)
             Text(
-              '$requestedCount gün nöbet seçildi',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.primary,
+              'İstenmeyen gün yok',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.outline,
               ),
+            )
+          else
+            _StatusLine(
+              icon: Icons.cancel_outlined,
+              text: '$unavailableCount gün istemiyor',
+              color: theme.colorScheme.error,
+            ),
+          if (requestedCount > 0)
+            _StatusLine(
+              icon: Icons.check,
+              text: '$requestedCount gün nöbet seçildi',
+              color: theme.colorScheme.primary,
             ),
           if (annualLeaveCount > 0)
             _LeaveLine(
@@ -290,22 +292,10 @@ class _PersonRow extends StatelessWidget {
               text: '$sickLeaveCount gün rapor',
             ),
           if (wantsOvertime)
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.more_time,
-                  size: 16,
-                  color: theme.colorScheme.primary,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  'Fazla mesai istiyor',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              ],
+            _StatusLine(
+              icon: Icons.more_time,
+              text: 'Fazla mesai istiyor',
+              color: theme.colorScheme.primary,
             ),
         ],
       ),
@@ -317,6 +307,38 @@ class _PersonRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Kişi satırında simgeli, renkli kısa durum ("6 gün istemiyor").
+class _StatusLine extends StatelessWidget {
+  const _StatusLine({
+    required this.icon,
+    required this.text,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String text;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 2),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: color),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 class _LeaveLine extends StatelessWidget {
