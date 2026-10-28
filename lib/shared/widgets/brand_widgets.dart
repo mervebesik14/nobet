@@ -45,22 +45,12 @@ class BrandHeader extends StatelessWidget implements PreferredSizeWidget {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Container(
-        // Koyu temada başlık zeminle bir: degrade ve yuvarlak köşe yok.
-        // Üstte hafif yeşil ışıma, alt kenarda zemine karışır.
-        decoration: brand.flatHeader
-            ? BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [const Color(0xFF113027), brand.background],
-                ),
-              )
-            : BoxDecoration(
-                gradient: brand.headerGradient,
-                borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(28),
-                ),
-              ),
+        decoration: BoxDecoration(
+          gradient: brand.headerGradient,
+          borderRadius: const BorderRadius.vertical(
+            bottom: Radius.circular(28),
+          ),
+        ),
         child: SafeArea(
           bottom: false,
           child: Padding(
@@ -267,10 +257,7 @@ class PillHeader extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            // Koyu temada hap yok, yalnız yeşil yazı.
-            padding: brand.pill.a == 0
-                ? EdgeInsets.zero
-                : const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: brand.pill,
               borderRadius: BorderRadius.circular(999),
@@ -280,7 +267,7 @@ class PillHeader extends StatelessWidget {
               style: theme.textTheme.labelMedium?.copyWith(
                 color: brand.onPill,
                 fontWeight: FontWeight.w700,
-                letterSpacing: brand.flatHeader ? 1.4 : 0.6,
+                letterSpacing: 0.6,
               ),
             ),
           ),
@@ -310,12 +297,11 @@ class GroupCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           for (var i = 0; i < children.length; i++) ...[
-            // Koyu temada çizgi kart boyunca uzanır.
             if (i > 0)
               Divider(
                 height: 1,
-                indent: context.brand.flatHeader ? 0 : dividerIndent,
-                endIndent: context.brand.flatHeader ? 0 : dividerIndent,
+                indent: dividerIndent,
+                endIndent: dividerIndent,
               ),
             children[i],
           ],
@@ -346,58 +332,32 @@ class BrandStepper extends StatelessWidget {
   Widget build(BuildContext context) {
     final brand = context.brand;
     final text = Theme.of(context).textTheme;
-    // Koyu tema: çerçeveli koyu kutu, içinde küçük kare düğmeler; + yeşil.
-    final framed = brand.flatHeader;
-    Widget button(
-      IconData icon,
-      String tooltip,
-      VoidCallback? onTap, {
-      Color color = Colors.white,
-    }) {
-      final ink = onTap == null ? color.withValues(alpha: 0.35) : color;
-      final glyph = Icon(icon, size: 20, color: ink);
-      return Tooltip(
-        message: tooltip,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: SizedBox(
-            width: 36,
-            height: 36,
-            child: framed
-                ? Center(
-                    child: Container(
-                      width: 30,
-                      height: 30,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF29332F),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: glyph,
-                    ),
-                  )
-                : glyph,
+    Widget button(IconData icon, String tooltip, VoidCallback? onTap) =>
+        Tooltip(
+          message: tooltip,
+          child: InkWell(
+            onTap: onTap,
+            child: SizedBox(
+              width: 36,
+              height: 36,
+              child: Icon(
+                icon,
+                size: 20,
+                color: onTap == null
+                    ? Colors.white.withValues(alpha: 0.35)
+                    : Colors.white,
+              ),
+            ),
           ),
-        ),
-      );
-    }
-
+        );
     return Material(
       color: brand.stepper,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: brand.cardBorder),
-      ),
+      borderRadius: BorderRadius.circular(12),
       clipBehavior: Clip.antiAlias,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          button(
-            Icons.remove,
-            decrementTooltip,
-            onDecrement,
-            color: framed ? brand.accent : Colors.white,
-          ),
+          button(Icons.remove, decrementTooltip, onDecrement),
           Container(
             constraints: const BoxConstraints(minWidth: 48),
             height: 36,
@@ -412,12 +372,7 @@ class BrandStepper extends StatelessWidget {
               ),
             ),
           ),
-          button(
-            Icons.add,
-            incrementTooltip,
-            onIncrement,
-            color: framed ? brand.accent : Colors.white,
-          ),
+          button(Icons.add, incrementTooltip, onIncrement),
         ],
       ),
     );

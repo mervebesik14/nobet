@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Marka renkleri. Açık tema: yeşil degrade başlık, nane tonlu hap
-/// etiketler, beyaz kart grupları (Tasarım 3 · "güçlü marka"). Koyu tema:
-/// düz koyu başlık, ince çerçeveli kartlar, yeşil yazılı bölüm başlıkları
-/// ve parlak yeşil anahtarlar (Tasarım 4). Değerler `Theme.of(context).extension<BrandColors>()` ya da
+/// Marka renkleri: yeşil degrade başlık, nane tonlu hap etiketler, beyaz
+/// kart grupları (Tasarım 3 · "güçlü marka"). Açık ve koyu temada ayrı
+/// değerler; `Theme.of(context).extension<BrandColors>()` ya da
 /// `context.brand` ile okunur.
 @immutable
 class BrandColors extends ThemeExtension<BrandColors> {
@@ -20,10 +19,6 @@ class BrandColors extends ThemeExtension<BrandColors> {
     required this.stepper,
     required this.stepperValue,
     required this.divider,
-    required this.cardBorder,
-    required this.accent,
-    required this.fab,
-    required this.flatHeader,
   });
 
   final Color headerStart;
@@ -38,18 +33,6 @@ class BrandColors extends ThemeExtension<BrandColors> {
   final Color stepperValue;
   final Color divider;
 
-  /// Kart çerçevesi (açık temada yok).
-  final Color cardBorder;
-
-  /// Vurgu yeşili: koyu temada bölüm başlığı, + düğmesi, seçili sekme.
-  final Color accent;
-
-  /// Yüzen düğme zemini.
-  final Color fab;
-
-  /// Başlık degrade değil, zeminle aynı (koyu tema).
-  final bool flatHeader;
-
   static const light = BrandColors(
     headerStart: Color(0xFF138567),
     headerEnd: Color(0xFF0A5847),
@@ -62,28 +45,20 @@ class BrandColors extends ThemeExtension<BrandColors> {
     stepper: Color(0xFF117A61),
     stepperValue: Color(0xFF2C9177),
     divider: Color(0xFFE6EEEB),
-    cardBorder: Colors.transparent,
-    accent: Color(0xFF0F7A61),
-    fab: Color(0xFF117A61),
-    flatHeader: false,
   );
 
   static const dark = BrandColors(
-    headerStart: Color(0xFF0B1613),
-    headerEnd: Color(0xFF0B1613),
+    headerStart: Color(0xFF117A60),
+    headerEnd: Color(0xFF094A3C),
     onHeader: Colors.white,
-    onHeaderMuted: Color(0xA6FFFFFF),
-    background: Color(0xFF0B1613),
-    card: Color(0xFF141F1C),
-    pill: Colors.transparent,
-    onPill: Color(0xFF3CC896),
-    stepper: Color(0xFF1A2522),
-    stepperValue: Color(0xFF1A2522),
-    divider: Color(0xFF232E2B),
-    cardBorder: Color(0xFF2A3532),
-    accent: Color(0xFF3CC896),
-    fab: Color(0xFF1E9E70),
-    flatHeader: true,
+    onHeaderMuted: Color(0xCCFFFFFF),
+    background: Color(0xFF0D1613),
+    card: Color(0xFF17221F),
+    pill: Color(0xFF1C3D34),
+    onPill: Color(0xFF7FDDBF),
+    stepper: Color(0xFF13735B),
+    stepperValue: Color(0xFF238A70),
+    divider: Color(0xFF24312D),
   );
 
   /// Başlık zemini.
@@ -92,20 +67,6 @@ class BrandColors extends ThemeExtension<BrandColors> {
     end: Alignment.bottomRight,
     colors: [headerStart, headerEnd],
   );
-
-  /// Küçük etiket ve baş harf yuvarlağı zemini (koyu temada hap şeffaf
-  /// olduğu için ayrı ton).
-  Color get chip => pill.a == 0 ? const Color(0xFF16352D) : pill;
-
-  /// Öne çıkan bilgi kartı (Tatiller'de gereken saat): koyu temada da
-  /// yeşil kalır.
-  LinearGradient get featureGradient => flatHeader
-      ? const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF15493D), Color(0xFF0E2E27)],
-        )
-      : headerGradient;
 
   @override
   BrandColors copyWith() => this;
@@ -126,10 +87,6 @@ class BrandColors extends ThemeExtension<BrandColors> {
       stepper: c(stepper, other.stepper),
       stepperValue: c(stepperValue, other.stepperValue),
       divider: c(divider, other.divider),
-      cardBorder: c(cardBorder, other.cardBorder),
-      accent: c(accent, other.accent),
-      fab: c(fab, other.fab),
-      flatHeader: t < 0.5 ? flatHeader : other.flatHeader,
     );
   }
 }
@@ -159,7 +116,7 @@ ThemeData brandTheme(Brightness brightness) {
         surfaceContainerLowest: brand.background,
         // Bilgi kartları (yedek, ay başı hatırlatması) nane tonunda.
         secondaryContainer: dark
-            ? const Color(0xFF13302A)
+            ? const Color(0xFF16332B)
             : const Color(0xFFDDF0EA),
         onSecondaryContainer: dark
             ? const Color(0xFFBFEBDD)
@@ -202,10 +159,7 @@ ThemeData brandTheme(Brightness brightness) {
       color: brand.card,
       elevation: 0,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(dark ? 24 : 20),
-        side: BorderSide(color: brand.cardBorder),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       clipBehavior: Clip.antiAlias,
     ),
     listTileTheme: ListTileThemeData(
@@ -226,15 +180,14 @@ ThemeData brandTheme(Brightness brightness) {
       ),
       trackColor: WidgetStateProperty.resolveWith(
         (s) => s.contains(WidgetState.selected)
-            ? (dark ? const Color(0xFF22B07E) : brand.stepper)
-            : (dark ? const Color(0xFF303A37) : const Color(0xFFD3DDD9)),
+            ? brand.stepper
+            : (dark ? const Color(0xFF34423E) : const Color(0xFFD3DDD9)),
       ),
       trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
-      // Boş simge: kapalıyken de top tam boy (tasarımdaki gibi).
-      thumbIcon: const WidgetStatePropertyAll(Icon(null)),
+      thumbIcon: const WidgetStatePropertyAll(null),
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
-      backgroundColor: brand.fab,
+      backgroundColor: brand.stepper,
       foregroundColor: Colors.white,
       elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -243,15 +196,14 @@ ThemeData brandTheme(Brightness brightness) {
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: dark ? const Color(0xFF0F1A17) : brand.card,
-      // Koyu temada seçili sekme yalnız yeşil simge ve yazıyla belli olur.
-      indicatorColor: dark ? Colors.transparent : brand.pill,
+      backgroundColor: brand.card,
+      indicatorColor: brand.pill,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       iconTheme: WidgetStateProperty.resolveWith(
         (s) => IconThemeData(
           color: s.contains(WidgetState.selected)
-              ? (dark ? brand.accent : brand.onPill)
+              ? brand.onPill
               : scheme.onSurfaceVariant,
         ),
       ),
@@ -261,7 +213,7 @@ ThemeData brandTheme(Brightness brightness) {
               ? FontWeight.w700
               : FontWeight.w500,
           color: s.contains(WidgetState.selected)
-              ? (dark ? brand.accent : scheme.onSurface)
+              ? scheme.onSurface
               : scheme.onSurfaceVariant,
         ),
       ),
