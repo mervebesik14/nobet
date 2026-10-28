@@ -253,7 +253,8 @@ class _ShareBar extends StatelessWidget {
     final theme = Theme.of(context);
     final brand = context.brand;
     final isTech = role == Role.radiologyTech;
-    final color = isTech ? _techColor : brand.stepper;
+    final techColor = brand.flatHeader ? const Color(0xFF8C9EFF) : _techColor;
+    final color = isTech ? techColor : brand.fab;
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
@@ -284,14 +285,14 @@ class _ShareBar extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: isTech
-                            ? _techColor.withValues(alpha: 0.12)
-                            : brand.pill,
+                            ? techColor.withValues(alpha: 0.14)
+                            : brand.chip,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         isTech ? 'Rad. Tek.' : role.label,
                         style: theme.textTheme.labelSmall?.copyWith(
-                          color: isTech ? _techColor : brand.onPill,
+                          color: isTech ? techColor : brand.onPill,
                           fontWeight: FontWeight.w700,
                         ),
                       ),

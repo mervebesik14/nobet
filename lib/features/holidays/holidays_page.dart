@@ -119,7 +119,7 @@ class _RequiredHoursCard extends ConsumerWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        gradient: brand.headerGradient,
+        gradient: brand.featureGradient,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(

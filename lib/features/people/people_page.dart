@@ -156,7 +156,7 @@ class _PersonTile extends ConsumerWidget {
         radius: 22,
         backgroundColor: person.colorValue != null
             ? Color(person.colorValue!)
-            : brand.pill,
+            : brand.chip,
         foregroundColor: brand.onPill,
         child: Text(
           initial,
@@ -220,7 +220,7 @@ class _Tag extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: brand.pill,
+        color: brand.chip,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(

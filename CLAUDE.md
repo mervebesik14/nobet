@@ -34,7 +34,7 @@
   - `lib/shared/widgets`: ortak widget'lar
 - Locale `tr_TR`; tarihler `intl` ile Türkçe biçimlenir.
 - Paylaş / yazdır / PNG'ye çevir / dosya seç işlemleri yalnızca `lib/shared/platform_services.dart` (`platformServicesProvider`) üzerinden çağrılır; testlerde `test/helpers.dart` içindeki `FakePlatformServices` ile override edilir.
-- Arayüz tasarımı "güçlü marka": `lib/shared/brand.dart` (renkler, `brandTheme`, açık/koyu) ve `lib/shared/widgets/brand_widgets.dart` (`BrandHeader` yeşil degrade başlık, `HeaderMonthSelector`, `PillHeader`, `GroupCard`, `BrandStepper`). Sekme ekranları `BrandHeader` kullanır; alt sayfalar temadaki yeşil AppBar'ı. Yazı tipi DM Sans (`assets/fonts/dmsans`, SIL OFL 1.1).
+- Arayüz tasarımı "güçlü marka": `lib/shared/brand.dart` (renkler, `brandTheme`, açık/koyu) ve `lib/shared/widgets/brand_widgets.dart` (`BrandHeader` yeşil degrade başlık, `HeaderMonthSelector`, `PillHeader`, `GroupCard`, `BrandStepper`). Sekme ekranları `BrandHeader` kullanır; alt sayfalar temadaki yeşil AppBar'ı. Koyu tema Tasarım 4: düz koyu başlık (`flatHeader`), ince çerçeveli kartlar, haplar yerine yeşil yazı, parlak yeşil anahtarlar. Yazı tipi DM Sans (`assets/fonts/dmsans`, SIL OFL 1.1).
 - PDF'te Türkçe karakterler için `assets/fonts` altındaki Roboto gömülür (Apache 2.0).
 - Uygulama adı "Nöbetçi". Uygulama ikonu `assets/icon/make_icon.py` ile çizilir (`python3 assets/icon/make_icon.py assets/icon`) → `dart run flutter_launcher_icons`. Araç `ios/Runner.xcodeproj/project.pbxproj` içinde `ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS` değerini bozar; o değişikliği geri al.
 - Her değişiklikten sonra `flutter analyze` ve `flutter test` temiz geçmeli.
