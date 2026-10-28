@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../shared/brand.dart';
 import '../holidays/holidays_page.dart';
 import '../month/month_page.dart';
 import '../people/people_page.dart';
@@ -39,36 +40,42 @@ class MainShell extends ConsumerWidget {
     return Scaffold(
       // IndexedStack: sekme değişince sayfaların durumu korunur.
       body: IndexedStack(index: index, children: _pages),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: index,
-        onDestinationSelected: ref.read(selectedTabProvider.notifier).select,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.people_outline),
-            selectedIcon: Icon(Icons.people),
-            label: 'Kişiler',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month),
-            label: 'Ay Planı',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.celebration_outlined),
-            selectedIcon: Icon(Icons.celebration),
-            label: 'Tatiller',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.insights_outlined),
-            selectedIcon: Icon(Icons.insights),
-            label: 'İstatistik',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: 'Ayarlar',
-          ),
-        ],
+      bottomNavigationBar: DecoratedBox(
+        // Koyu temada menünün üstünde ince çizgi.
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: context.brand.cardBorder)),
+        ),
+        child: NavigationBar(
+          selectedIndex: index,
+          onDestinationSelected: ref.read(selectedTabProvider.notifier).select,
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.people_outline),
+              selectedIcon: Icon(Icons.people),
+              label: 'Kişiler',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.calendar_month_outlined),
+              selectedIcon: Icon(Icons.calendar_month),
+              label: 'Ay Planı',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.celebration_outlined),
+              selectedIcon: Icon(Icons.celebration),
+              label: 'Tatiller',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.insights_outlined),
+              selectedIcon: Icon(Icons.insights),
+              label: 'İstatistik',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.settings_outlined),
+              selectedIcon: Icon(Icons.settings),
+              label: 'Ayarlar',
+            ),
+          ],
+        ),
       ),
     );
   }

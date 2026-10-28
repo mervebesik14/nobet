@@ -74,13 +74,13 @@ class BrandColors extends ThemeExtension<BrandColors> {
     onHeader: Colors.white,
     onHeaderMuted: Color(0xA6FFFFFF),
     background: Color(0xFF0B1613),
-    card: Color(0xFF111D1A),
+    card: Color(0xFF141F1C),
     pill: Colors.transparent,
     onPill: Color(0xFF3CC896),
-    stepper: Color(0xFF17231F),
-    stepperValue: Color(0xFF17231F),
-    divider: Color(0xFF1E2C28),
-    cardBorder: Color(0xFF22322D),
+    stepper: Color(0xFF1A2522),
+    stepperValue: Color(0xFF1A2522),
+    divider: Color(0xFF232E2B),
+    cardBorder: Color(0xFF2A3532),
     accent: Color(0xFF3CC896),
     fab: Color(0xFF1E9E70),
     flatHeader: true,
@@ -203,7 +203,7 @@ ThemeData brandTheme(Brightness brightness) {
       elevation: 0,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(dark ? 24 : 20),
         side: BorderSide(color: brand.cardBorder),
       ),
       clipBehavior: Clip.antiAlias,
@@ -218,14 +218,20 @@ ThemeData brandTheme(Brightness brightness) {
       ),
     ),
     switchTheme: SwitchThemeData(
-      thumbColor: const WidgetStatePropertyAll(Colors.white),
+      // Koyu temada kapalı anahtarın topu açık gri.
+      thumbColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected) || !dark
+            ? Colors.white
+            : const Color(0xFFC6D1CD),
+      ),
       trackColor: WidgetStateProperty.resolveWith(
         (s) => s.contains(WidgetState.selected)
             ? (dark ? const Color(0xFF22B07E) : brand.stepper)
-            : (dark ? const Color(0xFF2A3834) : const Color(0xFFD3DDD9)),
+            : (dark ? const Color(0xFF303A37) : const Color(0xFFD3DDD9)),
       ),
       trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
-      thumbIcon: const WidgetStatePropertyAll(null),
+      // Boş simge: kapalıyken de top tam boy (tasarımdaki gibi).
+      thumbIcon: const WidgetStatePropertyAll(Icon(null)),
     ),
     floatingActionButtonTheme: FloatingActionButtonThemeData(
       backgroundColor: brand.fab,
@@ -237,7 +243,7 @@ ThemeData brandTheme(Brightness brightness) {
       ),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: dark ? brand.background : brand.card,
+      backgroundColor: dark ? const Color(0xFF0F1A17) : brand.card,
       // Koyu temada seçili sekme yalnız yeşil simge ve yazıyla belli olur.
       indicatorColor: dark ? Colors.transparent : brand.pill,
       surfaceTintColor: Colors.transparent,

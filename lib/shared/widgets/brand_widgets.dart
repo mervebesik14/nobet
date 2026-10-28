@@ -46,8 +46,15 @@ class BrandHeader extends StatelessWidget implements PreferredSizeWidget {
       value: SystemUiOverlayStyle.light,
       child: Container(
         // Koyu temada başlık zeminle bir: degrade ve yuvarlak köşe yok.
+        // Üstte hafif yeşil ışıma, alt kenarda zemine karışır.
         decoration: brand.flatHeader
-            ? BoxDecoration(color: brand.background)
+            ? BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [const Color(0xFF113027), brand.background],
+                ),
+              )
             : BoxDecoration(
                 gradient: brand.headerGradient,
                 borderRadius: const BorderRadius.vertical(
@@ -273,7 +280,7 @@ class PillHeader extends StatelessWidget {
               style: theme.textTheme.labelMedium?.copyWith(
                 color: brand.onPill,
                 fontWeight: FontWeight.w700,
-                letterSpacing: 0.6,
+                letterSpacing: brand.flatHeader ? 1.4 : 0.6,
               ),
             ),
           ),
@@ -303,11 +310,12 @@ class GroupCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           for (var i = 0; i < children.length; i++) ...[
+            // Koyu temada çizgi kart boyunca uzanır.
             if (i > 0)
               Divider(
                 height: 1,
-                indent: dividerIndent,
-                endIndent: dividerIndent,
+                indent: context.brand.flatHeader ? 0 : dividerIndent,
+                endIndent: context.brand.flatHeader ? 0 : dividerIndent,
               ),
             children[i],
           ],
@@ -362,7 +370,7 @@ class BrandStepper extends StatelessWidget {
                       width: 30,
                       height: 30,
                       decoration: BoxDecoration(
-                        color: brand.cardBorder,
+                        color: const Color(0xFF29332F),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: glyph,
@@ -384,7 +392,12 @@ class BrandStepper extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          button(Icons.remove, decrementTooltip, onDecrement),
+          button(
+            Icons.remove,
+            decrementTooltip,
+            onDecrement,
+            color: framed ? brand.accent : Colors.white,
+          ),
           Container(
             constraints: const BoxConstraints(minWidth: 48),
             height: 36,
