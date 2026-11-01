@@ -13,7 +13,7 @@ types:
         index: 1
   Person:
     typeId: 1
-    nextIndex: 9
+    nextIndex: 10
     fields:
       id:
         index: 0
@@ -33,6 +33,8 @@ types:
         index: 7
       startDate:
         index: 8
+      phone:
+        index: 9
   Holiday:
     typeId: 2
     nextIndex: 5

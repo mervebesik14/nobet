@@ -110,6 +110,28 @@ class FakePlatformServices extends PlatformServices {
     return pickedExcel;
   }
 
+  /// pickContactPhone'un döndüreceği kişi (boşsa vazgeçilmiş sayılır).
+  ({String? name, String phone})? pickedContact;
+
+  /// openUrl ile açılan bağlantılar.
+  final openedUrls = <Uri>[];
+
+  /// openUrl sonucu: false ise WhatsApp yüklü değil gibi davranır (yalnız
+  /// whatsapp:// bağlantıları için).
+  bool whatsAppInstalled = true;
+
+  @override
+  Future<({String? name, String phone})?> pickContactPhone() async {
+    calls.add('pickContactPhone');
+    return pickedContact;
+  }
+
+  @override
+  Future<bool> openUrl(Uri uri) async {
+    openedUrls.add(uri);
+    return uri.scheme != 'whatsapp' || whatsAppInstalled;
+  }
+
   @override
   Future<({pw.Font regular, pw.Font bold})> loadPdfFonts() async {
     pw.Font load(String file) => pw.Font.ttf(

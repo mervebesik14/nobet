@@ -32,6 +32,7 @@ import 'edit_sheet.dart';
 import '../settings/report_info.dart';
 import 'overtime_report_pdf.dart';
 import 'personal_roster_pdf.dart';
+import 'whatsapp_send_page.dart';
 import 'roster_history_page.dart';
 import 'roster_pdf.dart';
 import 'roster_flow.dart';
@@ -1458,6 +1459,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             _ShareAction.personalCalendar ||
             _ShareAction.addToCalendar ||
             _ShareAction.overtimeReport ||
+            _ShareAction.whatsAppEach ||
             _ShareAction.allPersonalPdf ||
             _ShareAction.allPersonalCalendar ||
             _ShareAction.excel:
@@ -1571,6 +1573,14 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 weekendDays: weekendDays,
                 holidayDays: holidayDays,
               ),
+              _ShareAction.whatsAppEach => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => WhatsAppSendPage(
+                    personIds: [for (final r in rows) r.id],
+                    dayShifts: dayShifts,
+                  ),
+                ),
+              ),
               _ShareAction.overtimeReport => _shareOvertimeReport(
                 plan,
                 summary,
@@ -1637,6 +1647,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 child: ListTile(
                   leading: Icon(Icons.groups_outlined),
                   title: Text('Herkesin listesi (PDF)'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.whatsAppEach,
+                child: ListTile(
+                  leading: Icon(Icons.send_to_mobile_outlined),
+                  title: Text('Herkese WhatsApp\'tan gönder'),
                 ),
               ),
               PopupMenuItem(
@@ -2008,6 +2025,7 @@ enum _ShareAction {
   personalCalendar,
   allPersonalCalendar,
   overtimeReport,
+  whatsAppEach,
 }
 
 /// Vurgulanan kişinin özeti: tablonun üstünde, kapatılabilir.

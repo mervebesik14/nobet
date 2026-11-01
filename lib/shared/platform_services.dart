@@ -1,9 +1,11 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_native_contact_picker/flutter_native_contact_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Telefonun paylaş / yazdır / dosya seç işlemleri. Ekranlar bunları bu
 /// servis üzerinden çağırır; testlerde sahte bir sürümle değiştirilir.
@@ -69,6 +71,25 @@ class PlatformServices {
       allowedExtensions: const ['xlsx'],
     );
     return file?.xFile.readAsBytes();
+  }
+
+  /// Telefon rehberinden bir numara seçtirir (izin istemez); vazgeçerse
+  /// boş döner.
+  Future<({String? name, String phone})?> pickContactPhone() async {
+    final contact = await FlutterNativeContactPicker().selectPhoneNumber();
+    final phone =
+        contact?.selectedPhoneNumber ?? contact?.phoneNumbers?.firstOrNull;
+    if (phone == null || phone.trim().isEmpty) return null;
+    return (name: contact?.fullName, phone: phone);
+  }
+
+  /// Bağlantıyı başka uygulamada açar (WhatsApp); açılamadıysa false.
+  Future<bool> openUrl(Uri uri) async {
+    try {
+      return await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } on Object {
+      return false;
+    }
   }
 
   /// PDF'e gömülen Türkçe destekli fontlar.

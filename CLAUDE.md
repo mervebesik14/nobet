@@ -23,6 +23,7 @@
 - Kendi nöbet hatırlatması: Ayarlar'da "Sen kimsin?" seçilince o kişinin nöbetlerinden önceki gün (varsayılan 20:00) bildirim (`ShiftReminder`).
 - Ay Planı'nın en üstünde Bugün/Yarın kartı (nöbetçiler, 16B, 7A; kişi nöbetteyse "Nöbettesin").
 - Haftalık yedek dosyası: son yedekten 7 gün geçince Belgeler/Yedekler'e `nobetci-yedek-YYYY-AA-GG.json` (en yeni 8), iPhone'da Dosyalar › iPhone'umda › Nöbetçi'de görünür (`WeeklyBackupPolicy`).
+- Kişide isteğe bağlı telefon (kişi formunda rehberden seçilir, `PhoneNumber` ile 90… biçimine çevrilir). Paylaş > Herkese WhatsApp'tan gönder: her kişi için WhatsApp kendi listesiyle açılır (yüklü değilse wa.me); numarasız kişiye rehberden eklenir. Rehber ve bağlantı açma `PlatformServices` üzerinden.
 - Fazla mesai raporu: Paylaş > Fazla mesai raporu (PDF); kurum/birim ve imza bilgileri Ayarlar'dan.
 - Algoritma ve hesaplar lib/logic altında saf Dart, birim testli; arayüz metinleri Türkçe.
 

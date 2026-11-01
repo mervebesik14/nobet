@@ -289,6 +289,59 @@ void main() {
     expect(ics, contains('X-WR-CALNAME:Banu nöbetleri'));
   });
 
+  testWidgets('herkese WhatsApp: numara rehberden eklenir, kişiye özel mesaj', (
+    tester,
+  ) async {
+    await boxes.people.put(
+      'a',
+      const Person(
+        id: 'a',
+        name: 'Ayşe',
+        role: Role.nurse,
+        phone: '0532 111 22 33',
+      ),
+    );
+    await pump(tester);
+    await choose(tester, 'Herkese WhatsApp\'tan gönder');
+    expect(find.text('0 / 1 gönderildi'), findsOneWidget);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('wa-a')),
+        matching: find.text('Gönder'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final uri = services.openedUrls.single;
+    expect(uri.scheme, 'whatsapp');
+    expect(uri.queryParameters['phone'], '905321112233');
+    expect(uri.queryParameters['text'], contains('Ayşe'));
+    expect(find.text('1 / 1 gönderildi'), findsOneWidget);
+
+    // Banu'nun numarası yok: rehberden eklenir.
+    services.pickedContact = (name: 'Banu K.', phone: '+90 533 444 55 66');
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('wa-b')),
+        matching: find.text('Rehberden'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(boxes.people.get('b')!.phone, '0533 444 55 66');
+
+    // WhatsApp yüklü değilse wa.me açılır.
+    services.whatsAppInstalled = false;
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('wa-b')),
+        matching: find.text('Gönder'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(services.openedUrls.last.host, 'wa.me');
+    expect(services.openedUrls.last.path, '/905334445566');
+  });
+
   testWidgets('fazla mesai raporu PDF olarak paylaşılır', (tester) async {
     await boxes.meta.put('reportInfo', {
       'institution': 'Örnek Devlet Hastanesi',

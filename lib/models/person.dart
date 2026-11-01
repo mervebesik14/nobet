@@ -12,6 +12,7 @@ class Person {
     this.inactiveFrom,
     this.inactiveUntil,
     this.startDate,
+    this.phone,
   });
 
   final String id;
@@ -40,6 +41,10 @@ class Person {
   /// İşe başlama tarihi (isteğe bağlı). Öncesindeki günlerde kişi nöbete
   /// yazılmaz ve yıl içi dengede o günler kişinin payına sayılmaz.
   final DateTime? startDate;
+
+  /// Telefon numarası (WhatsApp ile kişiye özel liste göndermek için),
+  /// yazıldığı gibi; gönderirken [PhoneNumber] ile düzeltilir.
+  final String? phone;
 
   static DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
 
@@ -102,6 +107,8 @@ class Person {
     bool clearInactiveUntil = false,
     DateTime? startDate,
     bool clearStartDate = false,
+    String? phone,
+    bool clearPhone = false,
   }) {
     return Person(
       id: id,
@@ -117,6 +124,7 @@ class Person {
           ? null
           : (inactiveUntil ?? this.inactiveUntil),
       startDate: clearStartDate ? null : (startDate ?? this.startDate),
+      phone: clearPhone ? null : (phone ?? this.phone),
     );
   }
 
@@ -130,6 +138,7 @@ class Person {
     'inactiveFrom': inactiveFrom?.toIso8601String(),
     'inactiveUntil': inactiveUntil?.toIso8601String(),
     'startDate': startDate?.toIso8601String(),
+    if (phone != null) 'phone': phone,
   };
 
   factory Person.fromJson(Map<String, dynamic> json) => Person(
@@ -148,6 +157,7 @@ class Person {
     startDate: json['startDate'] == null
         ? null
         : DateTime.parse(json['startDate'] as String),
+    phone: json['phone'] as String?,
   );
 
   @override
@@ -161,7 +171,8 @@ class Person {
       other.isChargeNurse == isChargeNurse &&
       other.inactiveFrom == inactiveFrom &&
       other.inactiveUntil == inactiveUntil &&
-      other.startDate == startDate;
+      other.startDate == startDate &&
+      other.phone == phone;
 
   @override
   int get hashCode => Object.hash(
@@ -174,6 +185,7 @@ class Person {
     inactiveFrom,
     inactiveUntil,
     startDate,
+    phone,
   );
 
   @override

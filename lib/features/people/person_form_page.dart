@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../logic/phone_number.dart';
 import '../../models/models.dart';
+import '../../shared/platform_services.dart';
 import '../../shared/providers.dart';
 import 'people_controller.dart';
 import 'person_delete_dialog.dart';
@@ -20,6 +22,7 @@ class PersonFormPage extends ConsumerStatefulWidget {
 class _PersonFormPageState extends ConsumerState<PersonFormPage> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name;
+  late final TextEditingController _phone;
   late Role _role;
   late bool _isActive;
   late bool _isChargeNurse;
@@ -48,6 +51,7 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
     super.initState();
     final person = widget.person;
     _name = TextEditingController(text: person?.name ?? '');
+    _phone = TextEditingController(text: person?.phone ?? '');
     _role = person?.role ?? Role.nurse;
     final today = ref.read(todayProvider);
     // Pasif dönemi bitmiş kişi aktif görünür; dönemi sürüyor ya da
@@ -70,6 +74,7 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
   @override
   void dispose() {
     _name.dispose();
+    _phone.dispose();
     super.dispose();
   }
 
@@ -82,6 +87,24 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
       return 'Bu adla bir kişi zaten var.';
     }
     return null;
+  }
+
+  String? _validatePhone(String? value) {
+    final v = value?.trim() ?? '';
+    if (v.isEmpty || PhoneNumber.normalize(v) != null) return null;
+    return 'Numara anlaşılamadı (ör. 0532 123 45 67).';
+  }
+
+  /// Rehberden numara seçer; ad boşsa rehberdeki adı da yazar.
+  Future<void> _pickContact() async {
+    final picked = await ref.read(platformServicesProvider).pickContactPhone();
+    if (picked == null || !mounted) return;
+    setState(() {
+      _phone.text = PhoneNumber.display(picked.phone);
+      if (_name.text.trim().isEmpty && (picked.name ?? '').isNotEmpty) {
+        _name.text = picked.name!;
+      }
+    });
   }
 
   Future<void> _pickStartDate() async {
@@ -109,6 +132,7 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
         isActive: _isActive,
         isChargeNurse: chargeNurse,
         startDate: _startDate,
+        phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
       );
     } else {
       final messenger = ScaffoldMessenger.of(context);
@@ -119,6 +143,8 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
           isChargeNurse: chargeNurse,
           startDate: _startDate,
           clearStartDate: _startDate == null,
+          phone: _phone.text.trim(),
+          clearPhone: _phone.text.trim().isEmpty,
         ),
       );
       final from = _inactiveFrom;
@@ -194,6 +220,23 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
               ),
               validator: _validateName,
               onFieldSubmitted: (_) => _save(),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              key: const ValueKey('phone-field'),
+              controller: _phone,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                labelText: 'Telefon (WhatsApp)',
+                hintText: '0532 123 45 67',
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  tooltip: 'Rehberden seç',
+                  icon: const Icon(Icons.contacts_outlined),
+                  onPressed: _pickContact,
+                ),
+              ),
+              validator: _validatePhone,
             ),
             const SizedBox(height: 24),
             Text('Görev', style: Theme.of(context).textTheme.titleSmall),

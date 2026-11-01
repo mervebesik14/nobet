@@ -69,6 +69,7 @@ class PeopleController extends Notifier<List<Person>> {
     bool isActive = true,
     bool isChargeNurse = false,
     DateTime? startDate,
+    String? phone,
   }) async {
     final person = Person(
       id: _uuid.v4(),
@@ -79,9 +80,22 @@ class PeopleController extends Notifier<List<Person>> {
       startDate: startDate == null
           ? null
           : DateTime(startDate.year, startDate.month, startDate.day),
+      phone: phone,
     );
     await _save(person);
     return person;
+  }
+
+  /// Kişinin telefon numarasını yazar (boşsa siler).
+  Future<void> setPhone(String personId, String? phone) async {
+    final person = state.where((p) => p.id == personId).firstOrNull;
+    if (person == null) return;
+    final value = phone?.trim();
+    await _save(
+      value == null || value.isEmpty
+          ? person.copyWith(clearPhone: true)
+          : person.copyWith(phone: value),
+    );
   }
 
   /// Var olan kişiyi günceller.

@@ -7,6 +7,7 @@ import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/features/people/people_page.dart';
 import 'package:nobet_listesi/logic/turkish_collation.dart';
 import 'package:nobet_listesi/models/models.dart';
+import 'package:nobet_listesi/shared/platform_services.dart';
 import 'package:nobet_listesi/shared/providers.dart';
 
 import '../../helpers.dart';
@@ -22,6 +23,8 @@ void main() {
 
   tearDown(() => Hive.close());
 
+  final services = FakePlatformServices();
+
   Future<void> pumpPage(WidgetTester tester) async {
     // Telefon boyu: uzun kişi formu tek ekrana sığsın.
     tester.view.physicalSize = const Size(1080, 2400);
@@ -32,6 +35,7 @@ void main() {
         overrides: [
           ...boxOverrides(boxes),
           todayProvider.overrideWithValue(DateTime(2026, 10, 11)),
+          platformServicesProvider.overrideWithValue(services),
         ],
         child: const MaterialApp(home: PeoplePage()),
       ),
@@ -110,7 +114,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Ad boş olamaz.'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextFormField), 'Mehmet Öz');
+    await tester.enterText(find.byType(TextFormField).first, 'Mehmet Öz');
     await tester.tap(find.text('Radyoloji Teknikeri'));
     await tester.tap(find.text('Kaydet'));
     await tester.pumpAndSettle();
@@ -122,6 +126,34 @@ void main() {
     expect(saved.role, Role.radiologyTech);
   });
 
+  testWidgets('telefon rehberden seçilir; ad boşsa rehberdeki ad yazılır', (
+    tester,
+  ) async {
+    await pumpPage(tester);
+    await tester.tap(find.byType(FloatingActionButton));
+    await tester.pumpAndSettle();
+    services.pickedContact = (name: 'Selin Ak', phone: '+905051234567');
+    await tester.tap(find.byTooltip('Rehberden seç'));
+    await tester.pumpAndSettle();
+    expect(find.text('0505 123 45 67'), findsOneWidget);
+
+    // Geçersiz numara kaydedilmez.
+    await tester.enterText(find.byKey(const ValueKey('phone-field')), '12');
+    await tester.tap(find.text('Kaydet'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Numara anlaşılamadı'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('phone-field')),
+      '0505 123 45 67',
+    );
+    await tester.tap(find.text('Kaydet'));
+    await tester.pumpAndSettle();
+    final saved = boxes.people.values.single;
+    expect(saved.name, 'Selin Ak');
+    expect(saved.phone, '0505 123 45 67');
+  });
+
   testWidgets('sorumlu hemşire işaretlenir; tek kişi olur', (tester) async {
     await seed(const [
       Person(id: '1', name: 'Ayşe', role: Role.nurse, isChargeNurse: true),
@@ -131,7 +163,7 @@ void main() {
 
     await tester.tap(find.byType(FloatingActionButton));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextFormField), 'Banu');
+    await tester.enterText(find.byType(TextFormField).first, 'Banu');
     // Önceki sorumlu hemşire uyarıda adıyla görünür.
     expect(find.textContaining('Şu an sorumlu hemşire: Ayşe'), findsOneWidget);
     await tester.tap(find.text('Sorumlu hemşire'));
@@ -161,7 +193,7 @@ void main() {
 
     await tester.tap(find.byType(FloatingActionButton));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextFormField), ' ayşe ');
+    await tester.enterText(find.byType(TextFormField).first, ' ayşe ');
     await tester.tap(find.text('Kaydet'));
     await tester.pumpAndSettle();
 
@@ -179,7 +211,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Kişiyi Düzenle'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextFormField), 'Ayşe Kaya');
+    await tester.enterText(find.byType(TextFormField).first, 'Ayşe Kaya');
     await tester.tap(find.text('Aktif'));
     await tester.pumpAndSettle();
     // Pasif dönemi varsayılan olarak bugünden itibaren, süresiz.
