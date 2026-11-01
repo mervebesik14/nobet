@@ -70,6 +70,13 @@ void main() {
     expect(s.byId['t']!.shifts, 6);
   });
 
+  test('rol ortalaması (yıllık toplam)', () {
+    final s = build();
+    // Ayşe 5, Zeynep 2 nöbet.
+    expect(s.roleMean(Role.nurse, (t) => t.shifts), 3.5);
+    expect(s.roleMean(Role.radiologyTech, (t) => t.shifts), 6);
+  });
+
   test('fazla mesai ay ay toplanır', () {
     // Ali: Eylül 4 nöbet (96 < 154), Ekim 2 nöbet → fazla mesai 0.
     expect(build().byId['t']!.overtimeHours, 0);

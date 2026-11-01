@@ -80,6 +80,22 @@ void main() {
     expect(String.fromCharCodes(services.lastPdf!.take(5)), '%PDF-');
   });
 
+  testWidgets('kişi karnesi: kişi seçilir, PDF paylaşılır', (tester) async {
+    await pump(tester);
+    await choose(tester, 'Kişi karnesi (PDF)');
+    expect(find.text('Kimin karnesi?'), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(SimpleDialog),
+        matching: find.text('Hemşire 2'),
+      ),
+    );
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(services.calls, ['sharePdf:karne-hemsire-2-2026.pdf']);
+    expect(String.fromCharCodes(services.lastPdf!.take(5)), '%PDF-');
+  });
+
   testWidgets('Excel olarak paylaşılır', (tester) async {
     await pump(tester);
     await choose(tester, 'Excel olarak paylaş');

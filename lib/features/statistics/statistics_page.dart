@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
+import '../../logic/file_names.dart';
 import '../../logic/turkish_dates.dart';
 import '../../logic/xlsx_writer.dart';
 import '../../logic/yearly_excel.dart';
@@ -13,6 +14,7 @@ import '../../shared/widgets/brand_widgets.dart';
 import '../holidays/holidays_controller.dart';
 import '../people/people_controller.dart';
 import 'monthly_comparison.dart';
+import 'person_report_pdf.dart';
 import 'past_roster_page.dart';
 import 'statistics_pdf.dart';
 import '../../shared/providers.dart';
@@ -29,7 +31,7 @@ class StatisticsPage extends ConsumerStatefulWidget {
   ConsumerState<StatisticsPage> createState() => _StatisticsPageState();
 }
 
-enum _ShareAction { pdf, excel }
+enum _ShareAction { pdf, excel, personReport }
 
 class _StatisticsPageState extends ConsumerState<StatisticsPage> {
   late int _year = ref.read(todayProvider).year;
@@ -57,6 +59,34 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
             boldFont: fonts.bold,
           );
           await services.sharePdf(pdf, '$base.pdf');
+        case _ShareAction.personReport:
+          final row = await showDialog<YearlyRow>(
+            context: context,
+            builder: (context) => SimpleDialog(
+              title: const Text('Kimin karnesi?'),
+              children: [
+                for (final r in summary.rows)
+                  SimpleDialogOption(
+                    onPressed: () => Navigator.of(context).pop(r),
+                    child: Text(r.name),
+                  ),
+              ],
+            ),
+          );
+          if (row == null || !mounted) return;
+          final fonts = await services.loadPdfFonts();
+          final pdf = await buildPersonReportPdf(
+            year: _year,
+            row: row,
+            summary: summary,
+            font: fonts.regular,
+            boldFont: fonts.bold,
+            createdAt: ref.read(todayProvider),
+          );
+          await services.sharePdf(
+            pdf,
+            'karne-${fileSlug(row.name)}-$_year.pdf',
+          );
         case _ShareAction.excel:
           await services.shareFile(
             YearlyExcel.build(year: _year, summary: summary),
@@ -112,6 +142,13 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
                 child: ListTile(
                   leading: Icon(Icons.picture_as_pdf_outlined),
                   title: Text('PDF olarak paylaş'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.personReport,
+                child: ListTile(
+                  leading: Icon(Icons.badge_outlined),
+                  title: Text('Kişi karnesi (PDF)'),
                 ),
               ),
               PopupMenuItem(

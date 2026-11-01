@@ -72,6 +72,17 @@ class YearlySummary {
     return pick(own) - mean;
   }
 
+  /// [role] grubunun (sorumlu hemşire hariç) yıllık toplam ortalaması;
+  /// grupta kimse yoksa 0.
+  double roleMean(Role role, num Function(PersonTotals) pick) {
+    final group = [
+      for (final r in rows)
+        if (r.role == role && !r.isChargeNurse) pick(r.totals),
+    ];
+    if (group.isEmpty) return 0;
+    return group.fold<num>(0, (a, b) => a + b) / group.length;
+  }
+
   /// [year] yılının listesi oluşturulmuş aylarını toplar. [beforeMonth]
   /// verilirse yalnızca ondan önceki aylar (yeni ay oluşturulurken yıl içi
   /// toplam için).
