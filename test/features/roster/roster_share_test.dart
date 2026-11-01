@@ -108,7 +108,7 @@ void main() {
     await choose(tester, 'PDF olarak paylaş');
     expect(find.text('Ne paylaşılsın?'), findsOneWidget);
     expect(find.text('Yalnız liste'), findsOneWidget);
-    expect(find.text('Liste ve ayrıntılar'), findsOneWidget);
+    expect(find.text('Liste ve seçilenler'), findsOneWidget);
     // Vazgeçilirse hiçbir şey paylaşılmaz.
     await tester.tapAt(const Offset(5, 5));
     await tester.pumpAndSettle();
@@ -147,6 +147,58 @@ void main() {
     // xlsx bir zip dosyasıdır: "PK" ile başlar.
     expect(String.fromCharCodes(file.bytes.take(2)), 'PK');
     expect(sheetNames(file.bytes), ['Nöbet Listesi', 'Mesai Özeti']);
+  });
+
+  testWidgets('özet sütunları seçilir ve hatırlanır', (tester) async {
+    await pump(tester);
+    await tester.tap(find.byTooltip('Paylaş'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Excel olarak paylaş'));
+    await tester.pumpAndSettle();
+    // Yalnız toplam nöbet ve fazla mesai kalsın.
+    for (final c in [
+      'weekend',
+      'nationalHoliday',
+      'religiousHoliday',
+      'everyOtherDay',
+      'longGaps',
+      'dayShifts',
+      'worked',
+      'required',
+    ]) {
+      await tester.tap(find.byKey(ValueKey('col-$c')));
+    }
+    await tester.tap(find.byKey(const ValueKey('share-with-details')));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+
+    final sheet = ZipDecoder()
+        .decodeBytes(services.sharedFiles.single.bytes)
+        .firstWhere((f) => f.name == 'xl/worksheets/sheet2.xml');
+    final xml = utf8.decode(sheet.content);
+    expect(xml, contains('Toplam nöbet'));
+    expect(xml, contains('Fazla mesai'));
+    expect(xml, isNot(contains('Hafta sonu nöbet')));
+    expect(xml, isNot(contains('Çalışılan saat')));
+    expect(boxes.meta.get('shareSummaryColumns'), ['shifts', 'overtime']);
+
+    // Bir dahakinde aynı seçimle açılır.
+    await tester.tap(find.byTooltip('Paylaş'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('PDF olarak paylaş'));
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<CheckboxListTile>(find.byKey(const ValueKey('col-weekend')))
+          .value,
+      isFalse,
+    );
+    expect(
+      tester
+          .widget<CheckboxListTile>(find.byKey(const ValueKey('col-shifts')))
+          .value,
+      isTrue,
+    );
   });
 
   testWidgets('Excel yalnız liste: tek sayfa', (tester) async {

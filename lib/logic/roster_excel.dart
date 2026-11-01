@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import '../models/models.dart';
 import 'day_shift_planner.dart';
 import 'roster_summary.dart';
+import 'summary_columns.dart';
 import 'turkish_dates.dart';
 import 'xlsx_writer.dart';
 
@@ -37,6 +38,7 @@ class RosterExcel {
     Map<int, int> missingByDay = const {},
     Iterable<DayShift> dayShifts = const [],
     bool includeSummary = true,
+    Set<SummaryColumn> summaryColumns = const {...SummaryColumn.values},
   }) => XlsxWriter.build([
     _rosterSheet(
       plan: plan,
@@ -47,7 +49,8 @@ class RosterExcel {
       missingByDay: missingByDay,
       dayShifts: dayShifts,
     ),
-    if (includeSummary) _summarySheet(plan, summary),
+    if (includeSummary && summaryColumns.isNotEmpty)
+      _summarySheet(plan, summary, summaryColumns),
   ]);
 
   static String title(MonthPlan plan) =>
@@ -174,30 +177,17 @@ class RosterExcel {
 
   static double _round(double v) => (v * 10).roundToDouble() / 10;
 
-  static XlsxSheet _summarySheet(MonthPlan plan, RosterSummary summary) {
-    final has7A = summary.people.any((r) => r.dayShifts > 0);
-    final hasNational = summary.people.any((r) => r.nationalHolidayShifts > 0);
-    final hasReligious = summary.people.any(
-      (r) => r.religiousHolidayShifts > 0,
-    );
+  static XlsxSheet _summarySheet(
+    MonthPlan plan,
+    RosterSummary summary,
+    Set<SummaryColumn> selected,
+  ) {
+    final columns = SummaryColumn.visible(summary, selected);
     const head = XlsxStyle(bold: true, fill: _header, wrap: true);
     const number = XlsxStyle(align: XlsxAlign.right);
     XlsxCell n(num v) => XlsxCell(v is double ? _round(v) : v, style: number);
 
-    final headers = [
-      'Ad Soyad',
-      'Görev',
-      'Toplam nöbet',
-      'Hafta sonu nöbet',
-      if (hasNational) 'Resmi tatil nöbeti',
-      if (hasReligious) 'Dini bayram nöbeti',
-      'Gün aşırı çift',
-      '4–5 gün ara',
-      if (has7A) '7A gün',
-      'Çalışılan saat',
-      'Gereken saat',
-      'Fazla mesai',
-    ];
+    final headers = ['Ad Soyad', 'Görev', for (final c in columns) c.label];
     final out = <List<XlsxCell>>[
       [
         XlsxCell(
@@ -210,31 +200,17 @@ class RosterExcel {
         [
           XlsxCell(r.name),
           XlsxCell(r.isChargeNurse ? 'Sorumlu hemşire' : r.role.label),
-          n(r.shifts),
-          n(r.weekendShifts),
-          if (hasNational) n(r.nationalHolidayShifts),
-          if (hasReligious) n(r.religiousHolidayShifts),
-          n(r.everyOtherDayPairs),
-          n(r.longGaps),
-          if (has7A) n(r.dayShifts),
-          n(r.workedHours),
-          n(r.requiredHours),
-          n(r.overtimeHours),
+          for (final c in columns) n(c.valueOf(r)),
         ],
       for (final a in summary.averages.values)
         [
           const XlsxCell('Ortalama', style: XlsxStyle(bold: true)),
           XlsxCell(a.role.pluralLabel, style: const XlsxStyle(bold: true)),
-          n(a.shifts),
-          n(a.weekendShifts),
-          if (hasNational) n(a.nationalHolidayShifts),
-          if (hasReligious) n(a.religiousHolidayShifts),
-          n(a.everyOtherDayPairs),
-          const XlsxCell.empty(),
-          if (has7A) const XlsxCell.empty(),
-          n(a.workedHours),
-          n(summary.requiredHours),
-          n(a.overtimeHours),
+          for (final c in columns)
+            switch (c.averageOf(a, summary)) {
+              final v? => n(v),
+              null => const XlsxCell.empty(),
+            },
         ],
     ];
     return XlsxSheet(

@@ -17,6 +17,7 @@ import '../../logic/roster_generator.dart';
 import '../../logic/roster_summary.dart';
 import '../../logic/roster_validator.dart';
 import '../../logic/shift_gaps.dart';
+import '../../logic/summary_columns.dart';
 import '../../logic/turkish_collation.dart';
 import '../../logic/turkish_dates.dart';
 import '../../logic/xlsx_writer.dart';
@@ -1371,37 +1372,30 @@ class _RosterPageState extends ConsumerState<RosterPage> {
 
   /// Tüm listeyi paylaşırken ne gönderileceğini sorar: yalnız nöbet tablosu
   /// (false) ya da altında kişi başı özetle (true). Vazgeçilirse null.
-  Future<bool?> _askDetails(_ShareAction action) => showDialog<bool>(
-    context: context,
-    builder: (context) => SimpleDialog(
-      title: Text(
-        action == _ShareAction.print ? 'Ne yazdırılsın?' : 'Ne paylaşılsın?',
+  static const _columnsKey = 'shareSummaryColumns';
+
+  /// Paylaşırken özet tablosunda hangi sütunlar olsun? Boş küme: yalnız
+  /// liste; null: vazgeçildi. Seçim hatırlanır.
+  Future<Set<SummaryColumn>?> _askDetails(_ShareAction action) async {
+    final meta = ref.read(hiveBoxesProvider).meta;
+    final saved = meta.get(_columnsKey);
+    final initial = saved is List
+        ? SummaryColumn.fromNames(saved.cast<String>())
+        : {...SummaryColumn.values};
+    final picked = await showDialog<Set<SummaryColumn>>(
+      context: context,
+      builder: (_) => _ShareDetailsDialog(
+        title: action == _ShareAction.print
+            ? 'Ne yazdırılsın?'
+            : 'Ne paylaşılsın?',
+        initial: initial,
       ),
-      children: [
-        SimpleDialogOption(
-          key: const ValueKey('share-list-only'),
-          onPressed: () => Navigator.of(context).pop(false),
-          child: const ListTile(
-            leading: Icon(Icons.table_chart_outlined),
-            title: Text('Yalnız liste'),
-            subtitle: Text('Nöbet tablosu'),
-          ),
-        ),
-        SimpleDialogOption(
-          key: const ValueKey('share-with-details'),
-          onPressed: () => Navigator.of(context).pop(true),
-          child: const ListTile(
-            leading: Icon(Icons.summarize_outlined),
-            title: Text('Liste ve ayrıntılar'),
-            subtitle: Text(
-              'Altında kişi başı özet: nöbet, hafta sonu, saatler, '
-              'fazla mesai',
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
+    );
+    if (picked != null && picked.isNotEmpty) {
+      await meta.put(_columnsKey, [for (final c in picked) c.name]);
+    }
+    return picked;
+  }
 
   Future<void> _share(
     _ShareAction action, {
@@ -1420,8 +1414,9 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     final title =
         '${DateFormat.yMMMM('tr_TR').format(DateTime(plan.year, plan.month))} '
         'Nöbet Listesi';
-    final details = await _askDetails(action);
-    if (details == null || !mounted) return;
+    final columns = await _askDetails(action);
+    if (columns == null || !mounted) return;
+    final details = columns.isNotEmpty;
     try {
       if (action == _ShareAction.excel) {
         final xlsx = RosterExcel.build(
@@ -1434,6 +1429,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
           missingByDay: missingByDay,
           dayShifts: dayShifts,
           includeSummary: details,
+          summaryColumns: columns,
         );
         await services.shareFile(xlsx, '$fileBase.xlsx', XlsxWriter.mimeType);
         return;
@@ -1452,6 +1448,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         boldFont: fonts.bold,
         singlePage: action == _ShareAction.png,
         includeSummary: details,
+        summaryColumns: columns,
       );
       switch (action) {
         case _ShareAction.personal ||
@@ -2079,6 +2076,70 @@ class _HighlightSummary extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Paylaşma seçimi: "Yalnız liste" ya da özet sütunlarını işaretleyip
+/// "Liste ve seçilenler".
+class _ShareDetailsDialog extends StatefulWidget {
+  const _ShareDetailsDialog({required this.title, required this.initial});
+
+  final String title;
+  final Set<SummaryColumn> initial;
+
+  @override
+  State<_ShareDetailsDialog> createState() => _ShareDetailsDialogState();
+}
+
+class _ShareDetailsDialogState extends State<_ShareDetailsDialog> {
+  late final _selected = {...widget.initial};
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: Text(widget.title),
+      contentPadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Listenin altındaki kişi başı özette hangi sütunlar olsun? '
+                'Ad ve görev her zaman yazılır. Seçimin hatırlanır.',
+                style: theme.textTheme.bodySmall,
+              ),
+            ),
+            for (final c in SummaryColumn.values)
+              CheckboxListTile(
+                key: ValueKey('col-${c.name}'),
+                dense: true,
+                value: _selected.contains(c),
+                title: Text(c.label),
+                onChanged: (v) =>
+                    setState(() => v! ? _selected.add(c) : _selected.remove(c)),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const ValueKey('share-list-only'),
+          onPressed: () => Navigator.of(context).pop(<SummaryColumn>{}),
+          child: const Text('Yalnız liste'),
+        ),
+        FilledButton(
+          key: const ValueKey('share-with-details'),
+          onPressed: _selected.isEmpty
+              ? null
+              : () => Navigator.of(context).pop({..._selected}),
+          child: const Text('Liste ve seçilenler'),
+        ),
+      ],
     );
   }
 }

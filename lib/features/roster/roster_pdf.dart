@@ -6,6 +6,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../../logic/day_shift_planner.dart';
 import '../../logic/roster_summary.dart';
+import '../../logic/summary_columns.dart';
 import '../../models/models.dart';
 import 'roster_table.dart';
 
@@ -28,6 +29,7 @@ Future<Uint8List> buildRosterPdf({
   Iterable<DayShift> dayShifts = const [],
   bool singlePage = false,
   bool includeSummary = true,
+  Set<SummaryColumn> summaryColumns = const {...SummaryColumn.values},
 }) async {
   final title =
       '${DateFormat.yMMMM('tr_TR').format(DateTime(plan.year, plan.month))} '
@@ -65,11 +67,11 @@ Future<Uint8List> buildRosterPdf({
       ],
     ),
     // Ayrıntılar: kişi başı özet tablosu (isteğe bağlı).
-    if (includeSummary) ...[
+    if (includeSummary && summaryColumns.isNotEmpty) ...[
       pw.SizedBox(height: 14),
       pw.Text('Özet', style: pw.TextStyle(font: boldFont, fontSize: 12)),
       pw.SizedBox(height: 4),
-      _summaryTable(summary, boldFont),
+      _summaryTable(summary, boldFont, summaryColumns),
     ],
   ];
 
@@ -262,12 +264,14 @@ pw.Widget _rosterTable({
   );
 }
 
-pw.Widget _summaryTable(RosterSummary summary, pw.Font boldFont) {
+pw.Widget _summaryTable(
+  RosterSummary summary,
+  pw.Font boldFont,
+  Set<SummaryColumn> selected,
+) {
   final number = NumberFormat('#,##0.#', 'tr_TR');
   String n(num v) => number.format(v);
-  final has7A = summary.people.any((r) => r.dayShifts > 0);
-  final hasNational = summary.people.any((r) => r.nationalHolidayShifts > 0);
-  final hasReligious = summary.people.any((r) => r.religiousHolidayShifts > 0);
+  final columns = SummaryColumn.visible(summary, selected);
   return pw.TableHelper.fromTextArray(
     border: pw.TableBorder.all(color: PdfColors.grey500, width: 0.4),
     headerStyle: pw.TextStyle(font: boldFont, fontSize: 8),
@@ -275,50 +279,23 @@ pw.Widget _summaryTable(RosterSummary summary, pw.Font boldFont) {
     headerDecoration: const pw.BoxDecoration(color: PdfColors.grey200),
     cellAlignment: pw.Alignment.centerRight,
     cellAlignments: {0: pw.Alignment.centerLeft, 1: pw.Alignment.centerLeft},
-    headers: [
-      'Ad',
-      'Görev',
-      'Toplam nöbet',
-      'Hafta sonu nöbet',
-      if (hasNational) 'Resmi tatil nöbeti',
-      if (hasReligious) 'Dini bayram nöbeti',
-      'Gün aşırı çift',
-      '4–5 gün ara',
-      if (has7A) '7A gün',
-      'Çalışılan saat',
-      'Gereken saat',
-      'Fazla mesai',
-    ],
+    headers: ['Ad', 'Görev', for (final c in columns) c.label],
     data: [
       for (final r in summary.people)
         [
           r.name,
           r.isChargeNurse ? 'Sorumlu hemşire' : r.role.label,
-          n(r.shifts),
-          n(r.weekendShifts),
-          if (hasNational) n(r.nationalHolidayShifts),
-          if (hasReligious) n(r.religiousHolidayShifts),
-          n(r.everyOtherDayPairs),
-          n(r.longGaps),
-          if (has7A) n(r.dayShifts),
-          n(r.workedHours),
-          n(r.requiredHours),
-          n(r.overtimeHours),
+          for (final c in columns) n(c.valueOf(r)),
         ],
       for (final a in summary.averages.values)
         [
           'Ortalama',
           a.role.pluralLabel,
-          n(a.shifts),
-          n(a.weekendShifts),
-          if (hasNational) n(a.nationalHolidayShifts),
-          if (hasReligious) n(a.religiousHolidayShifts),
-          n(a.everyOtherDayPairs),
-          '',
-          if (has7A) '',
-          n(a.workedHours),
-          n(summary.requiredHours),
-          n(a.overtimeHours),
+          for (final c in columns)
+            switch (c.averageOf(a, summary)) {
+              final v? => n(v),
+              null => '',
+            },
         ],
     ],
   );
