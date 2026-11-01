@@ -34,7 +34,7 @@ void main() {
   tearDown(() => Hive.close());
 
   Future<void> pump(WidgetTester tester, {Widget? home}) async {
-    tester.view.physicalSize = const Size(1200, 4000);
+    tester.view.physicalSize = const Size(1200, 5000);
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
@@ -289,6 +289,67 @@ void main() {
       await tester.runAsync(() => Future<void>.delayed(Duration.zero));
       await tester.pump();
     }
+
+    testWidgets('kendi nöbet hatırlatması: kişi ve saat seçilir', (
+      tester,
+    ) async {
+      await boxes.people.put(
+        'm',
+        const Person(id: 'm', name: 'Merve Beşik', role: Role.nurse),
+      );
+      await boxes.people.put(
+        'e',
+        const Person(id: 'e', name: 'Emre Dinç', role: Role.nurse),
+      );
+      await boxes.monthPlans.put(
+        '2026-10',
+        const MonthPlan(
+          year: 2026,
+          month: 10,
+          assignments: {
+            5: DayAssignment(day: 5, nurseIds: ['m', 'e']),
+            14: DayAssignment(day: 14, nurseIds: ['m', 'e']),
+            20: DayAssignment(day: 20, nurseIds: ['e']),
+          },
+        ),
+      );
+      await openApp(tester);
+      expect(notifications.shiftScheduled, isEmpty);
+
+      await tester.tap(find.text('Ayarlar'));
+      await tester.pumpAndSettle();
+      final tile = find.byKey(const ValueKey('self-person'));
+      await tester.scrollUntilVisible(tile, 200);
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Merve Beşik').last);
+      await tester.pump(const Duration(seconds: 3));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+      expect(boxes.meta.get('selfPersonId'), 'm');
+      expect(
+        notifications.shiftScheduled.single.at,
+        DateTime(2026, 10, 13, 20),
+      );
+      expect(
+        notifications.shiftScheduled.single.body,
+        startsWith('Yarın (14 Ekim Çarşamba) nöbetin var (24).'),
+      );
+      expect(
+        find.textContaining('Merve Beşik · nöbetten önceki gün 20:00'),
+        findsOneWidget,
+      );
+
+      // Kapatılınca iptal.
+      await tester.tap(tile);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Kapalı'));
+      await tester.pump(const Duration(seconds: 3));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+      expect(notifications.shiftScheduled, isEmpty);
+      expect(find.byKey(const ValueKey('shift-reminder-time')), findsNothing);
+    });
 
     testWidgets('açılışta her ayın 16sı 10:00 için kurulur', (tester) async {
       await openApp(tester);

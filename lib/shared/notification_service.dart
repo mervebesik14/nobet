@@ -64,6 +64,26 @@ class NotificationService {
     ),
   );
 
+  /// Düğmesiz bildirim (kendi nöbet hatırlatması).
+  static const _plainDetails = NotificationDetails(
+    android: AndroidNotificationDetails(
+      'nobet_hatirlatma_defibrilator',
+      'Nöbet hatırlatması',
+      channelDescription: 'Kendi nöbetinden önceki akşam hatırlatır.',
+      importance: Importance.high,
+      priority: Priority.high,
+      playSound: true,
+      sound: RawResourceAndroidNotificationSound(_sound),
+    ),
+    iOS: DarwinNotificationDetails(
+      presentAlert: true,
+      presentBanner: true,
+      presentList: true,
+      presentSound: true,
+      sound: '$_sound.wav',
+    ),
+  );
+
   Future<void> _init() => _ready ??= _initialize();
 
   Future<void> _initialize() async {
@@ -131,9 +151,11 @@ class NotificationService {
   }
 
   /// [ids] kimlikli eski bildirimleri iptal edip [items]'ı planlar.
+  /// [startedButton]: "Başladım" düğmesi (ay başı hatırlatması).
   Future<void> schedule(
     List<ScheduledNotification> items, {
     required Iterable<int> ids,
+    bool startedButton = true,
   }) async {
     await _init();
     for (final id in ids) {
@@ -150,7 +172,7 @@ class NotificationService {
           n.at.hour,
           n.at.minute,
         ),
-        notificationDetails: _details,
+        notificationDetails: startedButton ? _details : _plainDetails,
         // Tam saat izni gerektirmez; birkaç dakika kayabilir.
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         title: n.title,

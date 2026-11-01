@@ -134,12 +134,17 @@ class FakeNotificationService extends NotificationService {
   Future<void> schedule(
     List<ScheduledNotification> items, {
     required Iterable<int> ids,
+    bool startedButton = true,
   }) async {
     scheduleCalls++;
-    scheduled
+    // Ay başı ve kendi nöbet hatırlatmaları ayrı tutulur.
+    (startedButton ? scheduled : shiftScheduled)
       ..clear()
       ..addAll(items);
   }
+
+  /// Son planlanan kendi nöbet hatırlatmaları.
+  final shiftScheduled = <ScheduledNotification>[];
 
   @override
   Future<void> show({

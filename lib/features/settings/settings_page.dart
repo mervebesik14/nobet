@@ -12,8 +12,10 @@ import '../../shared/notification_service.dart';
 import '../../shared/platform_services.dart';
 import '../../shared/widgets/brand_widgets.dart';
 import '../month/month_reminder_notifications.dart';
+import '../people/people_controller.dart';
 import 'auto_backups_page.dart';
 import 'backup_actions.dart';
+import 'shift_reminder_notifications.dart';
 
 /// Ayarlar sekmesi: nöbet kuralları, mesai hesabı, tema ve yedekleme.
 class SettingsPage extends ConsumerWidget {
@@ -29,6 +31,13 @@ class SettingsPage extends ConsumerWidget {
     final reminderDay = ref.watch(monthReminderDayProvider);
     final reminderTime = ref.watch(monthReminderTimeProvider);
     final reminderInterval = ref.watch(monthReminderIntervalProvider);
+    final selfId = ref.watch(selfPersonProvider);
+    final selfName = ref
+        .watch(peopleProvider)
+        .where((p) => p.id == selfId)
+        .firstOrNull
+        ?.name;
+    final shiftTime = ref.watch(shiftReminderTimeProvider);
     final reminderTimeLabel = NextMonthReminder.timeLabel(
       reminderTime.hour,
       reminderTime.minute,
@@ -263,6 +272,42 @@ class SettingsPage extends ConsumerWidget {
                     _pickReminderInterval(context, ref, reminderInterval),
               ),
               ListTile(
+                key: const ValueKey('self-person'),
+                leading: const Icon(Icons.person_pin_circle_outlined),
+                title: const Text('Kendi nöbet hatırlatmam'),
+                subtitle: Text(
+                  selfName == null
+                      ? 'Kapalı. Kim olduğunu seçersen nöbetlerinden önceki '
+                            'akşam bildirim gelir.'
+                      : '$selfName · nöbetten önceki gün '
+                            '${NextMonthReminder.timeLabel(shiftTime.hour, shiftTime.minute)}',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _pickSelf(context, ref),
+              ),
+              if (selfName != null)
+                ListTile(
+                  key: const ValueKey('shift-reminder-time'),
+                  leading: const Icon(Icons.alarm),
+                  title: const Text('Nöbet hatırlatma saati'),
+                  subtitle: Text(
+                    'Önceki gün ${NextMonthReminder.timeLabel(shiftTime.hour, shiftTime.minute)}',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () async {
+                    final picked = await _askTime(
+                      context,
+                      TimeOfDay(hour: shiftTime.hour, minute: shiftTime.minute),
+                      'Nöbet hatırlatma saati',
+                    );
+                    if (picked != null) {
+                      await ref
+                          .read(shiftReminderTimeProvider.notifier)
+                          .set(picked.hour, picked.minute);
+                    }
+                  },
+                ),
+              ListTile(
                 leading: const Icon(Icons.volume_up_outlined),
                 title: const Text('Bildirimi dene'),
                 subtitle: const Text('Şimdi bir deneme bildirimi gelir.'),
@@ -395,21 +440,69 @@ class SettingsPage extends ConsumerWidget {
     }
   }
 
+  /// 24 saat biçiminde saat seçici.
+  static Future<TimeOfDay?> _askTime(
+    BuildContext context,
+    TimeOfDay initial,
+    String help,
+  ) => showTimePicker(
+    context: context,
+    initialTime: initial,
+    helpText: help,
+    cancelText: 'Vazgeç',
+    confirmText: 'Tamam',
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
+      child: child!,
+    ),
+  );
+
+  /// "Ben kimim?": nöbet hatırlatmasının kurulacağı kişi ya da kapalı.
+  static Future<void> _pickSelf(BuildContext context, WidgetRef ref) async {
+    final people = ref.read(peopleProvider).where((p) => p.isActive).toList();
+    final current = ref.read(selfPersonProvider);
+    final picked = await showDialog<String>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Sen kimsin?'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(context).pop(''),
+            child: Text(
+              'Kapalı',
+              style: TextStyle(
+                fontWeight: current == null ? FontWeight.w700 : null,
+              ),
+            ),
+          ),
+          for (final p in people)
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(context).pop(p.id),
+              child: Text(
+                p.name,
+                style: TextStyle(
+                  fontWeight: p.id == current ? FontWeight.w700 : null,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+    if (picked == null) return;
+    await ref
+        .read(selfPersonProvider.notifier)
+        .set(picked.isEmpty ? null : picked);
+  }
+
   static Future<void> _pickReminderTime(
     BuildContext context,
     WidgetRef ref,
     ({int hour, int minute}) current,
   ) async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay(hour: current.hour, minute: current.minute),
-      helpText: 'Bildirim saati',
-      cancelText: 'Vazgeç',
-      confirmText: 'Tamam',
-      builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
-        child: child!,
-      ),
+    final picked = await _askTime(
+      context,
+      TimeOfDay(hour: current.hour, minute: current.minute),
+      'Bildirim saati',
     );
     if (picked != null) {
       await ref

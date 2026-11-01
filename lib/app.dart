@@ -6,6 +6,7 @@ import 'data/auto_backup_service.dart';
 import 'data/providers.dart';
 import 'features/month/month_reminder_notifications.dart';
 
+import 'features/settings/shift_reminder_notifications.dart';
 import 'features/shell/main_shell.dart';
 import 'shared/brand.dart';
 
@@ -19,6 +20,8 @@ class NobetApp extends ConsumerWidget {
     ref.watch(autoBackupWatcherProvider);
     // Gelecek ayın listesi yoksa ayın seçilen günü telefon bildirimi.
     ref.watch(monthReminderWatcherProvider);
+    // Seçilen kişinin nöbetlerinden önceki akşam bildirim.
+    ref.watch(shiftReminderWatcherProvider);
     return MaterialApp(
       themeMode: ref.watch(themeModeProvider),
       title: 'Nöbetçi',
