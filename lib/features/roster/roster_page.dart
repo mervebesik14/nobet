@@ -1575,6 +1575,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                   builder: (_) => WhatsAppSendPage(
                     personIds: [for (final r in rows) r.id],
                     dayShifts: dayShifts,
+                    weekendDays: weekendDays,
+                    holidayDays: holidayDays,
                   ),
                 ),
               ),

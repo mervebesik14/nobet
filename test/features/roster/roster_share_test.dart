@@ -355,6 +355,23 @@ void main() {
     );
     await pump(tester);
     await choose(tester, 'Herkese WhatsApp\'tan gönder');
+    // Varsayılan PDF: numarası olmayana da gönderilebilir.
+    expect(find.text('0 / 3 gönderildi'), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('wa-b')),
+        matching: find.text('Gönder'),
+      ),
+    );
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(services.calls, ['sharePdf:nobet-banu-2026-10.pdf']);
+    expect(isPdf(services.lastPdf), isTrue);
+    expect(find.text('1 / 3 gönderildi'), findsOneWidget);
+
+    // Mesaj: WhatsApp kişinin sohbetinde açılır.
+    await tester.tap(find.text('Mesaj'));
+    await tester.pumpAndSettle();
     expect(find.text('0 / 1 gönderildi'), findsOneWidget);
 
     await tester.tap(
