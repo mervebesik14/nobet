@@ -16,6 +16,7 @@ import '../roster/roster_flow.dart';
 import '../roster/roster_page.dart';
 import 'month_plan_controller.dart';
 import 'month_reminder_notifications.dart';
+import 'request_collect_page.dart';
 import 'unavailable_days_page.dart';
 import '../../shared/app_colors.dart';
 import '../../shared/providers.dart';
@@ -156,6 +157,20 @@ class MonthPage extends ConsumerWidget {
                 ],
               ),
             ),
+          if (active.isNotEmpty && !plan.isLocked)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: _CardButton(
+                key: const ValueKey('collect-requests'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const RequestCollectPage(),
+                  ),
+                ),
+                icon: Icons.forum_outlined,
+                label: 'İstekleri topla (WhatsApp)',
+              ),
+            ),
           if (active.isEmpty)
             const Padding(
               padding: EdgeInsets.all(24),
@@ -200,6 +215,7 @@ class MonthPage extends ConsumerWidget {
 /// Beyaz kart görünümlü düğme ("Listeyi elle gir").
 class _CardButton extends StatelessWidget {
   const _CardButton({
+    super.key,
     required this.onPressed,
     required this.icon,
     required this.label,

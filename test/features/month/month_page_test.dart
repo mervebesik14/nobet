@@ -520,6 +520,57 @@ void main() {
     });
   });
 
+  testWidgets('istekler toplanır: mesaj paylaşılır, cevaplar okunup eklenir', (
+    tester,
+  ) async {
+    await seed(
+      _team,
+      const MonthPlan(
+        year: 2026,
+        month: 10,
+        unavailableDays: {
+          'n1': [1],
+        },
+      ),
+    );
+    await pumpPage(tester);
+    await tester.tap(find.byKey(const ValueKey('collect-requests')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Ekim 2026 nöbet listesini'), findsOneWidget);
+    await tester.tap(find.text('Paylaş'));
+    await tester.pump();
+    expect(services.sharedTexts.last, contains('Ekim 2026'));
+
+    await tester.enterText(
+      find.byKey(const ValueKey('requests-input')),
+      '[01.10.2026 09:00] Ayşe: 3, 5 olmaz, izin 20-22\n'
+      'Banu: yok\n'
+      'Zeynep: 7',
+    );
+    await tester.tap(find.text('Oku'));
+    await tester.pumpAndSettle();
+    expect(find.text('İstemiyor: 3, 5\nYıllık izin: 20–22'), findsOneWidget);
+    expect(find.textContaining('Uygun olmayan günü yok: Banu'), findsOneWidget);
+    await tester.dragUntilVisible(
+      find.textContaining(RegExp('Henüz yazmayanlar: .*Cemile')),
+      find.byType(ListView).last,
+      const Offset(0, -200),
+    );
+    expect(
+      find.textContaining(RegExp('Henüz yazmayanlar: .*Cemile')),
+      findsOneWidget,
+    );
+    expect(find.textContaining('anlaşılamadı:\nZeynep: 7'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const ValueKey('apply-requests')));
+    await tester.tap(find.byKey(const ValueKey('apply-requests')));
+    await tester.pumpAndSettle();
+    final plan = boxes.monthPlans.get('2026-10')!;
+    expect(plan.unavailableDaysOf('n1'), [1, 3, 5]);
+    expect(plan.annualLeaveOf('n1'), [20, 21, 22]);
+    expect(find.text('1 kişinin istekleri eklendi.'), findsOneWidget);
+  });
+
   group('ay başı hatırlatması', () {
     final reminder = find.byKey(const ValueKey('next-month-reminder'));
 

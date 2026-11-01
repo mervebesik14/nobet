@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/month_plan_repository.dart';
 import '../../data/providers.dart';
 import '../../data/turkish_holidays.dart';
+import '../../logic/request_parser.dart';
 import '../../logic/block_reason.dart';
 import '../../logic/day_shift_planner.dart';
 import '../../logic/feasibility_checker.dart';
@@ -207,6 +208,41 @@ class MonthPlanController extends Notifier<MonthPlan> {
       set.remove(personId);
     }
     state = state.copyWith(overtimeRequests: set);
+    await ref.read(monthPlanRepositoryProvider).save(state);
+    return true;
+  }
+
+  /// Mesajlardan okunan istekleri tek seferde ekler: istenmeyen günler ve
+  /// izinler mevcutlara eklenir (silinmez), fazla mesai isteği açılır.
+  /// İstenmeyen gün olan seçilmiş nöbet günü düşer. Kilitli ayda false.
+  Future<bool> applyRequests(Map<String, PersonRequest> requests) async {
+    if (state.isLocked) return false;
+    var plan = state;
+    final unavailable = {...plan.unavailableDays};
+    final requested = {...plan.requestedShifts};
+    final overtime = {...plan.overtimeRequests};
+    for (final MapEntry(key: id, value: r) in requests.entries) {
+      final days = {...plan.unavailableDaysOf(id), ...r.unavailable};
+      if (days.isNotEmpty) unavailable[id] = days.toList()..sort();
+      final kept = plan.requestedShiftsOf(id).where((d) => !days.contains(d));
+      if (kept.isEmpty) {
+        requested.remove(id);
+      } else {
+        requested[id] = kept.toList();
+      }
+      if (r.overtime) overtime.add(id);
+    }
+    plan = plan.copyWith(
+      unavailableDays: unavailable,
+      requestedShifts: requested,
+      overtimeRequests: overtime,
+    );
+    for (final MapEntry(key: id, value: r) in requests.entries) {
+      for (final MapEntry(key: type, value: days) in r.leaves.entries) {
+        plan = plan.withLeave(id, type, {...plan.leaveOf(id, type), ...days});
+      }
+    }
+    state = plan;
     await ref.read(monthPlanRepositoryProvider).save(state);
     return true;
   }
