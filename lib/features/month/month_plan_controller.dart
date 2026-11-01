@@ -900,6 +900,87 @@ final dayShiftsProvider = Provider<Map<int, DayShift>>((ref) {
   );
 });
 
+/// Bir günün nöbetçileri ve 7A'sı ("Bugün" kartı için).
+typedef DayOverview = ({
+  DateTime date,
+  bool hasRoster,
+  List<String> nurseIds,
+  String? techId,
+  String? tech16bId,
+  List<String> dayShiftIds,
+});
+
+/// Bugünün ve yarının nöbetçileri; ilgili ayın listesi yoksa hasRoster
+/// false. Seçili aydan bağımsız (ay başında yarın sonraki aydadır).
+final todayOverviewProvider = Provider<List<DayOverview>>((ref) {
+  ref.watch(monthPlanProvider); // listeler değişince yenilensin
+  final today = ref.watch(todayProvider);
+  final repo = ref.watch(monthPlanRepositoryProvider);
+  final people = ref.watch(peopleProvider);
+  final holidays = ref.watch(holidaysProvider);
+  final base = ref.watch(rosterSettingsProvider);
+  final shiftsByMonth = <String, List<DayShift>>{};
+
+  List<DayShift> dayShiftsOf(MonthPlan plan) => shiftsByMonth[plan.key] ??= () {
+    final settings = effectiveSettings(base, nurseOnly: plan.nurseOnly);
+    final tail = previousMonthTailOf(repo, plan);
+    return [
+      ...DayShiftPlanner.plan(
+        year: plan.year,
+        month: plan.month,
+        assignments: plan.assignments,
+        people: people,
+        holidays: holidays,
+        settings: settings,
+        leaveDays: plan.leaveDays,
+        unavailableDays: plan.unavailableDays,
+        previousMonthLastDay: tail.isEmpty ? const {} : tail.last,
+        overrides: plan.dayShiftOverrides,
+      ).values,
+      ...DayShiftPlanner.manual(
+        year: plan.year,
+        month: plan.month,
+        days: plan.techDayShifts,
+        assignments: plan.assignments,
+        holidays: holidays,
+        settings: settings,
+      ),
+    ];
+  }();
+
+  return [
+    for (final date in [
+      DateTime(today.year, today.month, today.day),
+      DateTime(today.year, today.month, today.day + 1),
+    ])
+      () {
+        final plan = repo.get(date.year, date.month);
+        if (plan == null || !plan.hasRoster) {
+          return (
+            date: date,
+            hasRoster: false,
+            nurseIds: const <String>[],
+            techId: null,
+            tech16bId: null,
+            dayShiftIds: const <String>[],
+          );
+        }
+        final a = plan.assignments[date.day];
+        return (
+          date: date,
+          hasRoster: true,
+          nurseIds: a?.nurseIds ?? const <String>[],
+          techId: a?.techId,
+          tech16bId: a?.tech16bId,
+          dayShiftIds: [
+            for (final s in dayShiftsOf(plan))
+              if (s.day == date.day) s.personId,
+          ],
+        );
+      }(),
+  ];
+});
+
 /// Geçmiş kutusu her yazıldığında artar; [rosterHistoryProvider] yeniden
 /// okunur. (Plan denetleyicisi geçmiş sağlayıcısını doğrudan yenileyemez:
 /// geçmiş plana bağlıdır.)

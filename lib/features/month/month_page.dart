@@ -21,6 +21,7 @@ import 'unavailable_days_page.dart';
 import '../../shared/app_colors.dart';
 import '../../shared/providers.dart';
 import '../settings/backup_actions.dart';
+import '../settings/shift_reminder_notifications.dart';
 
 /// Ay Planı sekmesi: ay seçici, aktif kişiler ve istenmeyen gün sayıları,
 /// liste oluşturmadan önceki uygunluk uyarıları.
@@ -85,6 +86,7 @@ class MonthPage extends ConsumerWidget {
         // FAB son kartı örtmesin.
         padding: const EdgeInsets.only(top: 8, bottom: 96),
         children: [
+          const _TodayCard(),
           if (BackupReminder.isDue(
             today: ref.watch(todayProvider),
             hasData: ref.watch(peopleProvider).isNotEmpty,
@@ -207,6 +209,120 @@ class MonthPage extends ConsumerWidget {
             ],
           _FeasibilitySection(report: report),
         ],
+      ),
+    );
+  }
+}
+
+/// Bugünün ve yarının nöbetçileri; telefonu kullanan kişi ("Sen")
+/// nöbetteyse vurgulanır. Hiçbir listede yoksa gösterilmez.
+class _TodayCard extends ConsumerWidget {
+  const _TodayCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final days = ref.watch(todayOverviewProvider);
+    if (!days.any((d) => d.hasRoster)) return const SizedBox.shrink();
+    final names = {for (final p in ref.watch(peopleProvider)) p.id: p.name};
+    final self = ref.watch(selfPersonProvider);
+    final theme = Theme.of(context);
+    final brand = context.brand;
+    String name(String id) => names[id] ?? 'Silinmiş kişi';
+    final muted = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+
+    Widget day(DayOverview d, String label) {
+      final lines = <(String, String)>[
+        if (d.nurseIds.isNotEmpty) ('Hemşire', d.nurseIds.map(name).join(', ')),
+        if (d.techId != null) ('Radyoloji', name(d.techId!)),
+        if (d.tech16bId != null) ('16B', name(d.tech16bId!)),
+        if (d.dayShiftIds.isNotEmpty)
+          ('7A', d.dayShiftIds.map(name).join(', ')),
+      ];
+      final onDuty =
+          self != null &&
+          [...d.nurseIds, ?d.techId, ?d.tech16bId].contains(self);
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(
+                  label,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: brand.onPill,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    formatDayMonthWeekday(
+                      d.date.year,
+                      d.date.month,
+                      d.date.day,
+                    ),
+                    style: muted,
+                  ),
+                ),
+                if (onDuty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: brand.stepper,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'Nöbettesin',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            if (!d.hasRoster)
+              Text('Bu ayın listesi yok.', style: muted)
+            else if (lines.isEmpty)
+              Text('Nöbetçi yazılmamış.', style: muted)
+            else
+              for (final (role, who) in lines)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text.rich(
+                    TextSpan(
+                      children: [
+                        TextSpan(text: '$role: ', style: muted),
+                        TextSpan(
+                          text: who,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      key: const ValueKey('today-card'),
+      padding: const EdgeInsets.only(top: 4),
+      child: GroupCard(
+        dividerIndent: 16,
+        children: [day(days[0], 'BUGÜN'), day(days[1], 'YARIN')],
       ),
     );
   }

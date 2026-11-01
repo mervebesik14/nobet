@@ -520,6 +520,48 @@ void main() {
     });
   });
 
+  testWidgets('Bugün kartı: bugünün ve yarının nöbetçileri, ay geçişi', (
+    tester,
+  ) async {
+    await seed(
+      _team,
+      const MonthPlan(
+        year: 2026,
+        month: 10,
+        assignments: {
+          31: DayAssignment(day: 31, nurseIds: ['n1', 'n2'], techId: 't1'),
+        },
+      ),
+    );
+    await boxes.meta.put('selfPersonId', 'n2');
+    await pumpPage(tester, today: DateTime(2026, 10, 31));
+    final card = find.byKey(const ValueKey('today-card'));
+    expect(card, findsOneWidget);
+    expect(
+      find.descendant(of: card, matching: find.text('31 Ekim Cumartesi')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: card, matching: find.text('Nöbettesin')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: card, matching: find.textContaining('Ayşe, Banu')),
+      findsOneWidget,
+    );
+    // Yarın Kasım'da; Kasım listesi yok.
+    expect(
+      find.descendant(of: card, matching: find.text('Bu ayın listesi yok.')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Bugün kartı: hiçbir liste yoksa görünmez', (tester) async {
+    await seed(_team);
+    await pumpPage(tester);
+    expect(find.byKey(const ValueKey('today-card')), findsNothing);
+  });
+
   testWidgets('istekler toplanır: mesaj paylaşılır, cevaplar okunup eklenir', (
     tester,
   ) async {
