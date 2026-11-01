@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../logic/file_names.dart';
+import '../../logic/totals_columns.dart';
 import '../../logic/turkish_dates.dart';
 import '../../logic/xlsx_writer.dart';
 import '../../logic/yearly_excel.dart';
@@ -10,6 +11,7 @@ import '../../logic/yearly_summary.dart';
 import '../../models/models.dart';
 import '../../shared/brand.dart';
 import '../../shared/platform_services.dart';
+import '../../shared/widgets/column_picker_dialog.dart';
 import '../../shared/widgets/brand_widgets.dart';
 import '../holidays/holidays_controller.dart';
 import '../people/people_controller.dart';
@@ -35,6 +37,8 @@ enum _ShareAction { pdf, excel, personReport }
 
 class _StatisticsPageState extends ConsumerState<StatisticsPage> {
   late int _year = ref.read(todayProvider).year;
+
+  static const _reportColumnsKey = 'reportCardColumns';
 
   void _notify(String message) => ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
@@ -74,8 +78,26 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
             ),
           );
           if (row == null || !mounted) return;
+          final meta = ref.read(hiveBoxesProvider).meta;
+          final saved = meta.get(_reportColumnsKey);
+          final columns = await showDialog<Set<TotalsColumn>>(
+            context: context,
+            builder: (_) => ColumnPickerDialog<TotalsColumn>(
+              title: 'Karnede hangi sütunlar olsun?',
+              intro:
+                  'Ay her zaman yazılır; özet kutuları da seçilen '
+                  'sütunlara göre çıkar. Seçimin hatırlanır.',
+              options: [for (final c in TotalsColumn.values) (c, c.label)],
+              initial: saved is List
+                  ? TotalsColumn.fromNames(saved.cast<String>())
+                  : {...TotalsColumn.values},
+            ),
+          );
+          if (columns == null || !mounted) return;
+          await meta.put(_reportColumnsKey, [for (final c in columns) c.name]);
           final fonts = await services.loadPdfFonts();
           final pdf = await buildPersonReportPdf(
+            columns: columns,
             year: _year,
             row: row,
             summary: summary,

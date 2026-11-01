@@ -90,9 +90,19 @@ void main() {
         matching: find.text('Hemşire 2'),
       ),
     );
+    await tester.pumpAndSettle();
+    expect(find.text('Karnede hangi sütunlar olsun?'), findsOneWidget);
+    // Gün aşırı çift ve 4–5 gün ara çıkarılır.
+    await tester.tap(
+      find.byKey(const ValueKey('pick-TotalsColumn.everyOtherDay')),
+    );
+    await tester.tap(find.byKey(const ValueKey('pick-TotalsColumn.longGaps')));
+    await tester.tap(find.byKey(const ValueKey('pick-confirm')));
     await tester.runAsync(() => Future<void>.delayed(Duration.zero));
     await tester.pumpAndSettle();
     expect(services.calls, ['sharePdf:karne-hemsire-2-2026.pdf']);
+    expect(boxes.meta.get('reportCardColumns'), isNot(contains('longGaps')));
+    expect(boxes.meta.get('reportCardColumns'), contains('shifts'));
     expect(String.fromCharCodes(services.lastPdf!.take(5)), '%PDF-');
   });
 

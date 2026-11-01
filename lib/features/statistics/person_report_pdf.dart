@@ -5,6 +5,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../../logic/person_totals.dart';
+import '../../logic/totals_columns.dart';
 import '../../logic/turkish_dates.dart';
 import '../../logic/yearly_summary.dart';
 import '../../models/models.dart';
@@ -26,6 +27,7 @@ Future<Uint8List> buildPersonReportPdf({
   required pw.Font font,
   required pw.Font boldFont,
   DateTime? createdAt,
+  Set<TotalsColumn> columns = const {...TotalsColumn.values},
 }) async {
   final doc = pw.Document(
     title: '${row.name} · $year Nöbet Karnesi',
@@ -44,17 +46,10 @@ Future<Uint8List> buildPersonReportPdf({
       ? 'Hemşire'
       : 'Radyoloji teknikeri';
 
-  final columns = <(String, num Function(PersonTotals))>[
-    ('Nöbet', (t) => t.shifts),
-    ('Hafta sonu', (t) => t.weekendShifts),
-    ('Resmi tatil', (t) => t.nationalHolidayShifts),
-    ('Dini bayram', (t) => t.religiousHolidayShifts),
-    ('Gün aşırı çift', (t) => t.everyOtherDayPairs),
-    ('4–5 gün ara', (t) => t.longGaps),
-    ('Çalışılan saat', (t) => t.workedHours),
-    ('Gereken saat', (t) => t.requiredHours),
-    ('Fazla saat', (t) => t.overtimeHours),
+  final shown = [
+    for (final c in TotalsColumn.ordered(columns)) (c.label, c.valueOf),
   ];
+  bool has(TotalsColumn c) => columns.contains(c);
 
   pw.Widget cell(String text, {bool bold = false, PdfColor? color}) =>
       pw.Container(
@@ -162,19 +157,24 @@ Future<Uint8List> buildPersonReportPdf({
         pw.SizedBox(height: 12),
         pw.Row(
           children: [
-            box('Toplam nöbet', t.shifts, mean((t) => t.shifts)),
-            box('Hafta sonu', t.weekendShifts, mean((t) => t.weekendShifts)),
-            box(
-              'Tatil + bayram',
-              t.nationalHolidayShifts + t.religiousHolidayShifts,
-              mean((t) => t.nationalHolidayShifts + t.religiousHolidayShifts),
-            ),
-            box(
-              'Fazla mesai',
-              t.overtimeHours,
-              mean((t) => t.overtimeHours),
-              unit: ' sa',
-            ),
+            if (has(TotalsColumn.shifts))
+              box('Toplam nöbet', t.shifts, mean((t) => t.shifts)),
+            if (has(TotalsColumn.weekend))
+              box('Hafta sonu', t.weekendShifts, mean((t) => t.weekendShifts)),
+            if (has(TotalsColumn.nationalHoliday) ||
+                has(TotalsColumn.religiousHoliday))
+              box(
+                'Tatil + bayram',
+                t.nationalHolidayShifts + t.religiousHolidayShifts,
+                mean((t) => t.nationalHolidayShifts + t.religiousHolidayShifts),
+              ),
+            if (has(TotalsColumn.overtime))
+              box(
+                'Fazla mesai',
+                t.overtimeHours,
+                mean((t) => t.overtimeHours),
+                unit: ' sa',
+              ),
           ],
         ),
         pw.SizedBox(height: 16),
@@ -195,7 +195,7 @@ Future<Uint8List> buildPersonReportPdf({
               decoration: const pw.BoxDecoration(color: _primary),
               children: [
                 cell('Ay', bold: true, color: PdfColors.white),
-                for (final (label, _) in columns)
+                for (final (label, _) in shown)
                   cell(label, bold: true, color: PdfColors.white),
               ],
             ),
@@ -203,7 +203,7 @@ Future<Uint8List> buildPersonReportPdf({
               pw.TableRow(
                 children: [
                   cell(turkishMonthNames[m - 1]),
-                  for (final (_, pick) in columns)
+                  for (final (_, pick) in shown)
                     row.byMonth[m] == null
                         ? cell('–', color: _muted)
                         : cell(n(pick(row.byMonth[m]!))),
@@ -213,14 +213,14 @@ Future<Uint8List> buildPersonReportPdf({
               decoration: const pw.BoxDecoration(color: _tint),
               children: [
                 cell('Toplam', bold: true),
-                for (final (_, pick) in columns) cell(n(pick(t)), bold: true),
+                for (final (_, pick) in shown) cell(n(pick(t)), bold: true),
               ],
             ),
             if (!row.isChargeNurse)
               pw.TableRow(
                 children: [
                   cell('Rol ortalaması', color: _muted),
-                  for (final (_, pick) in columns)
+                  for (final (_, pick) in shown)
                     cell(n(mean(pick)), color: _muted),
                 ],
               ),
