@@ -100,7 +100,16 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('pick-confirm')));
     await tester.runAsync(() => Future<void>.delayed(Duration.zero));
     await tester.pumpAndSettle();
-    expect(services.calls, ['sharePdf:karne-hemsire-2-2026.pdf']);
+    // Önce önizleme; paylaşılmadan gösterilir.
+    expect(find.text('Hemşire 2 · karne'), findsOneWidget);
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('pdf-page-0')), findsOneWidget);
+    expect(services.calls, ['pdfPages']);
+    await tester.tap(find.widgetWithText(FloatingActionButton, 'Paylaş'));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(services.calls, ['pdfPages', 'sharePdf:karne-hemsire-2-2026.pdf']);
     expect(boxes.meta.get('reportCardColumns'), isNot(contains('longGaps')));
     expect(boxes.meta.get('reportCardColumns'), contains('shifts'));
     expect(String.fromCharCodes(services.lastPdf!.take(5)), '%PDF-');

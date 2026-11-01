@@ -12,6 +12,7 @@ import '../../models/models.dart';
 import '../../shared/brand.dart';
 import '../../shared/platform_services.dart';
 import '../../shared/widgets/column_picker_dialog.dart';
+import '../../shared/widgets/pdf_preview_page.dart';
 import '../../shared/widgets/brand_widgets.dart';
 import '../holidays/holidays_controller.dart';
 import '../people/people_controller.dart';
@@ -91,6 +92,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
               initial: saved is List
                   ? TotalsColumn.fromNames(saved.cast<String>())
                   : {...TotalsColumn.values},
+              confirmLabel: 'Önizle',
             ),
           );
           if (columns == null || !mounted) return;
@@ -105,9 +107,16 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
             boldFont: fonts.bold,
             createdAt: ref.read(todayProvider),
           );
-          await services.sharePdf(
-            pdf,
-            'karne-${fileSlug(row.name)}-$_year.pdf',
+          if (!mounted) return;
+          // Önce önizleme: ne gönderildiği görülsün.
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => PdfPreviewPage(
+                title: '${row.name} · karne',
+                pdf: pdf,
+                fileName: 'karne-${fileSlug(row.name)}-$_year.pdf',
+              ),
+            ),
           );
         case _ShareAction.excel:
           await services.shareFile(

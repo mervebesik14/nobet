@@ -26,6 +26,16 @@ class PlatformServices {
     return page.toPng();
   }
 
+  /// PDF'in bütün sayfalarını önizleme için PNG görsellere çevirir
+  /// (piksel boyutlarıyla: görsel çözülmeden yer ayrılsın).
+  Future<List<({Uint8List png, int width, int height})>> pdfPages(
+    Uint8List pdf, {
+    double dpi = 110,
+  }) async => [
+    await for (final page in Printing.raster(pdf, dpi: dpi))
+      (png: await page.toPng(), width: page.width, height: page.height),
+  ];
+
   /// Herhangi bir dosyayı paylaşım menüsüyle gönderir.
   Future<void> shareFile(Uint8List bytes, String filename, String mimeType) =>
       SharePlus.instance.share(
