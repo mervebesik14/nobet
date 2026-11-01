@@ -43,7 +43,7 @@ void main() {
 
   tearDown(() => Hive.close());
 
-  Future<void> pumpMonthPage(WidgetTester tester) async {
+  Future<void> pumpMonthPage(WidgetTester tester, {int options = 1}) async {
     tester.view.physicalSize = const Size(1600, 3200);
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
@@ -54,6 +54,8 @@ void main() {
           todayProvider.overrideWithValue(DateTime(2026, 10, 11)),
           // Testte isolate yerine aynı iş parçacığında, az denemeyle.
           rosterRunnerProvider.overrideWithValue((g) async => g.generate()),
+          // Aday seçimi ayrı testte; burada tek liste.
+          rosterOptionCountProvider.overrideWithValue(options),
         ],
         child: const MaterialApp(home: MonthPage()),
       ),
@@ -122,6 +124,33 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.text('Listeyi Gör'), findsOneWidget);
+  });
+
+  testWidgets('3 aday liste karşılaştırılır; seçilen kaydedilir', (
+    tester,
+  ) async {
+    await pumpMonthPage(tester, options: 3);
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('3 liste hazır'), findsOneWidget);
+    expect(find.text('Önerilen'), findsOneWidget);
+    expect(find.text('Hafta sonu farkı'), findsOneWidget);
+    // Vazgeçince kaydedilmez.
+    await tester.tap(find.text('Vazgeç'));
+    await tester.pumpAndSettle();
+    expect(saved().hasRoster, isFalse);
+
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('roster-option-2')));
+    await tester.pumpAndSettle();
+    expect(find.text('Ekim 2026 Nöbet Listesi'), findsOneWidget);
+    expect(saved().assignments.length, 31);
   });
 
   testWidgets('uygunluk sorunu varsa sorar; vazgeçince oluşturulmaz', (

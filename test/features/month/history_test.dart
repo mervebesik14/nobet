@@ -65,6 +65,8 @@ void main() {
           ...boxOverrides(boxes),
           todayProvider.overrideWithValue(DateTime(2026, 10, 11)),
           rosterRunnerProvider.overrideWithValue((g) async => g.generate()),
+          // Aday seçimi ayrı testte; burada tek liste.
+          rosterOptionCountProvider.overrideWithValue(1),
         ],
         child: const MaterialApp(home: MonthPage()),
       ),

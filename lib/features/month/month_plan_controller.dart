@@ -5,6 +5,8 @@ import '../../data/month_plan_repository.dart';
 import '../../data/providers.dart';
 import '../../data/turkish_holidays.dart';
 import '../../logic/request_parser.dart';
+import '../../logic/roster_options.dart';
+import '../../logic/roster_summary.dart';
 import '../../logic/block_reason.dart';
 import '../../logic/day_shift_planner.dart';
 import '../../logic/feasibility_checker.dart';
@@ -316,10 +318,58 @@ class MonthPlanController extends Notifier<MonthPlan> {
   /// rastgele tohum kullanılır (her "Yeniden oluştur" farklı liste verir).
   /// Kilit burada kontrol edilmez; onayı ekran ister.
   Future<RosterResult> generate({int? seed, bool? nurseOnly}) async {
-    final plan = state;
-    final onlyNurses = nurseOnly ?? plan.nurseOnly;
-    final generator = _generator(plan, onlyNurses: onlyNurses, seed: seed);
+    final onlyNurses = nurseOnly ?? state.nurseOnly;
+    final generator = _generator(state, onlyNurses: onlyNurses, seed: seed);
     final result = await ref.read(rosterRunnerProvider)(generator);
+    await applyResult(result, nurseOnly: onlyNurses);
+    return result;
+  }
+
+  /// [count] farklı tohumla aday listeler üretir (kaydetmez); her birinin
+  /// karşılaştırma ölçüleriyle. Seçilen [applyResult] ile kaydedilir.
+  Future<List<({RosterResult result, RosterOptionStats stats})>>
+  generateOptions({required int count, required bool nurseOnly}) async {
+    final first = ref.read(rosterSeedProvider)();
+    final results = await Future.wait([
+      for (var i = 0; i < count; i++)
+        ref.read(rosterRunnerProvider)(
+          _generator(state, onlyNurses: nurseOnly, seed: first + i * 7919),
+        ),
+    ]);
+    final settings = effectiveSettings(
+      ref.read(rosterSettingsProvider),
+      nurseOnly: nurseOnly,
+    );
+    final holidays = ref
+        .read(holidaysProvider)
+        .where((h) => h.date.year == state.year && h.date.month == state.month)
+        .toList();
+    return [
+      for (final r in results)
+        (
+          result: r,
+          stats: RosterOptionStats.of(
+            r,
+            RosterSummary.build(
+              year: state.year,
+              month: state.month,
+              assignments: r.assignments,
+              people: ref.read(peopleProvider),
+              holidays: holidays,
+              settings: settings,
+              onlyRoles: nurseOnly ? const {Role.nurse} : null,
+              leaveDays: state.leaveDays,
+            ),
+          ),
+        ),
+    ];
+  }
+
+  /// Üretilmiş listeyi plana kaydeder (geçmişe yazılır).
+  Future<void> applyResult(
+    RosterResult result, {
+    required bool nurseOnly,
+  }) async {
     final before = state;
     state = state.copyWith(
       assignments: result.assignments,
@@ -329,7 +379,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       techDayShifts: const {},
       generatedAt: DateTime.now(),
       seed: result.seed,
-      nurseOnly: onlyNurses,
+      nurseOnly: nurseOnly,
     );
     await ref.read(monthPlanRepositoryProvider).save(state);
     await _record(
@@ -337,7 +387,6 @@ class MonthPlanController extends Notifier<MonthPlan> {
       before,
       details: false,
     );
-    return result;
   }
 
   /// Elle girmek için boş liste açar: ayın her günü boş koltuklarla. Önceki
@@ -652,6 +701,9 @@ RosterResult _runGenerator(RosterGenerator generator) => generator.generate();
 
 /// Algoritmayı arayüzü dondurmadan ayrı bir isolate'te çalıştırır.
 /// Testlerde doğrudan çalıştıran bir sürümle override edilir.
+/// "Listeyi Oluştur"un ürettiği aday sayısı (1 ise seçim sorulmaz).
+final rosterOptionCountProvider = Provider<int>((ref) => 3);
+
 final rosterRunnerProvider =
     Provider<Future<RosterResult> Function(RosterGenerator)>(
       (ref) =>

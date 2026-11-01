@@ -1,9 +1,13 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../logic/feasibility_checker.dart';
 import '../../logic/manual_edits.dart';
+import '../../logic/roster_generator.dart';
+import '../../logic/roster_options.dart';
 import '../people/people_controller.dart';
 import '../month/month_plan_controller.dart';
 
@@ -122,8 +126,23 @@ Future<bool> generateRoster(BuildContext context, WidgetRef ref) async {
       ),
     ),
   );
-  final result = await controller.generate(nurseOnly: nurseOnly);
-  navigator.pop();
+  final count = ref.read(rosterOptionCountProvider);
+  final RosterResult result;
+  if (count <= 1) {
+    result = await controller.generate(nurseOnly: nurseOnly);
+    navigator.pop();
+  } else {
+    final options = await controller.generateOptions(
+      count: count,
+      nurseOnly: nurseOnly,
+    );
+    navigator.pop();
+    if (!context.mounted) return false;
+    final picked = await chooseRosterOption(context, options);
+    if (picked == null || !context.mounted) return false;
+    result = picked;
+    await controller.applyResult(result, nurseOnly: nurseOnly);
+  }
 
   if (!result.isComplete && context.mounted) {
     await showDialog<void>(
@@ -143,6 +162,112 @@ Future<bool> generateRoster(BuildContext context, WidgetRef ref) async {
     );
   }
   return true;
+}
+
+/// Aday listeleri yan yana gösterir; seçilen döner (vazgeçilirse null).
+/// En iyi aday "Önerilen" işaretlidir; her ölçüde en iyi değer kalın.
+Future<RosterResult?> chooseRosterOption(
+  BuildContext context,
+  List<({RosterResult result, RosterOptionStats stats})> options,
+) {
+  final stats = [for (final o in options) o.stats];
+  final best = RosterOptionStats.best(stats);
+  final rows = <(String, int Function(RosterOptionStats))>[
+    ('Eksik koltuk', (s) => s.missing),
+    ('Toplam nöbet farkı', (s) => s.shiftSpread),
+    ('Hafta sonu farkı', (s) => s.weekendSpread),
+    ('Gün aşırı çift', (s) => s.everyOtherDayPairs),
+    ('4–5 gün ara', (s) => s.longGaps),
+  ];
+  return showDialog<RosterResult>(
+    context: context,
+    builder: (context) {
+      final theme = Theme.of(context);
+      return AlertDialog(
+        title: Text('${options.length} liste hazır'),
+        contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Farklar rol grubu içinde en çok ile en az tutan arasındadır; '
+                'hepsinde küçük olan daha iyi.',
+                style: theme.textTheme.bodySmall,
+              ),
+              const SizedBox(height: 12),
+              Table(
+                defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+                columnWidths: const {0: FlexColumnWidth(2.2)},
+                children: [
+                  TableRow(
+                    children: [
+                      const SizedBox(),
+                      for (var i = 0; i < options.length; i++)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: Column(
+                            children: [
+                              Text(
+                                String.fromCharCode(65 + i),
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              if (i == best)
+                                Text(
+                                  'Önerilen',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: theme.colorScheme.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                  for (final (label, value) in rows)
+                    TableRow(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Text(label, style: theme.textTheme.bodySmall),
+                        ),
+                        for (final s in stats)
+                          Text(
+                            '${value(s)}',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight:
+                                  value(s) == stats.map(value).reduce(min)
+                                  ? FontWeight.w800
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                      ],
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Vazgeç'),
+          ),
+          for (var i = 0; i < options.length; i++)
+            (i == best ? FilledButton.new : TextButton.new)(
+              key: ValueKey('roster-option-$i'),
+              onPressed: () => Navigator.of(context).pop(options[i].result),
+              child: Text(String.fromCharCode(65 + i)),
+            ),
+        ],
+      );
+    },
+  );
 }
 
 /// Liste kimler için oluşturulsun? true = yalnız hemşire, false = hemşire +
