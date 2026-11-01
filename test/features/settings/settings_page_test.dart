@@ -282,6 +282,29 @@ void main() {
     expect(find.text('Henüz otomatik yedek yok.'), findsOneWidget);
   });
 
+  testWidgets('kurum ve imza bilgileri kaydedilir', (tester) async {
+    await pump(tester);
+    final tile = find.byKey(const ValueKey('report-info'));
+    await tester.scrollUntilVisible(tile, 200);
+    expect(find.textContaining('Girilmedi.'), findsOneWidget);
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('report-Kurum (hastane) adı')),
+      'Örnek Devlet Hastanesi',
+    );
+    await tester.enterText(find.byKey(const ValueKey('report-Birim')), 'Acil');
+    await tester.enterText(
+      find.byKey(const ValueKey('report-Onaylayan unvan')),
+      'Başhekim',
+    );
+    await tester.tap(find.text('Kaydet'));
+    await tester.pumpAndSettle();
+    expect(find.text('Örnek Devlet Hastanesi · Acil'), findsOneWidget);
+    final saved = boxes.meta.get('reportInfo') as Map;
+    expect(saved['approvedTitle'], 'Başhekim');
+  });
+
   testWidgets('haftalık yedek dosyası: Şimdi yaz ile klasöre yazılır', (
     tester,
   ) async {

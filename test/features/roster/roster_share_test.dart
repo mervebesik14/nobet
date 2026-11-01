@@ -289,6 +289,17 @@ void main() {
     expect(ics, contains('X-WR-CALNAME:Banu nöbetleri'));
   });
 
+  testWidgets('fazla mesai raporu PDF olarak paylaşılır', (tester) async {
+    await boxes.meta.put('reportInfo', {
+      'institution': 'Örnek Devlet Hastanesi',
+      'unit': 'Radyoloji',
+    });
+    await pump(tester);
+    await choose(tester, 'Fazla mesai raporu (PDF)');
+    expect(services.calls, ['sharePdf:fazla-mesai-2026-10.pdf']);
+    expect(isPdf(services.lastPdf), isTrue);
+  });
+
   testWidgets('kişiye özel liste PDF olarak paylaşılır', (tester) async {
     await pump(tester);
     await choose(tester, 'Kişiye özel liste (PDF)');

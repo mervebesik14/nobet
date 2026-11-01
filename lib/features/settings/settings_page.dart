@@ -16,6 +16,7 @@ import '../month/month_reminder_notifications.dart';
 import '../people/people_controller.dart';
 import 'auto_backups_page.dart';
 import 'backup_actions.dart';
+import 'report_info.dart';
 import 'shift_reminder_notifications.dart';
 
 /// Ayarlar sekmesi: nöbet kuralları, mesai hesabı, tema ve yedekleme.
@@ -39,6 +40,7 @@ class SettingsPage extends ConsumerWidget {
         .firstOrNull
         ?.name;
     final shiftTime = ref.watch(shiftReminderTimeProvider);
+    final reportInfo = ref.watch(reportInfoProvider);
     final reminderTimeLabel = NextMonthReminder.timeLabel(
       reminderTime.hour,
       reminderTime.minute,
@@ -188,6 +190,27 @@ class SettingsPage extends ConsumerWidget {
                 leading: const Icon(Icons.restart_alt),
                 title: const Text('Varsayılanlara dön'),
                 onTap: () => controller.reset(),
+              ),
+            ],
+          ),
+          const PillHeader('Fazla mesai raporu'),
+          GroupCard(
+            children: [
+              ListTile(
+                key: const ValueKey('report-info'),
+                leading: const Icon(Icons.badge_outlined),
+                title: const Text('Kurum ve imza bilgileri'),
+                subtitle: Text(
+                  reportInfo.institution.isEmpty
+                      ? 'Girilmedi. Raporun başlığında ve imza alanlarında '
+                            'görünür.'
+                      : [
+                          reportInfo.institution,
+                          if (reportInfo.unit.isNotEmpty) reportInfo.unit,
+                        ].join(' · '),
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _editReportInfo(context, ref),
               ),
             ],
           ),
@@ -469,6 +492,18 @@ class SettingsPage extends ConsumerWidget {
     }
   }
 
+  /// Raporun kurum, birim ve imza bilgilerini düzenler.
+  static Future<void> _editReportInfo(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    final info = await showDialog<ReportInfo>(
+      context: context,
+      builder: (_) => _ReportInfoDialog(ref.read(reportInfoProvider)),
+    );
+    if (info != null) await ref.read(reportInfoProvider.notifier).set(info);
+  }
+
   /// 24 saat biçiminde saat seçici.
   static Future<TimeOfDay?> _askTime(
     BuildContext context,
@@ -633,6 +668,82 @@ class _NumberSetting extends StatelessWidget {
             ? null
             : () => onChanged((value + step).toDouble()),
       ),
+    );
+  }
+}
+
+/// Kurum ve imza bilgileri formu; kaydedilince yeni bilgiyi döner.
+class _ReportInfoDialog extends StatefulWidget {
+  const _ReportInfoDialog(this.info);
+
+  final ReportInfo info;
+
+  @override
+  State<_ReportInfoDialog> createState() => _ReportInfoDialogState();
+}
+
+class _ReportInfoDialogState extends State<_ReportInfoDialog> {
+  late final _fields = <String, TextEditingController>{
+    'Kurum (hastane) adı': TextEditingController(text: widget.info.institution),
+    'Birim': TextEditingController(text: widget.info.unit),
+    'Hazırlayan ad soyad': TextEditingController(text: widget.info.preparedBy),
+    'Hazırlayan unvan': TextEditingController(text: widget.info.preparedTitle),
+    'Onaylayan ad soyad': TextEditingController(text: widget.info.approvedBy),
+    'Onaylayan unvan': TextEditingController(text: widget.info.approvedTitle),
+  };
+
+  @override
+  void dispose() {
+    for (final c in _fields.values) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    List<String> values() => [for (final c in _fields.values) c.text.trim()];
+    return AlertDialog(
+      title: const Text('Kurum ve imza bilgileri'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final MapEntry(key: label, value: c) in _fields.entries)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: TextField(
+                  key: ValueKey('report-$label'),
+                  controller: c,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: InputDecoration(labelText: label),
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Vazgeç'),
+        ),
+        FilledButton(
+          onPressed: () {
+            final v = values();
+            Navigator.of(context).pop(
+              ReportInfo(
+                institution: v[0],
+                unit: v[1],
+                preparedBy: v[2],
+                preparedTitle: v[3],
+                approvedBy: v[4],
+                approvedTitle: v[5],
+              ),
+            );
+          },
+          child: const Text('Kaydet'),
+        ),
+      ],
     );
   }
 }

@@ -29,6 +29,8 @@ import '../../shared/calendar_service.dart';
 import '../../shared/platform_services.dart';
 import '../../shared/providers.dart';
 import 'edit_sheet.dart';
+import '../settings/report_info.dart';
+import 'overtime_report_pdf.dart';
 import 'personal_roster_pdf.dart';
 import 'roster_history_page.dart';
 import 'roster_pdf.dart';
@@ -1254,6 +1256,35 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     );
   }
 
+  /// İdareye verilecek imza alanlı fazla çalışma çizelgesini paylaşır.
+  /// Kurum / imza bilgileri Ayarlar > Rapor bilgileri'nden.
+  Future<void> _shareOvertimeReport(
+    MonthPlan plan,
+    RosterSummary summary,
+    int shiftHours,
+  ) async {
+    final services = ref.read(platformServicesProvider);
+    try {
+      final fonts = await services.loadPdfFonts();
+      final pdf = await buildOvertimeReportPdf(
+        year: plan.year,
+        month: plan.month,
+        summary: summary,
+        info: ref.read(reportInfoProvider),
+        shiftHours: shiftHours,
+        font: fonts.regular,
+        boldFont: fonts.bold,
+        createdAt: ref.read(todayProvider),
+      );
+      await services.sharePdf(
+        pdf,
+        'fazla-mesai-${plan.year}-${plan.month.toString().padLeft(2, '0')}.pdf',
+      );
+    } catch (e) {
+      if (mounted) _notify('Paylaşılamadı: $e');
+    }
+  }
+
   /// Herkesin kişiye özel PDF'ini ayrı dosyalar olarak tek seferde paylaşır.
   /// [calendar] ise PDF yerine herkesin takvim dosyası (.ics); ay içinde
   /// nöbeti ve 7A'sı olmayanlar atlanır.
@@ -1426,6 +1457,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             _ShareAction.personalPdf ||
             _ShareAction.personalCalendar ||
             _ShareAction.addToCalendar ||
+            _ShareAction.overtimeReport ||
             _ShareAction.allPersonalPdf ||
             _ShareAction.allPersonalCalendar ||
             _ShareAction.excel:
@@ -1539,6 +1571,11 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 weekendDays: weekendDays,
                 holidayDays: holidayDays,
               ),
+              _ShareAction.overtimeReport => _shareOvertimeReport(
+                plan,
+                summary,
+                settings.shiftHours,
+              ),
               _ShareAction.allPersonalPdf ||
               _ShareAction.allPersonalCalendar => _shareAllPersonal(
                 rows,
@@ -1600,6 +1637,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 child: ListTile(
                   leading: Icon(Icons.groups_outlined),
                   title: Text('Herkesin listesi (PDF)'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.overtimeReport,
+                child: ListTile(
+                  leading: Icon(Icons.assignment_outlined),
+                  title: Text('Fazla mesai raporu (PDF)'),
                 ),
               ),
               PopupMenuItem(
@@ -1963,6 +2007,7 @@ enum _ShareAction {
   addToCalendar,
   personalCalendar,
   allPersonalCalendar,
+  overtimeReport,
 }
 
 /// Vurgulanan kişinin özeti: tablonun üstünde, kapatılabilir.
