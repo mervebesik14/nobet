@@ -9,6 +9,7 @@ import 'package:nobet_listesi/app.dart';
 import 'package:nobet_listesi/data/auto_backup_service.dart';
 import 'package:nobet_listesi/data/backup_service.dart';
 import 'package:nobet_listesi/data/hive_boxes.dart';
+import 'package:nobet_listesi/data/weekly_file_backup.dart';
 import 'package:nobet_listesi/features/settings/auto_backups_page.dart';
 import 'package:nobet_listesi/features/settings/settings_page.dart';
 import 'package:nobet_listesi/models/models.dart';
@@ -279,6 +280,38 @@ void main() {
     await tester.tap(find.text('Otomatik yedekler'));
     await tester.pumpAndSettle();
     expect(find.text('Henüz otomatik yedek yok.'), findsOneWidget);
+  });
+
+  testWidgets('haftalık yedek dosyası: Şimdi yaz ile klasöre yazılır', (
+    tester,
+  ) async {
+    await boxes.people.put(
+      'a',
+      const Person(id: 'a', name: 'Ayşe', role: Role.nurse),
+    );
+    await pump(tester);
+    final tile = find.byKey(const ValueKey('weekly-backup'));
+    await tester.scrollUntilVisible(tile, 200);
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Henüz yazılmadı.'), findsOneWidget);
+
+    await tester.runAsync(() async {
+      await tester.tap(
+        find.descendant(of: tile, matching: find.text('Şimdi yaz')),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    });
+    await tester.pumpAndSettle();
+    final folder = ProviderScope.containerOf(
+      tester.element(find.byType(SettingsPage)),
+    ).read(backupFolderProvider);
+    final names = await tester.runAsync(folder.names);
+    expect(names, ['nobetci-yedek-2026-10-11.json']);
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Son: 11 Ekim 2026.'), findsOneWidget);
+    expect(find.text('Yedek dosyası yazıldı.'), findsOneWidget);
   });
 
   group('ay başı bildirimi', () {

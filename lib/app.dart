@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'data/auto_backup_service.dart';
 import 'data/providers.dart';
+import 'data/weekly_file_backup.dart';
 import 'features/month/month_reminder_notifications.dart';
 
 import 'features/settings/shift_reminder_notifications.dart';
@@ -18,6 +19,8 @@ class NobetApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Veri değiştikçe telefona sessizce yedek alınır.
     ref.watch(autoBackupWatcherProvider);
+    // Haftada bir yedek dosyası (Dosyalar uygulamasında görünür).
+    ref.watch(weeklyFileBackupWatcherProvider);
     // Gelecek ayın listesi yoksa ayın seçilen günü telefon bildirimi.
     ref.watch(monthReminderWatcherProvider);
     // Seçilen kişinin nöbetlerinden önceki akşam bildirim.

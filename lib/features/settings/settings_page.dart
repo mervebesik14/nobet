@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import '../../data/backup_service.dart';
 import '../../data/providers.dart';
+import '../../data/weekly_file_backup.dart';
 import '../../logic/next_month_reminder.dart';
 import '../../models/models.dart';
 import '../../shared/notification_service.dart';
@@ -353,6 +354,34 @@ class SettingsPage extends ConsumerWidget {
                   MaterialPageRoute<void>(
                     builder: (_) => const AutoBackupsPage(),
                   ),
+                ),
+              ),
+              ListTile(
+                key: const ValueKey('weekly-backup'),
+                leading: const Icon(Icons.folder_copy_outlined),
+                title: const Text('Haftalık yedek dosyası'),
+                subtitle: Text(
+                  '${switch (ref.watch(weeklyBackupDateProvider).value) {
+                    final d? => 'Son: ${DateFormat('d MMMM y', 'tr_TR').format(d)}. ',
+                    null => 'Henüz yazılmadı. ',
+                  }}'
+                  'Haftada bir kendiliğinden yazılır: Dosyalar › iPhone\'umda '
+                  '› Nöbetçi › Yedekler. Telefonun iCloud yedeğine de girer.',
+                ),
+                isThreeLine: true,
+                trailing: TextButton(
+                  onPressed: () async {
+                    final wrote = await writeWeeklyBackupNow(ref);
+                    if (context.mounted) {
+                      _notify(
+                        context,
+                        wrote
+                            ? 'Yedek dosyası yazıldı.'
+                            : 'Yedeklenecek veri yok.',
+                      );
+                    }
+                  },
+                  child: const Text('Şimdi yaz'),
                 ),
               ),
             ],

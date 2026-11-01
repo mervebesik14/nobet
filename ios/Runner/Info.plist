@@ -72,5 +72,9 @@
 	<string>Nöbetlerinizi takviminize eklemek ve liste değişince eski nöbet etkinliklerini güncellemek için.</string>
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
 	<string>Nöbetlerinizi takviminize eklemek için.</string>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 </dict>
 </plist>

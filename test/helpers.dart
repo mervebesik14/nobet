@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/misc.dart';
 import 'package:hive_ce/hive_ce.dart';
 import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/data/providers.dart';
+import 'package:nobet_listesi/data/weekly_file_backup.dart';
 import 'package:nobet_listesi/logic/roster_calendar.dart';
 import 'package:nobet_listesi/shared/calendar_service.dart';
 import 'package:nobet_listesi/shared/notification_service.dart';
@@ -27,6 +28,10 @@ List<Override> boxOverrides(HiveBoxes boxes) {
   return [
     hiveBoxesProvider.overrideWithValue(boxes),
     rosterSeedProvider.overrideWithValue(() => rng.nextInt(1 << 31)),
+    // Haftalık dosya yedeği gerçek Belgeler klasörü yerine geçici klasöre.
+    backupFolderProvider.overrideWithValue(
+      BackupFolder(Directory.systemTemp.createTempSync('nobet_yedek')),
+    ),
   ];
 }
 
