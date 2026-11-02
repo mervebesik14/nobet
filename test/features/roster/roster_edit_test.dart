@@ -965,9 +965,11 @@ void main() {
         find.descendant(of: cell('t2', 5), matching: find.text('7A')),
         findsOneWidget,
       );
-      // Serbest düzenlemede 7A hücresine dokununca 24 yazılır, 7A düşer
+      // Serbest düzenlemede 7A hücresi: "24 yaz" seçilince 7A düşer
       // (Can 6'sında da nöbetçi: art arda uyarısı onaylanır).
       await tester.tap(cell('t2', 5));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('24 yaz'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Yine de yap'));
       await tester.pumpAndSettle();
@@ -1044,6 +1046,67 @@ void main() {
       await tester.pumpAndSettle();
       expect(saved().dayShiftOverrides, {8: 'n0'});
     });
+  });
+
+  testWidgets('hemşireye sorumlunun 7A\'sına ek 7A yazılır ve kaldırılır', (
+    tester,
+  ) async {
+    await boxes.people.put(
+      'c',
+      const Person(
+        id: 'c',
+        name: 'Sorumlu',
+        role: Role.nurse,
+        isChargeNurse: true,
+      ),
+    );
+    await pumpRoster(tester);
+    Finder sevenA(String id, int d) =>
+        find.descendant(of: cell(id, d), matching: find.text('7A'));
+    // 16 Ekim Cuma: sorumlu 7A'da; Ayşe boş.
+    expect(sevenA('c', 16), findsOneWidget);
+    await tester.tap(cell('n0', 16));
+    await tester.pumpAndSettle();
+    await tester.tap(inSheet('Ek 7A yaz'));
+    await tester.pumpAndSettle();
+    expect(saved().techDayShifts, {
+      'n0': [16],
+    });
+    expect(saved().dayShiftOverrides, isEmpty);
+    // Aynı gün iki 7A.
+    expect(sevenA('c', 16), findsOneWidget);
+    expect(sevenA('n0', 16), findsOneWidget);
+
+    // Ek 7A hücresinde kaldır.
+    await tester.tap(cell('n0', 16));
+    await tester.pumpAndSettle();
+    await tester.tap(inSheet("7A'yı kaldır"));
+    await tester.pumpAndSettle();
+    expect(saved().techDayShifts, isEmpty);
+    expect(sevenA('n0', 16), findsNothing);
+    expect(sevenA('c', 16), findsOneWidget);
+  });
+
+  testWidgets('serbest düzenlemede otomatik 7A silinebilir', (tester) async {
+    await boxes.people.put(
+      'c',
+      const Person(
+        id: 'c',
+        name: 'Sorumlu',
+        role: Role.nurse,
+        isChargeNurse: true,
+      ),
+    );
+    await pumpRoster(tester);
+    await tester.tap(find.text('Serbest düzenleme'));
+    await tester.pumpAndSettle();
+    // 7A hücresi nöbete çevrilmez; 7A seçenekleri açılır.
+    await tester.tap(cell('c', 15));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text("7A'yı sil"));
+    await tester.pumpAndSettle();
+    expect(saved().dayShiftOverrides, {15: ''});
+    expect(saved().assignments[15]!.includes('c'), isFalse);
   });
 
   testWidgets("otomatik 7A silinir; geri alınabilir", (tester) async {

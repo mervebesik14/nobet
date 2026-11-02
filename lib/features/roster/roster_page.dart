@@ -349,10 +349,19 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   Future<void> _onCellTap(RosterCell cell, Role role) async {
     if (_swapFrom != null) return _completeSwap(cell, role);
     if (!_ensureUnlocked()) return;
-    if (_freeEdit) return _toggleCell(cell, role);
-
     // 7A yazan hücre: 7A'yı başkasına vermek ya da 24 nöbete yazmak.
     final dayShift = ref.read(dayShiftsProvider)[cell.day];
+    final onShiftHere =
+        _plan.assignments[cell.day]?.includes(cell.personId) ?? false;
+    // Serbest düzenlemede de 7A hücresi 7A seçeneklerini açar (silmek için).
+    final shows7A =
+        !onShiftHere &&
+        (dayShift?.personId == cell.personId || _techHas7A(cell, role));
+    if (_freeEdit && !shows7A) return _toggleCell(cell, role);
+    if (_freeEdit && _techHas7A(cell, role)) {
+      return _removeManual7AAsk(cell, role);
+    }
+
     if (dayShift?.personId == cell.personId &&
         !(_plan.assignments[cell.day]?.includes(cell.personId) ?? false)) {
       final choice = await showModalBottomSheet<String>(
@@ -708,9 +717,9 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     await _apply(result);
   }
 
-  /// Teknikerin [cell] gününde elle 7A'sı var mı (o gün nöbette değilken)?
+  /// Kişinin [cell] gününde elle (ek) 7A'sı var mı (o gün nöbette
+  /// değilken)? Teknikerde ve hemşirede (sorumlunun 7A'sına ek).
   bool _techHas7A(RosterCell cell, Role role) =>
-      role == Role.radiologyTech &&
       !(_plan.assignments[cell.day]?.includes(cell.personId) ?? false) &&
       (_plan.techDayShifts[cell.personId]?.contains(cell.day) ?? false);
 
@@ -736,6 +745,25 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     return workday && !_techHas7A(cell, role);
   }
 
+  /// Hemşireye ek 7A yazılabilir mi? Mesai günü, o günün (sorumlu) 7A'sı
+  /// onda değil ve elle 7A'sı yok.
+  bool _canExtra7A(RosterCell cell, Role role) {
+    if (role != Role.nurse) return false;
+    final plan = _plan;
+    final workday =
+        DayShiftPlanner.workdayHours(
+          year: plan.year,
+          month: plan.month,
+          day: cell.day,
+          holidays: ref.read(holidaysProvider),
+          settings: ref.read(effectiveSettingsProvider),
+        ) !=
+        null;
+    final isDayShift =
+        ref.read(dayShiftsProvider)[cell.day]?.personId == cell.personId;
+    return workday && !isDayShift && !_techHas7A(cell, role);
+  }
+
   /// Dokununca açılan sayfadaki 7A seçenekleri.
   List<EditOption> _dayShiftOptions(RosterCell cell, Role role) {
     final plan = _plan;
@@ -749,6 +777,16 @@ class _RosterPageState extends ConsumerState<RosterPage> {
           icon: Icons.wb_sunny_outlined,
           result: plan.assignments,
           onSelected: () => _removeTechDayShift(cell),
+        ),
+      if (_canExtra7A(cell, role))
+        EditOption(
+          title: onShift ? "Ek 7A'ya çevir" : 'Ek 7A yaz',
+          subtitle: onShift
+              ? '24 nöbeti kalkar; sorumlunun 7A\'sına ek olarak 7A çalışır.'
+              : 'Sorumlunun 7A\'sı kalır; bu kişi de 7A çalışır.',
+          icon: Icons.add_task,
+          result: plan.assignments,
+          onSelected: () => _writeTechDayShift(cell),
         ),
       if (_can7A(cell, role))
         EditOption(
@@ -860,11 +898,11 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       after = RosterEditor.replace(
         after,
         day: day,
-        role: Role.radiologyTech,
+        role: current!.nurseIds.contains(id) ? Role.nurse : Role.radiologyTech,
         oldId: id,
         newId: null,
         nursesPerDay: ref.read(effectiveSettingsProvider).nursesPerDay,
-        secondary: current!.isSecondaryTech(id),
+        secondary: current.isSecondaryTech(id),
       );
     }
     if (!await _confirmWarnings(_dayShiftWarnings(id, day, after))) return;
@@ -880,7 +918,33 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     );
   }
 
-  /// Teknikerin [cell] günündeki elle 7A'sını kaldırır.
+  /// Serbest düzenlemede elle 7A hücresi: 24 mü yazılsın, 7A mı kalksın?
+  Future<void> _removeManual7AAsk(RosterCell cell, Role role) async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${_name(cell.personId)} · ${_dayLabel(cell.day)} · 7A'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Vazgeç'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop('remove'),
+            child: const Text("7A'yı kaldır"),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop('24'),
+            child: const Text('24 yaz'),
+          ),
+        ],
+      ),
+    );
+    if (choice == 'remove') await _removeTechDayShift(cell);
+    if (choice == '24') await _toggleCell(cell, role);
+  }
+
+  /// Kişinin [cell] günündeki elle (ek) 7A'sını kaldırır.
   Future<void> _removeTechDayShift(RosterCell cell) async {
     final plan = _plan;
     final days = [
@@ -1016,6 +1080,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     // Teknikerin elle 7A'sı (hücrede 7A yazar).
     final techHas7A = _techHas7A(cell, role);
     final can7A = _can7A(cell, role);
+    final canExtra7A = _canExtra7A(cell, role);
     // Hemşirenin 7A hücresi dokunmayla aynı seçenekleri açar; boş
     // hemşire hücresinde 24 / 16A yaz seçilir.
     if (!onShift && isDayShift) return _onCellTap(cell, role);
@@ -1056,6 +1121,15 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                         : 'Nöbeti kalkar, bu gün 7A (gündüz) çalışır.',
                   ),
                   onTap: () => Navigator.of(context).pop('7a'),
+                ),
+              if (canExtra7A)
+                ListTile(
+                  leading: const Icon(Icons.add_task),
+                  title: const Text("Ek 7A'ya çevir"),
+                  subtitle: const Text(
+                    '24 nöbeti kalkar; sorumlunun 7A\'sına ek 7A çalışır.',
+                  ),
+                  onTap: () => Navigator.of(context).pop('extra7a'),
                 ),
               if (nurse)
                 ListTile(
@@ -1113,6 +1187,16 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                   ),
                   onTap: () => Navigator.of(context).pop('7a'),
                 ),
+              if (canExtra7A)
+                ListTile(
+                  key: const ValueKey('extra-7a-write'),
+                  leading: const Icon(Icons.add_task),
+                  title: const Text('Ek 7A yaz'),
+                  subtitle: const Text(
+                    'Sorumlunun 7A\'sı kalır; bu kişi de 7A çalışır.',
+                  ),
+                  onTap: () => Navigator.of(context).pop('extra7a'),
+                ),
               if (nurse)
                 ListTile(
                   key: const ValueKey('nurse-16a-write'),
@@ -1155,6 +1239,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         await (nurse ? _writeDayShift(cell) : _writeTechDayShift(cell));
       case 'no7a':
         await _removeTechDayShift(cell);
+      case 'extra7a':
+        await _writeTechDayShift(cell);
       case '16b':
         await _writeTechSeat(cell, secondary: true);
       case '24':
