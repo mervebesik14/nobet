@@ -358,10 +358,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     final shows7A =
         !onShiftHere &&
         (dayShift?.personId == cell.personId || _techHas7A(cell, role));
-    if (_freeEdit && !shows7A) return _toggleCell(cell, role);
-    if (_freeEdit && _techHas7A(cell, role)) {
-      return _removeManual7AAsk(cell, role);
+    // Serbest düzenlemede mesai günü dokundukça: boş → 24 → 7A → boş
+    // (sorumlu hemşire 7A'ya çevrilmez; hafta sonu/tatilde 24 → boş).
+    if (_freeEdit && _techHas7A(cell, role)) return _removeTechDayShift(cell);
+    if (_freeEdit && onShiftHere && _isWorkday(cell.day) && !_isCharge(cell)) {
+      return _writeTechDayShift(cell);
     }
+    if (_freeEdit && !shows7A) return _toggleCell(cell, role);
 
     if (dayShift?.personId == cell.personId &&
         !(_plan.assignments[cell.day]?.includes(cell.personId) ?? false)) {
@@ -727,6 +730,21 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   /// [cell] kişisine o gün 7A yazılabilir mi? Hemşire: sorumlu hemşire
   /// tanımlıyken mesai günü ve o günün 7A'sı zaten onda değilse. Tekniker:
   /// mesai günü ve henüz 7A'sı yoksa.
+  /// [day] mesai günü mü (hafta sonu / tam gün tatil değil)?
+  bool _isWorkday(int day) =>
+      DayShiftPlanner.workdayHours(
+        year: _plan.year,
+        month: _plan.month,
+        day: day,
+        holidays: ref.read(holidaysProvider),
+        settings: ref.read(effectiveSettingsProvider),
+      ) !=
+      null;
+
+  bool _isCharge(RosterCell cell) => ref
+      .read(peopleProvider)
+      .any((p) => p.id == cell.personId && p.isChargeNurse);
+
   bool _can7A(RosterCell cell, Role role) {
     final plan = _plan;
     if (role == Role.nurse) {
@@ -917,32 +935,6 @@ class _RosterPageState extends ConsumerState<RosterPage> {
           '${_name(id)} ${formatDayMonth(day, plan.month)} '
           '${onShift ? 'nöbet yerine ' : ''}7A\'ya yazıldı.',
     );
-  }
-
-  /// Serbest düzenlemede elle 7A hücresi: 24 mü yazılsın, 7A mı kalksın?
-  Future<void> _removeManual7AAsk(RosterCell cell, Role role) async {
-    final choice = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('${_name(cell.personId)} · ${_dayLabel(cell.day)} · 7A'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Vazgeç'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop('remove'),
-            child: const Text("7A'yı kaldır"),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop('24'),
-            child: const Text('24 yaz'),
-          ),
-        ],
-      ),
-    );
-    if (choice == 'remove') await _removeTechDayShift(cell);
-    if (choice == '24') await _toggleCell(cell, role);
   }
 
   /// Kişinin [cell] günündeki elle (ek) 7A'sını kaldırır.
@@ -1956,9 +1948,11 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                       const SizedBox(height: 4),
                       Text(
                         _freeEdit
-                            ? 'Serbest düzenleme açık: boş hücreye dokununca kişi '
-                                  'o güne yazılır, nöbete dokununca silinir. Kurallar '
-                                  'engellemez; ihlaller aşağıda uyarı olarak görünür.'
+                            ? 'Serbest düzenleme açık: mesai günlerinde dokundukça '
+                                  'boş → 24 → 7A → boş; hafta sonu ve tatilde nöbete '
+                                  'dokununca silinir. Basılı tutunca 16A ve Ek 7A '
+                                  'seçenekleri. Kurallar engellemez; ihlaller aşağıda '
+                                  'uyarı olarak görünür.'
                             : 'Düzenlemek için hücreye dokunun ya da basılı tutun; '
                                   'basılı tutunca takas da seçilebilir.',
                         style: theme.textTheme.bodySmall,

@@ -682,6 +682,35 @@ void main() {
     expect(sheet(), findsOneWidget);
   });
 
+  testWidgets('serbest düzenleme: hafta içi boş → 24 → 7A → boş', (
+    tester,
+  ) async {
+    await pumpRoster(tester);
+    await tester.tap(find.text('Serbest düzenleme'));
+    await tester.pumpAndSettle();
+
+    // 14 Ekim Çarşamba: Ayşe'nin 24'ü → ek 7A → boş → yine 24.
+    await tester.tap(cell('n0', 14));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[14]!.nurseIds, isNot(contains('n0')));
+    expect(saved().techDayShifts, {
+      'n0': [14],
+    });
+    expect(
+      find.descendant(of: cell('n0', 14), matching: find.text('7A')),
+      findsOneWidget,
+    );
+
+    await tester.tap(cell('n0', 14));
+    await tester.pumpAndSettle();
+    expect(saved().techDayShifts, isEmpty);
+    expect(saved().assignments[14]!.nurseIds, isNot(contains('n0')));
+
+    await tester.tap(cell('n0', 14));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[14]!.nurseIds, contains('n0'));
+  });
+
   testWidgets('basılı tut → Sil: nöbet doğrudan silinir', (tester) async {
     await pumpRoster(tester);
     await tester.longPress(cell('n0', 3));
@@ -973,11 +1002,13 @@ void main() {
         find.descendant(of: cell('t2', 5), matching: find.text('7A')),
         findsOneWidget,
       );
-      // Serbest düzenlemede 7A hücresi: "24 yaz" seçilince 7A düşer
-      // (Can 6'sında da nöbetçi: art arda uyarısı onaylanır).
+      // Serbest düzenlemede 7A hücresine dokununca 7A kalkar, bir daha
+      // dokununca 24 yazılır (Can 6'sında da nöbetçi: art arda uyarısı
+      // onaylanır).
       await tester.tap(cell('t2', 5));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('24 yaz'));
+      expect(saved().techDayShifts, isEmpty);
+      await tester.tap(cell('t2', 5));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Yine de yap'));
       await tester.pumpAndSettle();
