@@ -439,7 +439,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       final secondary = current.isSecondaryTech(id);
       final shift = role == Role.radiologyTech
           ? (secondary ? ' · 16B' : ' · 24')
-          : '';
+          : (current.isNurse16a(id) ? ' · 16A' : '');
       result = await showEditSheet(
         context,
         title: '${_name(id)} · ${_dayLabel(day)}$shift',
@@ -925,6 +925,78 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     );
   }
 
+  /// Nöbetçi hemşirenin [cell] günündeki vardiyasını 16A / 24 yapar.
+  Future<void> _setNurse16a(RosterCell cell, {required bool night}) async {
+    final plan = _plan;
+    try {
+      final after = RosterEditor.setNurse16a(
+        plan.assignments,
+        day: cell.day,
+        personId: cell.personId,
+        night: night,
+      );
+      await _apply(
+        after,
+        message:
+            '${_name(cell.personId)} ${formatDayMonth(cell.day, plan.month)} '
+            '${night ? "16A'ya" : "24'e"} çevrildi.',
+      );
+    } on RosterEditException catch (e) {
+      _notify(e.message);
+    }
+  }
+
+  /// Hemşireyi [cell] gününe 16A yazar: boş koltuk varsa oraya, yoksa
+  /// seçilen hemşirenin yerine.
+  Future<void> _writeNurse16a(RosterCell cell) async {
+    final plan = _plan;
+    final nursesPerDay = ref.read(effectiveSettingsProvider).nursesPerDay;
+    final current = plan.assignments[cell.day] ?? DayAssignment(day: cell.day);
+    String? replaced;
+    if (current.nurseIds.length >= nursesPerDay) {
+      replaced = await showDialog<String>(
+        context: context,
+        builder: (context) => SimpleDialog(
+          title: const Text('Kimin yerine 16A?'),
+          children: [
+            for (final other in current.nurseIds)
+              SimpleDialogOption(
+                onPressed: () => Navigator.of(context).pop(other),
+                child: Text(_name(other)),
+              ),
+          ],
+        ),
+      );
+      if (replaced == null || !mounted) return;
+    }
+    try {
+      var after = RosterEditor.replace(
+        plan.assignments,
+        day: cell.day,
+        role: Role.nurse,
+        oldId: replaced,
+        newId: cell.personId,
+        nursesPerDay: nursesPerDay,
+      );
+      after = RosterEditor.setNurse16a(
+        after,
+        day: cell.day,
+        personId: cell.personId,
+        night: true,
+      );
+      if (!await _confirmViolations(after)) return;
+      await _apply(
+        after,
+        message:
+            '${_name(cell.personId)} ${formatDayMonth(cell.day, plan.month)} '
+            "16A'ya yazıldı"
+            '${replaced == null ? '' : ' (${_name(replaced)} yerine)'}.',
+      );
+    } on RosterEditException catch (e) {
+      _notify(e.message);
+    }
+  }
+
   /// Uzun basma menüsü. Nöbet hücresinde: değiştir, sil, takas ve
   /// hemşirede 7A'ya / teknikerde 16B'ye (ya da 24'e) çevir. Boş hücrede:
   /// 24 nöbet yaz ve hemşirede 7A / teknikerde 16B yaz. 7A hücresinde
@@ -936,6 +1008,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     final current = plan.assignments[cell.day];
     final onShift = current?.includes(cell.personId) ?? false;
     final secondary = current?.isSecondaryTech(cell.personId) ?? false;
+    final night = current?.isNurse16a(cell.personId) ?? false;
     final isDayShift =
         ref.read(dayShiftsProvider)[cell.day]?.personId == cell.personId;
     final nurse = role == Role.nurse;
@@ -943,9 +1016,9 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     // Teknikerin elle 7A'sı (hücrede 7A yazar).
     final techHas7A = _techHas7A(cell, role);
     final can7A = _can7A(cell, role);
-    if (!onShift && (isDayShift || (nurse && !can7A))) {
-      return _onCellTap(cell, role);
-    }
+    // Hemşirenin 7A hücresi dokunmayla aynı seçenekleri açar; boş
+    // hemşire hücresinde 24 / 16A yaz seçilir.
+    if (!onShift && isDayShift) return _onCellTap(cell, role);
 
     final choice = await showModalBottomSheet<String>(
       context: context,
@@ -983,6 +1056,19 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                         : 'Nöbeti kalkar, bu gün 7A (gündüz) çalışır.',
                   ),
                   onTap: () => Navigator.of(context).pop('7a'),
+                ),
+              if (nurse)
+                ListTile(
+                  key: const ValueKey('nurse-16a-toggle'),
+                  leading: const Icon(Icons.nights_stay_outlined),
+                  title: Text(night ? "24'e çevir" : "16A'ya çevir"),
+                  subtitle: Text(
+                    night
+                        ? '16A yerine 24 nöbet tutar.'
+                        : '24 yerine 16A (16:00–08:00) tutar.',
+                  ),
+                  onTap: () =>
+                      Navigator.of(context).pop(night ? 'n24' : 'n16a'),
                 ),
               if (tech)
                 ListTile(
@@ -1027,6 +1113,16 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                   ),
                   onTap: () => Navigator.of(context).pop('7a'),
                 ),
+              if (nurse)
+                ListTile(
+                  key: const ValueKey('nurse-16a-write'),
+                  leading: const Icon(Icons.nights_stay_outlined),
+                  title: const Text('16A yaz'),
+                  subtitle: const Text(
+                    '16:00–08:00; o günün bir hemşire koltuğunu doldurur.',
+                  ),
+                  onTap: () => Navigator.of(context).pop('n16a-new'),
+                ),
               if (tech)
                 ListTile(
                   leading: const Icon(Icons.schedule),
@@ -1063,6 +1159,12 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         await _writeTechSeat(cell, secondary: true);
       case '24':
         await _writeTechSeat(cell, secondary: false);
+      case 'n16a':
+        await _setNurse16a(cell, night: true);
+      case 'n24':
+        await _setNurse16a(cell, night: false);
+      case 'n16a-new':
+        await _writeNurse16a(cell);
       case 'swap':
         setState(() => _swapFrom = cell);
     }

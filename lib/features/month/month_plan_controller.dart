@@ -905,6 +905,7 @@ typedef DayOverview = ({
   DateTime date,
   bool hasRoster,
   List<String> nurseIds,
+  List<String> nurse16aIds,
   String? techId,
   String? tech16bId,
   List<String> dayShiftIds,
@@ -960,6 +961,7 @@ final todayOverviewProvider = Provider<List<DayOverview>>((ref) {
             date: date,
             hasRoster: false,
             nurseIds: const <String>[],
+            nurse16aIds: const <String>[],
             techId: null,
             tech16bId: null,
             dayShiftIds: const <String>[],
@@ -970,6 +972,7 @@ final todayOverviewProvider = Provider<List<DayOverview>>((ref) {
           date: date,
           hasRoster: true,
           nurseIds: a?.nurseIds ?? const <String>[],
+          nurse16aIds: a?.nurse16aIds ?? const <String>[],
           techId: a?.techId,
           tech16bId: a?.tech16bId,
           dayShiftIds: [

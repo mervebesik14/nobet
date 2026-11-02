@@ -155,6 +155,7 @@ class RosterSummary {
     final assignedRole = <String, Role>{};
     // 16B (hafif) vardiyadaki tekniker günleri; çalışılan saat farklı.
     final secondary = <String, Set<int>>{};
+    final night = <String, Set<int>>{};
     for (final a in assignments.values) {
       for (final id in a.nurseIds) {
         (worked[id] ??= {}).add(a.day);
@@ -168,6 +169,9 @@ class RosterSummary {
         (worked[id] ??= {}).add(a.day);
         assignedRole[id] = Role.radiologyTech;
         (secondary[id] ??= {}).add(a.day);
+      }
+      for (final id in a.nurse16aIds) {
+        if (a.nurseIds.contains(id)) (night[id] ??= {}).add(a.day);
       }
     }
 
@@ -195,7 +199,8 @@ class RosterSummary {
       final person = byId[id];
       final days = worked[id] ?? const <int>{};
       final light = secondary[id] ?? const <int>{};
-      final full = days.length - light.length;
+      final nights = night[id] ?? const <int>{};
+      final full = days.length - light.length - nights.length;
       // İzin günleri (yıllık + şua) kişinin gereken saatinden düşülür
       // (altına inmez).
       final leave = leaveDays[id] ?? const <int>[];
@@ -214,11 +219,13 @@ class RosterSummary {
           nationalHolidayShifts: days.where(nationalDays.contains).length,
           religiousHolidayShifts: days.where(religiousDays.contains).length,
           everyOtherDayPairs: RosterGenerator.everyOtherDayPairs(days),
-          // 24 vardiyaları tam saat, 16B vardiyaları kısa saat sayılır.
-          // 7A günleri o günün mesai saati kadar eklenir.
+          // 24 vardiyaları tam saat, 16B vardiyaları kısa saat, hemşire
+          // 16A'ları 16 saat sayılır. 7A günleri o günün mesai saati kadar
+          // eklenir.
           workedHours:
               calc.workedHours(full) +
               light.length * settings.secondaryTechShiftHours +
+              nights.length * DayAssignment.nurse16aHours +
               (dayHours[id] ?? 0),
           requiredHours: personRequired,
           dayShifts: dayCount[id] ?? 0,

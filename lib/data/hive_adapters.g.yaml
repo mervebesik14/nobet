@@ -51,7 +51,7 @@ types:
         index: 4
   DayAssignment:
     typeId: 3
-    nextIndex: 4
+    nextIndex: 5
     fields:
       day:
         index: 0
@@ -61,6 +61,8 @@ types:
         index: 2
       tech16bId:
         index: 3
+      nurse16aIds:
+        index: 4
   MonthPlan:
     typeId: 4
     nextIndex: 16

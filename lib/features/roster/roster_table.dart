@@ -419,13 +419,14 @@ class _RosterTableState extends State<RosterTable> {
     );
   }
 
-  /// Nöbet hücresi yazısı: 16B teknikeri ise "16B", yoksa "24". Nöbet
-  /// yoksa null (izin yazısı hücrede ayrıca eklenir).
+  /// Nöbet hücresi yazısı: 16B teknikeri "16B", 16A hemşiresi "16A",
+  /// yoksa "24". Nöbet yoksa null (izin yazısı hücrede ayrıca eklenir).
   String? _labelFor(String id, int day, bool works) {
     if (!works) return null;
-    return (plan.assignments[day]?.isSecondaryTech(id) ?? false)
-        ? '16B'
-        : '$shiftHours';
+    return switch (plan.assignments[day]?.shiftCode(id)) {
+      final code? when code != '24' => code,
+      _ => '$shiftHours',
+    };
   }
 
   Widget _personCell(

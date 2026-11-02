@@ -406,10 +406,61 @@ void main() {
     await tester.pumpAndSettle();
     expect(saved().assignments[3]!.nurseIds, ['n6', 'n7']);
 
-    // Boş hücrede basılı tutmak doğrudan atama seçeneklerini açar.
+    // Boş hemşire hücresinde basılı tut: 24 ya da 16A yaz.
     await tester.longPress(cell('n0', 4));
     await tester.pumpAndSettle();
+    expect(find.text('16A yaz'), findsOneWidget);
+    await tester.tap(find.text('24 nöbet yaz'));
+    await tester.pumpAndSettle();
     expect(inSheet('Bu güne ata'), findsOneWidget);
+  });
+
+  testWidgets('hemşire 16A: yazılır, 24\'e ve 16A\'ya çevrilir', (
+    tester,
+  ) async {
+    await pumpRoster(tester);
+    // 3 Ekim'de n0 nöbetçi: 16A'ya çevir.
+    await tester.longPress(cell('n0', 3));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('nurse-16a-toggle')));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.nurse16aIds, ['n0']);
+    expect(saved().assignments[3]!.shiftCode('n0'), '16A');
+    expect(
+      find.descendant(of: cell('n0', 3), matching: find.text('16A')),
+      findsOneWidget,
+    );
+
+    // Geri 24'e.
+    await tester.longPress(cell('n0', 3));
+    await tester.pumpAndSettle();
+    expect(find.text("24'e çevir"), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('nurse-16a-toggle')));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.nurse16aIds, isEmpty);
+
+    // Boş hücreye 16A yaz: koltuk doluysa kimin yerine diye sorulur.
+    final day4 = saved().assignments[4]!.nurseIds;
+    await tester.longPress(cell('n0', 4));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('nurse-16a-write')));
+    await tester.pumpAndSettle();
+    expect(find.text('Kimin yerine 16A?'), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(SimpleDialog),
+        matching: find.text(_nurses[int.parse(day4.first.substring(1))]),
+      ),
+    );
+    await tester.pumpAndSettle();
+    if (find.text('Yine de yap').evaluate().isNotEmpty) {
+      await tester.tap(find.text('Yine de yap'));
+      await tester.pumpAndSettle();
+    }
+    final a = saved().assignments[4]!;
+    expect(a.nurseIds, contains('n0'));
+    expect(a.nurseIds, isNot(contains(day4.first)));
+    expect(a.nurse16aIds, ['n0']);
   });
 
   testWidgets('takas yapısal olarak olamıyorsa açıklar', (tester) async {

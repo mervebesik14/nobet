@@ -16,6 +16,7 @@ typedef CalendarEntry = ({
 ///
 /// - 24 nöbet: 08:00 → ertesi gün 08:00
 /// - 16B: 08:00 → 24:00
+/// - Hemşire 16A: 16:00 → ertesi gün 08:00
 /// - 7A: 08:00 → günün mesai saati kadar (ör. 7 saat → 15:00)
 ///
 /// Her etkinlikte önceki akşam 20:00'de hatırlatma vardır. Saatler cihazın
@@ -30,8 +31,12 @@ class RosterCalendar {
   /// Nöbet / 7A başlama saati.
   static const startHour = 8;
 
-  /// Hatırlatma: önceki akşam 20:00 (başlangıçtan 12 saat önce).
+  /// Hatırlatma: önceki akşam 20:00 (08:00 başlayana 12 saat önce).
   static const reminderBefore = Duration(hours: 12);
+
+  /// [start]'tan önceki akşam 20:00'ye kadar süre (16A 16:00'da başlar).
+  static Duration reminderFor(DateTime start) =>
+      start.difference(DateTime(start.year, start.month, start.day - 1, 20));
 
   static String _two(int n) => n.toString().padLeft(2, '0');
 
@@ -84,13 +89,14 @@ class RosterCalendar {
     final person = data.person;
     final out = <(int, CalendarEntry)>[];
     void add({
+      int hour = startHour,
       required String kind,
       required int day,
       required Duration length,
       required String title,
       String? description,
     }) {
-      final start = DateTime(data.year, data.month, day, startHour);
+      final start = DateTime(data.year, data.month, day, hour);
       out.add((
         day,
         (
@@ -106,12 +112,14 @@ class RosterCalendar {
     }
 
     for (final s in data.shifts) {
-      final is16 = s.shift == '16B';
+      // 16B: 08:00–24:00; hemşire 16A: 16:00–ertesi 08:00; 24: 08–08.
+      final short = s.shift == '16B' || s.shift == '16A';
       add(
-        kind: is16 ? '16b' : '24',
+        hour: s.shift == '16A' ? 16 : startHour,
+        kind: s.shift.toLowerCase(),
         day: s.day,
-        length: Duration(hours: is16 ? 16 : 24),
-        title: is16 ? 'Nöbet (16B)' : 'Nöbet (24)',
+        length: Duration(hours: short ? 16 : 24),
+        title: 'Nöbet (${s.shift})',
         description: [
           'Hemşire: ${s.nurses.join(', ')}',
           if (s.techs.isNotEmpty) 'Radyoloji: ${s.techs.join(', ')}',
@@ -160,7 +168,7 @@ class RosterCalendar {
         'BEGIN:VALARM',
         'ACTION:DISPLAY',
         'DESCRIPTION:${_escape(e.title)}',
-        'TRIGGER:-PT${reminderBefore.inHours}H',
+        'TRIGGER:-PT${reminderFor(e.start).inHours}H',
         'END:VALARM',
         'END:VEVENT',
       ]);

@@ -38,7 +38,7 @@ class ShiftReminder {
         items.add((
           at: at,
           shiftDay: day,
-          shift: a.isSecondaryTech(personId) ? '16B' : '24',
+          shift: a.shiftCode(personId),
           nurseIds: a.nurseIds,
           techIds: [?a.techId, ?a.tech16bId],
         ));

@@ -40,15 +40,19 @@ class RosterEditor {
     switch (role) {
       case Role.nurse:
         final nurses = [...current.nurseIds];
+        // 16A koltuğun özelliğidir: yerine geçen de 16A tutar.
+        final night = [...current.nurse16aIds];
         if (oldId != null) {
           final i = nurses.indexOf(oldId);
           if (i < 0) {
             throw const RosterEditException('Değiştirilecek kişi o gün yok.');
           }
+          final was16a = night.remove(oldId);
           if (newId == null) {
             nurses.removeAt(i);
           } else {
             nurses[i] = newId;
+            if (was16a) night.add(newId);
           }
         } else if (newId != null) {
           if (nurses.length >= nursesPerDay) {
@@ -56,7 +60,7 @@ class RosterEditor {
           }
           nurses.add(newId);
         }
-        updated = current.copyWith(nurseIds: nurses);
+        updated = current.copyWith(nurseIds: nurses, nurse16aIds: night);
       case Role.radiologyTech:
         final slotId = secondary ? current.tech16bId : current.techId;
         if (oldId != null && slotId != oldId) {
@@ -176,6 +180,31 @@ class RosterEditor {
   /// Teknikeri [day] gününde 24 ya da ([secondary] ise) 16B koltuğuna
   /// yazar. Kişi o gün öteki koltuktaysa oradan alınır (24 → 16B ya da
   /// tersi); koltukta başkası varsa onun yerine geçer.
+  /// [day] gününde nöbetçi hemşire [personId]'yi 16A ([night] true) ya da
+  /// 24 vardiyasına çevirir.
+  static Map<int, DayAssignment> setNurse16a(
+    Map<int, DayAssignment> assignments, {
+    required int day,
+    required String personId,
+    required bool night,
+  }) {
+    final current = assignments[day];
+    if (current == null || !current.nurseIds.contains(personId)) {
+      throw const RosterEditException('Bu hemşire o gün nöbetçi değil.');
+    }
+    final ids = {...current.nurse16aIds};
+    night ? ids.add(personId) : ids.remove(personId);
+    return {
+      ...assignments,
+      day: current.copyWith(
+        nurse16aIds: [
+          for (final id in current.nurseIds)
+            if (ids.contains(id)) id,
+        ],
+      ),
+    };
+  }
+
   static Map<int, DayAssignment> setTechSeat(
     Map<int, DayAssignment> assignments, {
     required int day,
@@ -190,6 +219,7 @@ class RosterEditor {
       nurseIds: current.nurseIds,
       techId: secondary ? keepOther : personId,
       tech16bId: secondary ? personId : keepOther,
+      nurse16aIds: current.nurse16aIds,
     );
     return {...assignments, day: updated};
   }

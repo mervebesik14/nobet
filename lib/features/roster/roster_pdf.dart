@@ -222,9 +222,10 @@ pw.Widget _rosterTable({
           for (final d in days)
             if (personDays.contains(d))
               cell(
-                (plan.assignments[d]?.isSecondaryTech(row.id) ?? false)
-                    ? '16B'
-                    : '$shiftHours',
+                switch (plan.assignments[d]?.shiftCode(row.id)) {
+                  final code? when code != '24' => code,
+                  _ => '$shiftHours',
+                },
                 color: columnColor(d),
                 bold: true,
               )

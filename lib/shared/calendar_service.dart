@@ -35,7 +35,7 @@ class CalendarService {
     startDate: e.start,
     endDate: e.end,
     description: e.description,
-    reminders: const [RosterCalendar.reminderBefore],
+    reminders: [RosterCalendar.reminderFor(e.start)],
   );
 
   /// Etkinliği siler; kullanıcı zaten sildiyse sessiz geçer.

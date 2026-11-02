@@ -128,9 +128,10 @@ class RosterExcel {
         XlsxCell(row.name),
         for (final d in days)
           if (personDays.contains(d))
-            (plan.assignments[d]?.isSecondaryTech(row.id) ?? false)
-                ? dayCell('16B', d, strong: true)
-                : dayCell(shiftHours, d, strong: true)
+            switch (plan.assignments[d]?.shiftCode(row.id)) {
+              final code? when code != '24' => dayCell(code, d, strong: true),
+              _ => dayCell(shiftHours, d, strong: true),
+            }
           else if (onDayShift.contains((row.id, d)))
             dayCell('7A', d, fill: _dayShift, strong: true)
           else if (leaveOn[d] case final type?)

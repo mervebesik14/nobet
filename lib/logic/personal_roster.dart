@@ -15,7 +15,7 @@ class PersonalShift {
 
   final int day;
 
-  /// Kişinin kendi vardiyası: "24" ya da "16B".
+  /// Kişinin kendi vardiyası: "24", "16B" ya da "16A".
   final String shift;
 
   /// O gün nöbetçi hemşireler (kişi dahil).
@@ -86,8 +86,11 @@ class PersonalRoster {
         if (plan.assignments[d] case final a? when a.includes(person.id))
           PersonalShift(
             day: d,
-            shift: a.isSecondaryTech(person.id) ? '16B' : '24',
-            nurses: a.nurseIds.map(name).toList(),
+            shift: a.shiftCode(person.id),
+            nurses: [
+              for (final id in a.nurseIds)
+                a.isNurse16a(id) ? '${name(id)} (16A)' : name(id),
+            ],
             techs: [
               if (a.techId case final id?)
                 a.tech16bId != null ? '${name(id)} (24)' : name(id),

@@ -167,13 +167,16 @@ class DayAssignmentAdapter extends TypeAdapter<DayAssignment> {
           : (fields[1] as List).cast<String>(),
       techId: fields[2] as String?,
       tech16bId: fields[3] as String?,
+      nurse16aIds: fields[4] == null
+          ? const []
+          : (fields[4] as List).cast<String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, DayAssignment obj) {
     writer
-      ..writeByte(4)
+      ..writeByte(5)
       ..writeByte(0)
       ..write(obj.day)
       ..writeByte(1)
@@ -181,7 +184,9 @@ class DayAssignmentAdapter extends TypeAdapter<DayAssignment> {
       ..writeByte(2)
       ..write(obj.techId)
       ..writeByte(3)
-      ..write(obj.tech16bId);
+      ..write(obj.tech16bId)
+      ..writeByte(4)
+      ..write(obj.nurse16aIds);
   }
 
   @override

@@ -234,7 +234,14 @@ class _TodayCard extends ConsumerWidget {
 
     Widget day(DayOverview d, String label) {
       final lines = <(String, String)>[
-        if (d.nurseIds.isNotEmpty) ('Hemşire', d.nurseIds.map(name).join(', ')),
+        if (d.nurseIds.isNotEmpty)
+          (
+            'Hemşire',
+            [
+              for (final id in d.nurseIds)
+                d.nurse16aIds.contains(id) ? '${name(id)} (16A)' : name(id),
+            ].join(', '),
+          ),
         if (d.techId != null) ('Radyoloji', name(d.techId!)),
         if (d.tech16bId != null) ('16B', name(d.tech16bId!)),
         if (d.dayShiftIds.isNotEmpty)

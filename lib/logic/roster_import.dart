@@ -58,7 +58,7 @@ class RosterImportResult {
 /// - Bir satırda gün başlıkları (1, 2, 3, … ; "1\nPer" gibi gün adı ekli
 ///   olabilir), hemen solundaki sütunda kişi adları.
 /// - Hücreler: `24`, `X`, `✓`, `N`, `Nöbet` → nöbet; `16B` → günde iki
-///   tekniker varken 16B vardiyası; `Y.İ.` / `Ş.İ.` / `R.` (ya da `Yıllık`,
+///   tekniker varken 16B vardiyası; hemşirede `16A` → 16A vardiyası; `Y.İ.` / `Ş.İ.` / `R.` (ya da `Yıllık`,
 ///   `Şua`, `Rapor`) → izin; `7A` teknikerde 7A günü, hemşirede yok
 ///   sayılır (sorumlu hemşire planından otomatik hesaplanır).
 /// - İsimler Türkçe büyük/küçük harf ve fazla boşluk gözetmeden eşlenir;
@@ -169,6 +169,7 @@ class RosterImport {
     final nurses = {for (var d = 1; d <= days; d++) d: <String>[]};
     final tech24 = {for (var d = 1; d <= days; d++) d: <String>[]};
     final tech16 = {for (var d = 1; d <= days; d++) d: <String>[]};
+    final nurse16a = {for (var d = 1; d <= days; d++) d: <String>[]};
     final leaves = <LeaveType, Map<String, List<int>>>{};
     final techDayShifts = <String, List<int>>{};
     final matched = <String>{};
@@ -220,7 +221,11 @@ class RosterImport {
           continue;
         }
         final is16 = code == '16B' || code == '16';
-        if (!is16 && !_shiftCodes.contains(code) && code != '$shiftHours') {
+        final is16a = code == '16A';
+        if (!is16 &&
+            !is16a &&
+            !_shiftCodes.contains(code) &&
+            code != '$shiftHours') {
           final shown = '${cells[d - 1]}'.trim();
           unknownValues[shown] = (unknownValues[shown] ?? 0) + 1;
           continue;
@@ -229,6 +234,7 @@ class RosterImport {
         shiftCount++;
         if (person.role == Role.nurse) {
           nurses[d]!.add(person.id);
+          if (is16a || is16) nurse16a[d]!.add(person.id);
         } else if (is16 && techsPerDay >= 2) {
           tech16[d]!.add(person.id);
         } else {
@@ -265,6 +271,7 @@ class RosterImport {
         nurseIds: [...?nurses[d]],
         techId: t24.firstOrNull,
         tech16bId: t16.firstOrNull,
+        nurse16aIds: [...?nurse16a[d]],
       );
     }
 
