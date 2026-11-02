@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/month_plan_repository.dart';
 import '../../data/providers.dart';
 import '../../data/turkish_holidays.dart';
+import '../../logic/holiday_history.dart';
 import '../../logic/request_parser.dart';
 import '../../logic/roster_options.dart';
 import '../../logic/roster_summary.dart';
@@ -506,7 +507,21 @@ class MonthPlanController extends Notifier<MonthPlan> {
         beforeMonth: plan.month,
       ).byId,
       existing: existing,
+      previousHolidayWorkers: HolidayHistory.previousWorkers(
+        year: plan.year,
+        month: plan.month,
+        holidays: _holidaysWithPreviousYear(plan.year),
+        plans: ref.read(monthPlanRepositoryProvider).getAll(),
+      ),
     );
+  }
+
+  /// Kayıtlı tatiller; önceki yılınki kayıtlı değilse hazır Türkiye
+  /// tatilleri eklenir (geçen yılki bayram günleri bulunsun).
+  List<Holiday> _holidaysWithPreviousYear(int year) {
+    final saved = ref.read(holidaysProvider);
+    final hasPrevious = saved.any((h) => h.date.year == year - 1);
+    return [...saved, if (!hasPrevious) ...TurkishHolidays.forYear(year - 1)];
   }
 
   /// Değişikliği geçmişe yazar: [before] geri alma için saklanır. [details]

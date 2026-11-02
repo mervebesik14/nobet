@@ -95,6 +95,7 @@ class RosterGenerator {
     this.absentDays = const {},
     this.existing,
     this.attempts = 400,
+    this.previousHolidayWorkers = const {},
   }) : people = people.where((p) => p.worksInMonth(year, month)).toList()
          ..sort((a, b) => a.id.compareTo(b.id));
 
@@ -127,6 +128,11 @@ class RosterGenerator {
 
   /// Fazla mesai isteyene tanınan ek nöbet payı.
   final int overtimeAllowance;
+
+  /// Tatil günü → aynı tatilin önceki seferinde nöbet tutanlar
+  /// ([HolidayHistory]). Bu kişiler o günlere mümkünse yazılmaz (ay içi
+  /// denge yine önce gelir).
+  final Map<int, Set<String>> previousHolidayWorkers;
 
   /// Kişi → mutlaka nöbet tutacağı günler: sorumlu hemşirenin seçtiği
   /// günler ve şua izni dönüşünün ilk iş günü. Bu günlere sabit yazılır;
@@ -299,6 +305,7 @@ class RosterGenerator {
       weekend: weekend,
       national: national,
       religious: religious,
+      lastHoliday: previousHolidayWorkers,
       tail: _tailFor(nurseMembers),
       absent: _absentFor(nurseMembers),
       yearToDate: yearToDate,
@@ -330,6 +337,7 @@ class RosterGenerator {
         weekend: weekend,
         national: national,
         religious: religious,
+        lastHoliday: previousHolidayWorkers,
         tail: techTail,
         absent: _absentFor(techMembers),
         yearToDate: yearToDate,
@@ -357,6 +365,7 @@ class RosterGenerator {
         weekend: weekend,
         national: national,
         religious: religious,
+        lastHoliday: previousHolidayWorkers,
         tail: techTail,
         absent: _absentFor(techMembers),
         yearToDate: yearToDate,
@@ -430,6 +439,7 @@ class _RoleSolver {
     required this.weekend,
     this.national = const {},
     this.religious = const {},
+    this.lastHoliday = const {},
     required this.tail,
     this.absent = const {},
     required Map<String, PersonTotals> yearToDate,
@@ -523,6 +533,14 @@ class _RoleSolver {
 
   /// Tam gün dini bayramlar; nöbetleri resmi tatillerden ayrı dengelenir.
   final Set<int> religious;
+
+  /// Tatil günü → aynı tatilin önceki seferinde nöbet tutanlar.
+  final Map<int, Set<String>> lastHoliday;
+
+  /// Geçen sefer de o tatilde tutan kişiyi yazmanın cezası (açgözlü adım
+  /// ve puan). Ay içi dengeyi bozmayacak kadar küçük.
+  static const _repeatHolidayGreedy = 6.0;
+  static const _repeatHolidayWeight = 4.0;
   final Map<String, Set<int>> tail;
 
   /// Kişi → izinli / pasif günler (boşluk hesabında aralığı keser).
@@ -767,7 +785,18 @@ class _RoleSolver {
         0.75 * totalPairs +
         _emptySlots() * RosterGenerator.emptySlotPenalty +
         RosterGenerator.changePenalty * _changes() +
+        _repeatHolidayWeight * _holidayRepeats() +
         reserveCost;
+  }
+
+  /// Geçen sefer de aynı tatilde tutanların bu seferki o gün nöbetleri.
+  int _holidayRepeats() {
+    var n = 0;
+    for (final MapEntry(key: d, value: who) in lastHoliday.entries) {
+      if (d < 1 || d > days) continue;
+      n += _slots[d].where(who.contains).length;
+    }
+    return n;
   }
 
   int _emptySlots() {
@@ -911,6 +940,7 @@ class _RoleSolver {
       cost += (_religiousCount(id) + 1 - religious.length * perDay / n) * 10;
       cost += ytdReligious[id]! * _ytdGreedyWeight;
     }
+    if (lastHoliday[d]?.contains(id) ?? false) cost += _repeatHolidayGreedy;
     final newPairs =
         (d - 2 >= 1 && _works(id, d - 2) ? 1 : 0) + (_works(id, d + 2) ? 1 : 0);
     if (newPairs > 0) {
@@ -1259,6 +1289,7 @@ class _TechSolver {
     required this.weekend,
     this.national = const {},
     this.religious = const {},
+    this.lastHoliday = const {},
     required this.tail,
     this.absent = const {},
     required Map<String, PersonTotals> yearToDate,
@@ -1294,6 +1325,9 @@ class _TechSolver {
 
   /// Tam gün dini bayramlar; nöbetleri resmi tatillerden ayrı dengelenir.
   final Set<int> religious;
+
+  /// Tatil günü → aynı tatilin önceki seferinde nöbet tutanlar.
+  final Map<int, Set<String>> lastHoliday;
 
   /// Kişi → fazla mesai payı; 24 sayısı dengesinde bu kadarı hoş görülür.
   final Map<String, int> allowance;
@@ -1519,7 +1553,18 @@ class _TechSolver {
                 over(_pairs24)) +
         0.75 * totalPairs +
         RosterGenerator.changePenalty * _changes() +
+        _RoleSolver._repeatHolidayWeight * _holidayRepeats() +
         empty;
+  }
+
+  int _holidayRepeats() {
+    var n = 0;
+    for (final MapEntry(key: d, value: who) in lastHoliday.entries) {
+      if (d < 1 || d > days) continue;
+      if (_slot24[d] case final id? when who.contains(id)) n++;
+      if (_slot16[d] case final id? when who.contains(id)) n++;
+    }
+    return n;
   }
 
   _TechSolution _run(
@@ -1649,6 +1694,9 @@ class _TechSolver {
     if (religious.contains(d)) {
       cost += (_religiousCount(id) + 1 - religious.length * 2 / n) * 10;
       cost += ytdReligious[id]! * 1.0;
+    }
+    if (lastHoliday[d]?.contains(id) ?? false) {
+      cost += _RoleSolver._repeatHolidayGreedy;
     }
     if (!is16b) {
       final newPairs =

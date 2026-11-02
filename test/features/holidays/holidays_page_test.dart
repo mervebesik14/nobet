@@ -6,6 +6,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/data/holiday_repository.dart';
 import 'package:nobet_listesi/features/holidays/holidays_page.dart';
+import 'package:nobet_listesi/models/models.dart';
 import 'package:nobet_listesi/shared/providers.dart';
 
 import '../../helpers.dart';
@@ -33,6 +34,30 @@ void main() {
       ),
     );
   }
+
+  testWidgets('geçen Cumhuriyet Bayramı\'nda tutanlar gösterilir', (
+    tester,
+  ) async {
+    await boxes.people.putAll({
+      'a': const Person(id: 'a', name: 'Banu', role: Role.nurse),
+      'b': const Person(id: 'b', name: 'Ayşe', role: Role.nurse),
+    });
+    await boxes.monthPlans.put(
+      '2025-10',
+      const MonthPlan(
+        year: 2025,
+        month: 10,
+        assignments: {
+          29: DayAssignment(day: 29, nurseIds: ['a', 'b']),
+        },
+      ),
+    );
+    await pumpPage(tester, DateTime(2026, 10, 11));
+    expect(
+      find.text('Resmi tatil · Tam gün\nGeçen sefer tutanlar: Ayşe, Banu'),
+      findsOneWidget,
+    );
+  });
 
   testWidgets('Ekim 2026: tatiller ve 145 saat gereken', (tester) async {
     await pumpPage(tester, DateTime(2026, 10, 11));

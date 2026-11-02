@@ -4,7 +4,11 @@ import 'package:intl/intl.dart';
 
 import '../../data/providers.dart';
 import '../../data/turkish_holidays.dart';
+import '../../logic/holiday_history.dart';
+import '../../logic/turkish_collation.dart';
 import '../../logic/work_hours_calculator.dart';
+import '../month/month_plan_controller.dart';
+import '../people/people_controller.dart';
 import '../../models/models.dart';
 import '../../shared/brand.dart';
 import '../../shared/widgets/brand_widgets.dart';
@@ -37,6 +41,19 @@ class HolidaysPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final month = ref.watch(holidayMonthProvider);
+    final allHolidays = ref.watch(holidaysProvider);
+    ref.watch(monthPlanProvider); // listeler değişince yenilensin
+    final lastWorkers = HolidayHistory.previousWorkers(
+      year: month.year,
+      month: month.month,
+      holidays: [
+        ...allHolidays,
+        if (!allHolidays.any((h) => h.date.year == month.year - 1))
+          ...TurkishHolidays.forYear(month.year - 1),
+      ],
+      plans: ref.watch(monthPlanRepositoryProvider).getAll(),
+    );
+    final names = {for (final p in ref.watch(peopleProvider)) p.id: p.name};
     final monthHolidays = ref
         .watch(holidaysProvider)
         .where((h) => h.date.year == month.year && h.date.month == month.month)
@@ -78,7 +95,14 @@ class HolidaysPage extends ConsumerWidget {
                       GroupCard(
                         children: [
                           for (final h in monthHolidays)
-                            _HolidayTile(holiday: h),
+                            _HolidayTile(
+                              holiday: h,
+                              lastWorkers: [
+                                for (final id
+                                    in lastWorkers[h.date.day] ?? const {})
+                                  names[id] ?? 'Silinmiş kişi',
+                              ]..sort(compareTurkish),
+                            ),
                         ],
                       ),
                     ],
@@ -192,9 +216,13 @@ class _MissingReligiousNotice extends StatelessWidget {
 enum _HolidayAction { toggleHalfDay, toggleReligious, delete }
 
 class _HolidayTile extends ConsumerWidget {
-  const _HolidayTile({required this.holiday});
+  const _HolidayTile({required this.holiday, this.lastWorkers = const []});
 
   final Holiday holiday;
+
+  /// Aynı tatilin önceki seferinde nöbet tutanlar (yeni listede o güne en
+  /// son yazılırlar).
+  final List<String> lastWorkers;
 
   Future<void> _onAction(
     BuildContext context,
@@ -282,7 +310,13 @@ class _HolidayTile extends ConsumerWidget {
                   : theme.colorScheme.primary,
             ),
           ),
-          Expanded(child: Text(details)),
+          Expanded(
+            child: Text(
+              lastWorkers.isEmpty
+                  ? details
+                  : '$details\nGeçen sefer tutanlar: ${lastWorkers.join(', ')}',
+            ),
+          ),
         ],
       ),
       trailing: PopupMenuButton<_HolidayAction>(

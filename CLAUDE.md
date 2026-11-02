@@ -10,6 +10,7 @@
 - Toplam nöbet, hafta sonu nöbeti ve gün aşırı çift sayısı rol grubu içinde eşit dağıtılır (fark ≤ 1 hedef). Öncelik adalet: önce o ayın içindeki denge, ay içi denge sağlandıktan sonra yıl içi toplam (ay içi eşitken fazla nöbet yıl içinde payından az tutana). Yıl içi pay, kişinin çalışabildiği güne oranlanır: işe başlamadan önceki, izin/rapor ve pasif günler sayılmaz (kişide isteğe bağlı işe başlama tarihi).
 - Hafta sonu = Cumartesi + Pazar (+ resmi tatiller, ayarla).
 - Tam gün resmi (ulusal) tatil ve dini bayram (Ramazan/Kurban) nöbetleri ayrı ayrı sayılır ve dengelenir (ay içinde fark ≤ 1 hedef, yıl içinde az tutana öncelik).
+- Yıllar arası bayram adaleti: aynı tatilin (ad eki atılır: "Kurban Bayramı 2. Gün" → Kurban Bayramı) önceki yıllardan en yakın seferinde nöbet tutanlar o tatilin günlerine en son yazılır (`HolidayHistory`, üreticide küçük ceza; ay içi denge önce). Tatiller ekranında "Geçen sefer tutanlar" yazar.
 - Şua izninden önceki 2 takvim gününde nöbet tutulmaz; şua dönüşünün ilk iş günü mutlaka nöbet tutulur (istemediği gün değilse; ay sınırını aşar).
 - Gereken saat = ayın resmi tatil olmayan hafta içi günleri × 7; arife (yarım gün tatil) = 5 saat (ayarlanabilir).
 - Çalışılan saat = nöbet × 24; fazla mesai = max(0, çalışılan − gereken).
