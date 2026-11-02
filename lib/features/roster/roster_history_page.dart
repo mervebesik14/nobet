@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../../models/models.dart';
 import '../month/month_plan_controller.dart';
+import 'swap_log_page.dart';
 
 /// Seçili ayın nöbet listesi değişiklik geçmişi: elle değişiklikler, 7A
 /// seçimleri, pasife alma, oluşturma ve sıfırlama. Her kayıt, o
@@ -68,7 +69,18 @@ class RosterHistoryPage extends ConsumerWidget {
     ).format(DateTime(plan.year, plan.month));
 
     return Scaffold(
-      appBar: AppBar(title: Text('Değişiklik geçmişi · $month')),
+      appBar: AppBar(
+        title: Text('Değişiklik geçmişi · $month'),
+        actions: [
+          IconButton(
+            tooltip: 'Takas defteri',
+            icon: const Icon(Icons.swap_horiz),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const SwapLogPage()),
+            ),
+          ),
+        ],
+      ),
       body: edits.isEmpty
           ? const Center(
               child: Padding(

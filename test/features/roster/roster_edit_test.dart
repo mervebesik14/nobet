@@ -391,6 +391,14 @@ void main() {
       findsOneWidget,
     );
     expect(find.textContaining('Takas:'), findsNothing);
+
+    // Takas defterinde görünür.
+    await tester.tap(find.byTooltip('Paylaş'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Takas defteri'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ayşe 3 Ekim ↔ Banu 4 Ekim'), findsOneWidget);
+    expect(find.text('1 takas · 0 diğer'), findsOneWidget);
   });
 
   testWidgets('basılı tut → Değiştir: elle başkasını yaz', (tester) async {

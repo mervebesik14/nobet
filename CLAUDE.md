@@ -28,6 +28,7 @@
 - Kişide isteğe bağlı telefon (kişi formunda rehberden seçilir, `PhoneNumber` ile 90… biçimine çevrilir). Paylaş > Herkese WhatsApp'tan gönder: varsayılan PDF (kişinin PDF'i paylaşım menüsüyle; WhatsApp sohbete dosya ekleyerek açılamadığı için kişi menüden seçilir) ya da Mesaj (WhatsApp kişinin sohbetinde listesi yazılı açılır, yüklü değilse wa.me; numarasız kişiye rehberden eklenir). Rehber ve bağlantı açma `PlatformServices` üzerinden.
 - Kişi karnesi: İstatistik > Paylaş > Kişi karnesi (PDF); seçilen kişinin yıl içi aylara göre nöbet, hafta sonu, tatil, bayram, gün aşırı çift, 4–5 gün ara, saatler ve rol ortalaması (`YearlySummary.roleMean`); sütunlar kişi seçildikten sonra seçilir (`TotalsColumn`, hatırlanır); paylaşmadan önce `PdfPreviewPage` ile önizlenir (sayfalar `PlatformServices.pdfPages`).
 - Liste paylaşılırken (PDF/PNG/Excel/yazdır) altındaki özetin sütunları seçilir (`SummaryColumn`); seçim hatırlanır (`app_meta` shareSummaryColumns), "Yalnız liste" özetsiz.
+- Takas defteri: Paylaş > Takas defteri (ya da Değişiklik geçmişi'nden); değişiklik geçmişinden takaslar ve "X yerine Y" değişiklikleri çıkarılır (`SwapLog`; oluşturma/sıfırlama sayılmaz), metin olarak paylaşılır.
 - Fazla mesai raporu: Paylaş > Fazla mesai raporu (PDF); kurum/birim ve imza bilgileri Ayarlar'dan.
 - Algoritma ve hesaplar lib/logic altında saf Dart, birim testli; arayüz metinleri Türkçe.
 

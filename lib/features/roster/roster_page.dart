@@ -33,6 +33,7 @@ import 'edit_sheet.dart';
 import '../settings/report_info.dart';
 import 'overtime_report_pdf.dart';
 import 'personal_roster_pdf.dart';
+import 'swap_log_page.dart';
 import 'whatsapp_send_page.dart';
 import 'roster_history_page.dart';
 import 'roster_pdf.dart';
@@ -1645,6 +1646,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             _ShareAction.addToCalendar ||
             _ShareAction.overtimeReport ||
             _ShareAction.whatsAppEach ||
+            _ShareAction.swapLog ||
             _ShareAction.allPersonalPdf ||
             _ShareAction.allPersonalCalendar ||
             _ShareAction.excel:
@@ -1758,6 +1760,9 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 weekendDays: weekendDays,
                 holidayDays: holidayDays,
               ),
+              _ShareAction.swapLog => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => const SwapLogPage()),
+              ),
               _ShareAction.whatsAppEach => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => WhatsAppSendPage(
@@ -1841,6 +1846,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 child: ListTile(
                   leading: Icon(Icons.send_to_mobile_outlined),
                   title: Text('Herkese WhatsApp\'tan gönder'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.swapLog,
+                child: ListTile(
+                  leading: Icon(Icons.swap_horiz),
+                  title: Text('Takas defteri'),
                 ),
               ),
               PopupMenuItem(
@@ -2213,6 +2225,7 @@ enum _ShareAction {
   allPersonalCalendar,
   overtimeReport,
   whatsAppEach,
+  swapLog,
 }
 
 /// Vurgulanan kişinin özeti: tablonun üstünde, kapatılabilir.
