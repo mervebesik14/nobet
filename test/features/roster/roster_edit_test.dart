@@ -432,7 +432,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('nurse-16a-toggle')));
     await tester.pumpAndSettle();
-    expect(saved().assignments[3]!.nurse16aIds, ['n0']);
+    expect(saved().assignments[3]!.shift16aIds, ['n0']);
     expect(saved().assignments[3]!.shiftCode('n0'), '16A');
     expect(
       find.descendant(of: cell('n0', 3), matching: find.text('16A')),
@@ -445,7 +445,7 @@ void main() {
     expect(find.text("24'e çevir"), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('nurse-16a-toggle')));
     await tester.pumpAndSettle();
-    expect(saved().assignments[3]!.nurse16aIds, isEmpty);
+    expect(saved().assignments[3]!.shift16aIds, isEmpty);
 
     // Boş hücreye 16A yaz: koltuk doluysa kimin yerine diye sorulur.
     final day4 = saved().assignments[4]!.nurseIds;
@@ -468,7 +468,36 @@ void main() {
     final a = saved().assignments[4]!;
     expect(a.nurseIds, contains('n0'));
     expect(a.nurseIds, isNot(contains(day4.first)));
-    expect(a.nurse16aIds, ['n0']);
+    expect(a.shift16aIds, ['n0']);
+  });
+
+  testWidgets("tekniker 16A: 24'ü 16A'ya çevrilir, boş hücreye yazılır", (
+    tester,
+  ) async {
+    await pumpRoster(tester);
+    // 3 Ekim'de t3 24 nöbette: 16A'ya çevir.
+    await tester.longPress(cell('t3', 3));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('nurse-16a-toggle')));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.shiftCode('t3'), '16A');
+    expect(
+      find.descendant(of: cell('t3', 3), matching: find.text('16A')),
+      findsOneWidget,
+    );
+
+    // Boş tekniker hücresine 16A yaz: 24 koltuğundakinin yerine.
+    await tester.longPress(cell('t0', 5));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('nurse-16a-write')));
+    await tester.pumpAndSettle();
+    if (find.text('Yine de yap').evaluate().isNotEmpty) {
+      await tester.tap(find.text('Yine de yap'));
+      await tester.pumpAndSettle();
+    }
+    final a = saved().assignments[5]!;
+    expect(a.techId, 't0');
+    expect(a.shift16aIds, ['t0']);
   });
 
   testWidgets('takas yapısal olarak olamıyorsa açıklar', (tester) async {

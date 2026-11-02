@@ -167,7 +167,7 @@ class DayAssignmentAdapter extends TypeAdapter<DayAssignment> {
           : (fields[1] as List).cast<String>(),
       techId: fields[2] as String?,
       tech16bId: fields[3] as String?,
-      nurse16aIds: fields[4] == null
+      shift16aIds: fields[4] == null
           ? const []
           : (fields[4] as List).cast<String>(),
     );
@@ -186,7 +186,7 @@ class DayAssignmentAdapter extends TypeAdapter<DayAssignment> {
       ..writeByte(3)
       ..write(obj.tech16bId)
       ..writeByte(4)
-      ..write(obj.nurse16aIds);
+      ..write(obj.shift16aIds);
   }
 
   @override

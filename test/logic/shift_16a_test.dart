@@ -6,19 +6,21 @@ import 'package:nobet_listesi/logic/roster_import.dart';
 import 'package:nobet_listesi/logic/roster_summary.dart';
 import 'package:nobet_listesi/models/models.dart';
 
-/// Hemşire 16A (16:00–08:00): koltuk doldurur, 16 saat sayılır.
+/// 16A (16:00–08:00, hemşire ve tekniker): koltuk doldurur, 16 saat sayılır.
 void main() {
   const people = [
     Person(id: 'a', name: 'Ayşe', role: Role.nurse),
     Person(id: 'b', name: 'Banu', role: Role.nurse),
     Person(id: 'c', name: 'Cemile', role: Role.nurse),
+    Person(id: 't', name: 'Tarık', role: Role.radiologyTech),
+    Person(id: 'u', name: 'Ufuk', role: Role.radiologyTech),
   ];
-  const day3 = DayAssignment(day: 3, nurseIds: ['a', 'b'], nurse16aIds: ['a']);
+  const day3 = DayAssignment(day: 3, nurseIds: ['a', 'b'], shift16aIds: ['a']);
 
   test('vardiya kodu ve günden çıkan hemşirenin işareti düşer', () {
     expect(day3.shiftCode('a'), '16A');
     expect(day3.shiftCode('b'), '24');
-    expect(day3.copyWith(nurseIds: ['b']).nurse16aIds, isEmpty);
+    expect(day3.copyWith(nurseIds: ['b']).shift16aIds, isEmpty);
     expect(DayAssignment.fromJson(day3.toJson()), day3);
   });
 
@@ -48,17 +50,17 @@ void main() {
       nursesPerDay: 2,
     );
     expect(replaced[3]!.nurseIds, ['c', 'b']);
-    expect(replaced[3]!.nurse16aIds, ['c']);
+    expect(replaced[3]!.shift16aIds, ['c']);
 
-    final toggled = RosterEditor.setNurse16a(
+    final toggled = RosterEditor.set16a(
       const {3: day3},
       day: 3,
       personId: 'b',
       night: true,
     );
-    expect(toggled[3]!.nurse16aIds, ['a', 'b']);
+    expect(toggled[3]!.shift16aIds, ['a', 'b']);
     expect(
-      () => RosterEditor.setNurse16a(
+      () => RosterEditor.set16a(
         const {3: day3},
         day: 3,
         personId: 'c',
@@ -94,6 +96,77 @@ void main() {
       people: people,
     );
     expect(r.assignments[3]!.nurseIds, ['a', 'b']);
-    expect(r.assignments[3]!.nurse16aIds, ['a']);
+    expect(r.assignments[3]!.shift16aIds, ['a']);
+  });
+
+  group('tekniker 16A', () {
+    const day5 = DayAssignment(day: 5, techId: 't', shift16aIds: ['t']);
+
+    test('vardiya kodu, saat, koltuktan çıkınca işaret düşer', () {
+      expect(day5.shiftCode('t'), '16A');
+      expect(day5.copyWith(clearTech: true).shift16aIds, isEmpty);
+      final s = RosterSummary.build(
+        year: 2026,
+        month: 11,
+        assignments: const {5: day5},
+        people: people,
+        holidays: const [],
+        settings: const RosterSettings(),
+      );
+      expect(s.people.firstWhere((p) => p.personId == 't').workedHours, 16);
+    });
+
+    test('yerine geçen 16A alır; 16B\'ye geçince düşer; çevirme', () {
+      final replaced = RosterEditor.replace(
+        const {5: day5},
+        day: 5,
+        role: Role.radiologyTech,
+        oldId: 't',
+        newId: 'u',
+        nursesPerDay: 2,
+      );
+      expect(replaced[5]!.techId, 'u');
+      expect(replaced[5]!.shift16aIds, ['u']);
+
+      final to16b = RosterEditor.setTechSeat(
+        const {5: day5},
+        day: 5,
+        personId: 't',
+        secondary: true,
+      );
+      expect(to16b[5]!.tech16bId, 't');
+      expect(to16b[5]!.shift16aIds, isEmpty);
+
+      final on = RosterEditor.set16a(
+        const {5: DayAssignment(day: 5, techId: 'u')},
+        day: 5,
+        personId: 'u',
+        night: true,
+      );
+      expect(on[5]!.shiftCode('u'), '16A');
+      expect(
+        () => RosterEditor.set16a(
+          const {5: DayAssignment(day: 5, techId: 'u', tech16bId: 't')},
+          day: 5,
+          personId: 't',
+          night: true,
+        ),
+        throwsA(isA<RosterEditException>()),
+      );
+    });
+
+    test("Excel'den tekniker 16A okunur", () {
+      final r = RosterImport.fromRows(
+        rows: [
+          ['', for (var d = 1; d <= 30; d++) d],
+          ['Tarık', '', '', '', '', '16A'],
+        ],
+        year: 2026,
+        month: 11,
+        people: people,
+      );
+      expect(r.assignments[5]!.techId, 't');
+      expect(r.assignments[5]!.shift16aIds, ['t']);
+    });
   });
 }

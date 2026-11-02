@@ -58,7 +58,7 @@ class RosterImportResult {
 /// - Bir satırda gün başlıkları (1, 2, 3, … ; "1\nPer" gibi gün adı ekli
 ///   olabilir), hemen solundaki sütunda kişi adları.
 /// - Hücreler: `24`, `X`, `✓`, `N`, `Nöbet` → nöbet; `16B` → günde iki
-///   tekniker varken 16B vardiyası; hemşirede `16A` → 16A vardiyası; `Y.İ.` / `Ş.İ.` / `R.` (ya da `Yıllık`,
+///   tekniker varken 16B vardiyası; hemşirede ve teknikerde `16A` → 16A vardiyası; `Y.İ.` / `Ş.İ.` / `R.` (ya da `Yıllık`,
 ///   `Şua`, `Rapor`) → izin; `7A` teknikerde 7A günü, hemşirede yok
 ///   sayılır (sorumlu hemşire planından otomatik hesaplanır).
 /// - İsimler Türkçe büyük/küçük harf ve fazla boşluk gözetmeden eşlenir;
@@ -239,6 +239,7 @@ class RosterImport {
           tech16[d]!.add(person.id);
         } else {
           tech24[d]!.add(person.id);
+          if (is16a) nurse16a[d]!.add(person.id);
         }
       }
     }
@@ -271,7 +272,10 @@ class RosterImport {
         nurseIds: [...?nurses[d]],
         techId: t24.firstOrNull,
         tech16bId: t16.firstOrNull,
-        nurse16aIds: [...?nurse16a[d]],
+        shift16aIds: [
+          for (final id in [...?nurse16a[d]])
+            if ((nurses[d]?.contains(id) ?? false) || id == t24.firstOrNull) id,
+        ],
       );
     }
 

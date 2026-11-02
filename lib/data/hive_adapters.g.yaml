@@ -61,7 +61,7 @@ types:
         index: 2
       tech16bId:
         index: 3
-      nurse16aIds:
+      shift16aIds:
         index: 4
   MonthPlan:
     typeId: 4

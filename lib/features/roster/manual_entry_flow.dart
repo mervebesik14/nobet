@@ -70,7 +70,7 @@ Future<bool> manualEntryFlow(BuildContext context, WidgetRef ref) async {
             title: const Text('Excel şablonunu paylaş'),
             subtitle: const Text(
               'Kişiler ve günlerle boş tablo: nöbet günlerine 24 (ikinci '
-              'teknikere 16B) yaz, sonra "Excel\'den al".',
+              'teknikere 16B, gece 16A) yaz, sonra "Excel\'den al".',
             ),
             onTap: () => Navigator.of(context).pop(_ManualEntry.template),
           ),

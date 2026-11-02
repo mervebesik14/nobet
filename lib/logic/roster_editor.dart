@@ -41,7 +41,7 @@ class RosterEditor {
       case Role.nurse:
         final nurses = [...current.nurseIds];
         // 16A koltuğun özelliğidir: yerine geçen de 16A tutar.
-        final night = [...current.nurse16aIds];
+        final night = [...current.shift16aIds];
         if (oldId != null) {
           final i = nurses.indexOf(oldId);
           if (i < 0) {
@@ -60,7 +60,7 @@ class RosterEditor {
           }
           nurses.add(newId);
         }
-        updated = current.copyWith(nurseIds: nurses, nurse16aIds: night);
+        updated = current.copyWith(nurseIds: nurses, shift16aIds: night);
       case Role.radiologyTech:
         final slotId = secondary ? current.tech16bId : current.techId;
         if (oldId != null && slotId != oldId) {
@@ -74,9 +74,18 @@ class RosterEditor {
               ? current.copyWith(clearTech16b: true)
               : current.copyWith(tech16bId: newId);
         } else {
+          // 16A koltuğun özelliğidir: yerine geçen de 16A tutar.
+          final was16a = oldId != null && current.is16a(oldId);
           updated = newId == null
               ? current.copyWith(clearTech: true)
-              : current.copyWith(techId: newId);
+              : current.copyWith(
+                  techId: newId,
+                  shift16aIds: [
+                    for (final id in current.shift16aIds)
+                      if (id != oldId) id,
+                    if (was16a) newId,
+                  ],
+                );
         }
     }
     return {...assignments, day: updated};
@@ -180,25 +189,26 @@ class RosterEditor {
   /// Teknikeri [day] gününde 24 ya da ([secondary] ise) 16B koltuğuna
   /// yazar. Kişi o gün öteki koltuktaysa oradan alınır (24 → 16B ya da
   /// tersi); koltukta başkası varsa onun yerine geçer.
-  /// [day] gününde nöbetçi hemşire [personId]'yi 16A ([night] true) ya da
-  /// 24 vardiyasına çevirir.
-  static Map<int, DayAssignment> setNurse16a(
+  /// [day] gününde nöbetçi hemşire ya da 24 koltuğundaki tekniker
+  /// [personId]'yi 16A ([night] true) ya da 24 vardiyasına çevirir.
+  static Map<int, DayAssignment> set16a(
     Map<int, DayAssignment> assignments, {
     required int day,
     required String personId,
     required bool night,
   }) {
     final current = assignments[day];
-    if (current == null || !current.nurseIds.contains(personId)) {
-      throw const RosterEditException('Bu hemşire o gün nöbetçi değil.');
+    if (current == null ||
+        !(current.nurseIds.contains(personId) || current.techId == personId)) {
+      throw const RosterEditException('Bu kişi o gün 24 nöbette değil.');
     }
-    final ids = {...current.nurse16aIds};
+    final ids = {...current.shift16aIds};
     night ? ids.add(personId) : ids.remove(personId);
     return {
       ...assignments,
       day: current.copyWith(
-        nurse16aIds: [
-          for (final id in current.nurseIds)
+        shift16aIds: [
+          for (final id in [...current.nurseIds, ?current.techId])
             if (ids.contains(id)) id,
         ],
       ),
@@ -219,7 +229,13 @@ class RosterEditor {
       nurseIds: current.nurseIds,
       techId: secondary ? keepOther : personId,
       tech16bId: secondary ? personId : keepOther,
-      nurse16aIds: current.nurse16aIds,
+      // 16B'ye geçen teknikerin 16A işareti düşer.
+      shift16aIds: [
+        for (final id in current.shift16aIds)
+          if (current.nurseIds.contains(id) ||
+              id == (secondary ? keepOther : personId))
+            id,
+      ],
     );
     return {...assignments, day: updated};
   }

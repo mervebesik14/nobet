@@ -89,11 +89,15 @@ class PersonalRoster {
             shift: a.shiftCode(person.id),
             nurses: [
               for (final id in a.nurseIds)
-                a.isNurse16a(id) ? '${name(id)} (16A)' : name(id),
+                a.is16a(id) ? '${name(id)} (16A)' : name(id),
             ],
             techs: [
               if (a.techId case final id?)
-                a.tech16bId != null ? '${name(id)} (24)' : name(id),
+                a.is16a(id)
+                    ? '${name(id)} (16A)'
+                    : a.tech16bId != null
+                    ? '${name(id)} (24)'
+                    : name(id),
               if (a.tech16bId case final id?) '${name(id)} (16B)',
             ],
             isWeekend: weekendDays.contains(d),

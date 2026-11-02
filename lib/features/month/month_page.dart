@@ -239,10 +239,14 @@ class _TodayCard extends ConsumerWidget {
             'Hemşire',
             [
               for (final id in d.nurseIds)
-                d.nurse16aIds.contains(id) ? '${name(id)} (16A)' : name(id),
+                d.shift16aIds.contains(id) ? '${name(id)} (16A)' : name(id),
             ].join(', '),
           ),
-        if (d.techId != null) ('Radyoloji', name(d.techId!)),
+        if (d.techId case final id?)
+          (
+            'Radyoloji',
+            d.shift16aIds.contains(id) ? '${name(id)} (16A)' : name(id),
+          ),
         if (d.tech16bId != null) ('16B', name(d.tech16bId!)),
         if (d.dayShiftIds.isNotEmpty)
           ('7A', d.dayShiftIds.map(name).join(', ')),

@@ -170,8 +170,8 @@ class RosterSummary {
         assignedRole[id] = Role.radiologyTech;
         (secondary[id] ??= {}).add(a.day);
       }
-      for (final id in a.nurse16aIds) {
-        if (a.nurseIds.contains(id)) (night[id] ??= {}).add(a.day);
+      for (final id in a.shift16aIds) {
+        if (a.is16a(id)) (night[id] ??= {}).add(a.day);
       }
     }
 
@@ -219,13 +219,13 @@ class RosterSummary {
           nationalHolidayShifts: days.where(nationalDays.contains).length,
           religiousHolidayShifts: days.where(religiousDays.contains).length,
           everyOtherDayPairs: RosterGenerator.everyOtherDayPairs(days),
-          // 24 vardiyaları tam saat, 16B vardiyaları kısa saat, hemşire
-          // 16A'ları 16 saat sayılır. 7A günleri o günün mesai saati kadar
+          // 24 vardiyaları tam saat, 16B vardiyaları kısa saat, 16A'lar
+          // 16 saat sayılır. 7A günleri o günün mesai saati kadar
           // eklenir.
           workedHours:
               calc.workedHours(full) +
               light.length * settings.secondaryTechShiftHours +
-              nights.length * DayAssignment.nurse16aHours +
+              nights.length * DayAssignment.shift16aHours +
               (dayHours[id] ?? 0),
           requiredHours: personRequired,
           dayShifts: dayCount[id] ?? 0,

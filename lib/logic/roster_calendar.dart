@@ -16,7 +16,7 @@ typedef CalendarEntry = ({
 ///
 /// - 24 nöbet: 08:00 → ertesi gün 08:00
 /// - 16B: 08:00 → 24:00
-/// - Hemşire 16A: 16:00 → ertesi gün 08:00
+/// - 16A (hemşire / tekniker): 16:00 → ertesi gün 08:00
 /// - 7A: 08:00 → günün mesai saati kadar (ör. 7 saat → 15:00)
 ///
 /// Her etkinlikte önceki akşam 20:00'de hatırlatma vardır. Saatler cihazın
@@ -112,7 +112,7 @@ class RosterCalendar {
     }
 
     for (final s in data.shifts) {
-      // 16B: 08:00–24:00; hemşire 16A: 16:00–ertesi 08:00; 24: 08–08.
+      // 16B: 08:00–24:00; 16A: 16:00–ertesi 08:00; 24: 08–08.
       final short = s.shift == '16B' || s.shift == '16A';
       add(
         hour: s.shift == '16A' ? 16 : startHour,

@@ -362,7 +362,7 @@ pw.Widget _legend(PersonalRosterData data) {
     spacing: 12,
     runSpacing: 4,
     children: [
-      item(_primary, 'Nöbet (24 / 16B)'),
+      item(_primary, 'Nöbet (24 / 16B / 16A)'),
       if (data.dayShiftDays.isNotEmpty)
         item(_dayShiftTint, '7A gündüz mesaisi'),
       for (final type in data.leaves.keys)

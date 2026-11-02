@@ -452,7 +452,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       final secondary = current.isSecondaryTech(id);
       final shift = role == Role.radiologyTech
           ? (secondary ? ' · 16B' : ' · 24')
-          : (current.isNurse16a(id) ? ' · 16A' : '');
+          : (current.is16a(id) ? ' · 16A' : '');
       result = await showEditSheet(
         context,
         title: '${_name(id)} · ${_dayLabel(day)}$shift',
@@ -982,11 +982,12 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     );
   }
 
-  /// Nöbetçi hemşirenin [cell] günündeki vardiyasını 16A / 24 yapar.
-  Future<void> _setNurse16a(RosterCell cell, {required bool night}) async {
+  /// Nöbetçi hemşirenin ya da 24'teki teknikerin [cell] günündeki
+  /// vardiyasını 16A / 24 yapar.
+  Future<void> _set16a(RosterCell cell, {required bool night}) async {
     final plan = _plan;
     try {
-      final after = RosterEditor.setNurse16a(
+      final after = RosterEditor.set16a(
         plan.assignments,
         day: cell.day,
         personId: cell.personId,
@@ -1004,9 +1005,37 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   }
 
   /// Hemşireyi [cell] gününe 16A yazar: boş koltuk varsa oraya, yoksa
-  /// seçilen hemşirenin yerine.
-  Future<void> _writeNurse16a(RosterCell cell) async {
+  /// seçilen hemşirenin yerine. Tekniker 24 koltuğuna (doluysa oradakinin
+  /// yerine) 16A yazılır.
+  Future<void> _write16a(RosterCell cell, Role role) async {
     final plan = _plan;
+    if (role == Role.radiologyTech) {
+      final replaced = plan.assignments[cell.day]?.techId;
+      try {
+        final after = RosterEditor.set16a(
+          RosterEditor.setTechSeat(
+            plan.assignments,
+            day: cell.day,
+            personId: cell.personId,
+            secondary: false,
+          ),
+          day: cell.day,
+          personId: cell.personId,
+          night: true,
+        );
+        if (!await _confirmViolations(after)) return;
+        await _apply(
+          after,
+          message:
+              '${_name(cell.personId)} ${formatDayMonth(cell.day, plan.month)} '
+              "16A'ya yazıldı"
+              '${replaced == null || replaced == cell.personId ? '' : ' (${_name(replaced)} yerine)'}.',
+        );
+      } on RosterEditException catch (e) {
+        _notify(e.message);
+      }
+      return;
+    }
     final nursesPerDay = ref.read(effectiveSettingsProvider).nursesPerDay;
     final current = plan.assignments[cell.day] ?? DayAssignment(day: cell.day);
     String? replaced;
@@ -1035,7 +1064,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         newId: cell.personId,
         nursesPerDay: nursesPerDay,
       );
-      after = RosterEditor.setNurse16a(
+      after = RosterEditor.set16a(
         after,
         day: cell.day,
         personId: cell.personId,
@@ -1065,7 +1094,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     final current = plan.assignments[cell.day];
     final onShift = current?.includes(cell.personId) ?? false;
     final secondary = current?.isSecondaryTech(cell.personId) ?? false;
-    final night = current?.isNurse16a(cell.personId) ?? false;
+    final night = current?.is16a(cell.personId) ?? false;
     final isDayShift =
         ref.read(dayShiftsProvider)[cell.day]?.personId == cell.personId;
     final nurse = role == Role.nurse;
@@ -1124,7 +1153,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                   ),
                   onTap: () => Navigator.of(context).pop('extra7a'),
                 ),
-              if (nurse)
+              if (nurse || (tech && !secondary))
                 ListTile(
                   key: const ValueKey('nurse-16a-toggle'),
                   leading: const Icon(Icons.nights_stay_outlined),
@@ -1190,16 +1219,18 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                   ),
                   onTap: () => Navigator.of(context).pop('extra7a'),
                 ),
-              if (nurse)
-                ListTile(
-                  key: const ValueKey('nurse-16a-write'),
-                  leading: const Icon(Icons.nights_stay_outlined),
-                  title: const Text('16A yaz'),
-                  subtitle: const Text(
-                    '16:00–08:00; o günün bir hemşire koltuğunu doldurur.',
-                  ),
-                  onTap: () => Navigator.of(context).pop('n16a-new'),
+              ListTile(
+                key: const ValueKey('nurse-16a-write'),
+                leading: const Icon(Icons.nights_stay_outlined),
+                title: const Text('16A yaz'),
+                subtitle: Text(
+                  nurse
+                      ? '16:00–08:00; o günün bir hemşire koltuğunu doldurur.'
+                      : '16:00–08:00; 24 koltuğunu doldurur, doluysa '
+                            'oradakinin yerine.',
                 ),
+                onTap: () => Navigator.of(context).pop('n16a-new'),
+              ),
               if (tech)
                 ListTile(
                   leading: const Icon(Icons.schedule),
@@ -1239,11 +1270,11 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       case '24':
         await _writeTechSeat(cell, secondary: false);
       case 'n16a':
-        await _setNurse16a(cell, night: true);
+        await _set16a(cell, night: true);
       case 'n24':
-        await _setNurse16a(cell, night: false);
+        await _set16a(cell, night: false);
       case 'n16a-new':
-        await _writeNurse16a(cell);
+        await _write16a(cell, role);
       case 'swap':
         setState(() => _swapFrom = cell);
     }

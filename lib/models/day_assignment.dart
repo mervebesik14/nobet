@@ -7,7 +7,7 @@ class DayAssignment {
     this.nurseIds = const [],
     this.techId,
     this.tech16bId,
-    this.nurse16aIds = const [],
+    this.shift16aIds = const [],
   });
 
   /// Ayın günü (1..31).
@@ -23,12 +23,13 @@ class DayAssignment {
   /// tekniker tutulan aylarda dolar. 16B çalışan ertesi gün çalışabilir.
   final String? tech16bId;
 
-  /// [nurseIds] içinden 16A (16:00–08:00) vardiyasındaki hemşireler; elle
-  /// yazılır. Koltuğu doldurur, kurallarda nöbet sayılır, 16 saat.
-  final List<String> nurse16aIds;
+  /// 16A (16:00–08:00) vardiyasındakiler: [nurseIds] içinden hemşireler ve
+  /// 24 koltuğundaki tekniker ([techId]); elle yazılır. Koltuğu doldurur,
+  /// kurallarda nöbet sayılır, 16 saat.
+  final List<String> shift16aIds;
 
-  /// Hemşire 16A vardiyasının saati.
-  static const nurse16aHours = 16;
+  /// 16A vardiyasının saati.
+  static const shift16aHours = 16;
 
   /// Bu günde nöbet tutan herkes.
   List<String> get personIds => [...nurseIds, ?techId, ?tech16bId];
@@ -38,14 +39,16 @@ class DayAssignment {
   /// [personId] bu gün 16B vardiyasında mı? (Değilse 24 kabul edilir.)
   bool isSecondaryTech(String personId) => personId == tech16bId;
 
-  /// [personId] bu gün 16A vardiyasındaki hemşire mi?
-  bool isNurse16a(String personId) =>
-      nurse16aIds.contains(personId) && nurseIds.contains(personId);
+  /// [personId] bu gün 16A vardiyasında mı (hemşire ya da 24 koltuğundaki
+  /// tekniker)?
+  bool is16a(String personId) =>
+      shift16aIds.contains(personId) &&
+      (nurseIds.contains(personId) || techId == personId);
 
   /// Kişinin bu günkü vardiyası: "16B", "16A" ya da "24".
   String shiftCode(String personId) => isSecondaryTech(personId)
       ? '16B'
-      : isNurse16a(personId)
+      : is16a(personId)
       ? '16A'
       : '24';
 
@@ -55,18 +58,19 @@ class DayAssignment {
     bool clearTech = false,
     String? tech16bId,
     bool clearTech16b = false,
-    List<String>? nurse16aIds,
+    List<String>? shift16aIds,
   }) {
     final nurses = nurseIds ?? this.nurseIds;
+    final tech = clearTech ? null : (techId ?? this.techId);
     return DayAssignment(
       day: day,
       nurseIds: nurses,
-      techId: clearTech ? null : (techId ?? this.techId),
+      techId: tech,
       tech16bId: clearTech16b ? null : (tech16bId ?? this.tech16bId),
-      // Günden çıkan hemşirenin 16A işareti düşer.
-      nurse16aIds: [
-        for (final id in nurse16aIds ?? this.nurse16aIds)
-          if (nurses.contains(id)) id,
+      // Günden (ya da 24 koltuğundan) çıkanın 16A işareti düşer.
+      shift16aIds: [
+        for (final id in shift16aIds ?? this.shift16aIds)
+          if (nurses.contains(id) || id == tech) id,
       ],
     );
   }
@@ -76,7 +80,7 @@ class DayAssignment {
     'nurseIds': nurseIds,
     'techId': techId,
     'tech16bId': tech16bId,
-    if (nurse16aIds.isNotEmpty) 'nurse16aIds': nurse16aIds,
+    if (shift16aIds.isNotEmpty) 'nurse16aIds': shift16aIds,
   };
 
   factory DayAssignment.fromJson(Map<String, dynamic> json) => DayAssignment(
@@ -84,7 +88,7 @@ class DayAssignment {
     nurseIds: (json['nurseIds'] as List? ?? const []).cast<String>(),
     techId: json['techId'] as String?,
     tech16bId: json['tech16bId'] as String?,
-    nurse16aIds: (json['nurse16aIds'] as List? ?? const []).cast<String>(),
+    shift16aIds: (json['nurse16aIds'] as List? ?? const []).cast<String>(),
   );
 
   @override
@@ -94,7 +98,7 @@ class DayAssignment {
       const ListEquality<String>().equals(other.nurseIds, nurseIds) &&
       other.techId == techId &&
       other.tech16bId == tech16bId &&
-      const ListEquality<String>().equals(other.nurse16aIds, nurse16aIds);
+      const ListEquality<String>().equals(other.shift16aIds, shift16aIds);
 
   @override
   int get hashCode => Object.hash(
@@ -102,11 +106,11 @@ class DayAssignment {
     const ListEquality<String>().hash(nurseIds),
     techId,
     tech16bId,
-    const ListEquality<String>().hash(nurse16aIds),
+    const ListEquality<String>().hash(shift16aIds),
   );
 
   @override
   String toString() =>
-      'DayAssignment($day: $nurseIds${nurse16aIds.isEmpty ? '' : ' (16A: $nurse16aIds)'} + '
+      'DayAssignment($day: $nurseIds${shift16aIds.isEmpty ? '' : ' (16A: $shift16aIds)'} + '
       '$techId${tech16bId == null ? '' : ' + $tech16bId(16B)'})';
 }
