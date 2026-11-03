@@ -113,6 +113,15 @@ void main() {
       find.byKey(const ValueKey('custom-shift-hours')),
       '19',
     );
+    // Süre yazılınca bitiş saati görünür (08:00 + 19 sa → 03:00).
+    await tester.pump();
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('custom-shift-end')),
+        matching: find.text('03:00'),
+      ),
+      findsOneWidget,
+    );
     await tester.tap(find.text('Kaydet'));
     await tester.pumpAndSettle();
     expect(find.textContaining('hazır bir vardiya'), findsOneWidget);
@@ -124,7 +133,7 @@ void main() {
     await tester.tap(find.text('Kaydet'));
     await tester.pumpAndSettle();
     expect(saved().customShifts, [const CustomShift(code: '19A', hours: 19)]);
-    expect(find.text('08:00 · 19 sa · nöbet koltuğu'), findsOneWidget);
+    expect(find.text('08:00–03:00 · 19 sa · nöbet koltuğu'), findsOneWidget);
 
     // Düzenle: ek mesai yap, süre 7,5.
     await tester.tap(find.byKey(const ValueKey('custom-shift-19A')));

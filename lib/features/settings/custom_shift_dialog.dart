@@ -42,22 +42,46 @@ class _CustomShiftDialogState extends State<CustomShiftDialog> {
     super.dispose();
   }
 
-  String get _startLabel =>
-      CustomShift(code: '', startMinute: _start, hours: 0).startLabel;
+  String _format(double h) =>
+      '$h'.replaceAll(RegExp(r'\.0$'), '').replaceAll('.', ',');
 
-  Future<void> _pickStart() async {
+  /// Yazılan süreye göre bitiş saati; süre anlaşılmazsa null.
+  String? get _endLabel {
+    final h = CustomShiftRules.parseHours(_hours.text);
+    if (h == null || h <= 0) return null;
+    return CustomShift(code: '', startMinute: _start, hours: h).endLabel;
+  }
+
+  Future<int?> _pickTime(int minute, String help) async {
     final picked = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay(hour: _start ~/ 60, minute: _start % 60),
-      helpText: 'Başlangıç saati',
+      initialTime: TimeOfDay(hour: minute ~/ 60, minute: minute % 60),
+      helpText: help,
       builder: (context, child) => MediaQuery(
         data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
         child: child!,
       ),
     );
-    if (picked != null) {
-      setState(() => _start = picked.hour * 60 + picked.minute);
-    }
+    return picked == null ? null : picked.hour * 60 + picked.minute;
+  }
+
+  /// Başlangıç değişince süre korunur, bitiş kayar.
+  Future<void> _pickStart() async {
+    final m = await _pickTime(_start, 'Başlangıç saati');
+    if (m != null) setState(() => _start = m);
+  }
+
+  /// Bitiş seçilince süre başlangıçtan hesaplanır (ertesi güne geçebilir).
+  Future<void> _pickEnd() async {
+    final h = CustomShiftRules.parseHours(_hours.text);
+    final current = h == null
+        ? _start
+        : CustomShift(code: '', startMinute: _start, hours: h).endMinute;
+    final m = await _pickTime(current, 'Bitiş saati');
+    if (m == null) return;
+    setState(
+      () => _hours.text = _format(CustomShiftRules.hoursBetween(_start, m)),
+    );
   }
 
   void _save() {
@@ -103,28 +127,41 @@ class _CustomShiftDialogState extends State<CustomShiftDialog> {
               helperText: editing ? 'Ad değiştirilemez.' : 'Listede görünür.',
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          ListTile(
+            key: const ValueKey('custom-shift-start'),
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.login),
+            title: const Text('Başlangıç saati'),
+            trailing: Text(
+              CustomShift.clock(_start),
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            onTap: _pickStart,
+          ),
+          ListTile(
+            key: const ValueKey('custom-shift-end'),
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.logout),
+            title: const Text('Bitiş saati'),
+            subtitle: const Text('Başlangıçtan önceyse ertesi gün.'),
+            trailing: Text(
+              _endLabel ?? '–',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            onTap: _pickEnd,
+          ),
           TextField(
             key: const ValueKey('custom-shift-hours'),
             controller: _hours,
+            onChanged: (_) => setState(() {}),
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             decoration: const InputDecoration(
               labelText: 'Çalışma süresi',
               suffixText: 'saat',
               hintText: 'ör. 19',
+              helperText: 'Bitiş seçilince kendiliğinden yazılır.',
             ),
-          ),
-          const SizedBox(height: 4),
-          ListTile(
-            key: const ValueKey('custom-shift-start'),
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.schedule),
-            title: const Text('Başlangıç saati'),
-            trailing: Text(
-              _startLabel,
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            onTap: _pickStart,
           ),
           SwitchListTile(
             key: const ValueKey('custom-shift-seat'),

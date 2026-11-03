@@ -11,6 +11,14 @@ class CustomShiftRules {
   static const minHours = 0.5;
   static const maxHours = 24.0;
 
+  /// Başlangıç ve bitişten süre (saat); bitiş başlangıçtan önce ya da
+  /// eşitse ertesi gün sayılır (13:00 → 08:00 = 19, 08:00 → 08:00 = 24).
+  static double hoursBetween(int startMinute, int endMinute) {
+    var diff = (endMinute - startMinute) % (24 * 60);
+    if (diff == 0) diff = 24 * 60;
+    return diff / 60;
+  }
+
   /// Kullanıcının yazdığı süre ("19", "7,5") → saat; anlaşılmazsa null.
   static double? parseHours(String text) =>
       double.tryParse(text.trim().replaceAll(',', '.'));

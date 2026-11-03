@@ -13,6 +13,10 @@ void main() {
     expect(CustomShift.normalize(' 12 g '), '12G');
     expect(CustomShiftRules.parseHours('7,5'), 7.5);
     expect(CustomShiftRules.parseHours('x'), isNull);
+    // Bitiş başlangıçtan önceyse ertesi gün; eşitse 24 saat.
+    expect(CustomShiftRules.hoursBetween(13 * 60, 8 * 60), 19);
+    expect(CustomShiftRules.hoursBetween(8 * 60, 15 * 60 + 30), 7.5);
+    expect(CustomShiftRules.hoursBetween(8 * 60, 8 * 60), 24);
   });
 
   test('hatalar', () {
@@ -29,10 +33,11 @@ void main() {
 
   test('tanım: açıklama ve JSON', () {
     const s = CustomShift(code: '19A', startMinute: 780, hours: 19);
-    expect(s.description, '13:00 · 19 sa · nöbet koltuğu');
+    expect(s.description, '13:00–08:00 · 19 sa · nöbet koltuğu');
+    expect(s.endLabel, '08:00');
     expect(
       const CustomShift(code: 'G', hours: 7.5, fillsSeat: false).description,
-      '08:00 · 7,5 sa · ek mesai',
+      '08:00–15:30 · 7,5 sa · ek mesai',
     );
     expect(CustomShift.fromJson(s.toJson()), s);
     const settings = RosterSettings(customShifts: [s]);

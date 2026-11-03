@@ -24,16 +24,24 @@ class CustomShift {
 
   int get startHour => startMinute ~/ 60;
 
-  String get startLabel =>
-      '${(startMinute ~/ 60).toString().padLeft(2, '0')}:'
-      '${(startMinute % 60).toString().padLeft(2, '0')}';
+  /// Bitiş, gece yarısından dakika (0–1439; ertesi güne geçebilir).
+  int get endMinute => (startMinute + (hours * 60).round()) % (24 * 60);
 
-  /// "13:00 · 19 sa · nöbet koltuğu"
+  static String clock(int minute) =>
+      '${(minute ~/ 60).toString().padLeft(2, '0')}:'
+      '${(minute % 60).toString().padLeft(2, '0')}';
+
+  String get startLabel => clock(startMinute);
+
+  String get endLabel => clock(endMinute);
+
+  /// "13:00–08:00 · 19 sa · nöbet koltuğu"
   String get description {
     final h = hours == hours.roundToDouble()
         ? hours.toInt().toString()
         : hours.toString().replaceAll('.', ',');
-    return '$startLabel · $h sa · ${fillsSeat ? 'nöbet koltuğu' : 'ek mesai'}';
+    return '$startLabel–$endLabel · $h sa · '
+        '${fillsSeat ? 'nöbet koltuğu' : 'ek mesai'}';
   }
 
   /// Ad karşılaştırması: boşluk atılır, büyük harf.
