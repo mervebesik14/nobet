@@ -63,7 +63,17 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
             font: fonts.regular,
             boldFont: fonts.bold,
           );
-          await services.sharePdf(pdf, '$base.pdf');
+          if (!mounted) return;
+          // Önce önizleme; "Paylaş" ile gönderilir.
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => PdfPreviewPage(
+                title: '$_year yıllık özet',
+                pdf: pdf,
+                fileName: '$base.pdf',
+              ),
+            ),
+          );
         case _ShareAction.personReport:
           final row = await showDialog<YearlyRow>(
             context: context,
@@ -172,14 +182,14 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
                 value: _ShareAction.pdf,
                 child: ListTile(
                   leading: Icon(Icons.picture_as_pdf_outlined),
-                  title: Text('PDF olarak paylaş'),
+                  title: Text('PDF (önizle ve paylaş)'),
                 ),
               ),
               PopupMenuItem(
                 value: _ShareAction.personReport,
                 child: ListTile(
                   leading: Icon(Icons.badge_outlined),
-                  title: Text('Kişi karnesi (PDF)'),
+                  title: Text('Kişi karnesi (önizle ve paylaş)'),
                 ),
               ),
               PopupMenuItem(

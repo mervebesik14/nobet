@@ -73,16 +73,24 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('PDF olarak paylaşılır', (tester) async {
+  testWidgets('PDF önce önizlenir, sonra paylaşılır', (tester) async {
     await pump(tester);
-    await choose(tester, 'PDF olarak paylaş');
-    expect(services.calls, ['sharePdf:nobet-istatistik-2026.pdf']);
+    await choose(tester, 'PDF (önizle ve paylaş)');
+    expect(find.text('2026 yıllık özet'), findsOneWidget);
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('pdf-page-0')), findsOneWidget);
+    expect(services.calls, ['pdfPages']);
+    await tester.tap(find.widgetWithText(FloatingActionButton, 'Paylaş'));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(services.calls, ['pdfPages', 'sharePdf:nobet-istatistik-2026.pdf']);
     expect(String.fromCharCodes(services.lastPdf!.take(5)), '%PDF-');
   });
 
   testWidgets('kişi karnesi: kişi seçilir, PDF paylaşılır', (tester) async {
     await pump(tester);
-    await choose(tester, 'Kişi karnesi (PDF)');
+    await choose(tester, 'Kişi karnesi (önizle ve paylaş)');
     expect(find.text('Kimin karnesi?'), findsOneWidget);
     await tester.tap(
       find.descendant(
@@ -128,7 +136,7 @@ void main() {
     await pump(tester);
     await tester.tap(find.byTooltip('Önceki yıl'));
     await tester.pumpAndSettle();
-    await choose(tester, 'PDF olarak paylaş');
+    await choose(tester, 'PDF (önizle ve paylaş)');
     expect(services.calls, isEmpty);
     expect(find.text('2025 için paylaşılacak liste yok.'), findsOneWidget);
   });
