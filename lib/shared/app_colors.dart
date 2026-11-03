@@ -11,8 +11,8 @@ extension AppTints on ColorScheme {
   Color _tint(Color color, double opacity) =>
       Color.alphaBlend(color.withValues(alpha: opacity), surface);
 
-  /// Hafta sonu sütunları: çok hafif marka tonu.
-  Color get weekendTint => _tint(primary, 0.08);
+  /// Hafta sonu sütunları: hafta içinden belirgin ayrışan marka tonu.
+  Color get weekendTint => _tint(primary, 0.22);
 
   /// Resmi tatil sütunları: hafif, sıcak vurgu (hafta sonundan ayrışır).
   Color get holidayTint => _tint(const Color(0xFFE0A030), 0.16);

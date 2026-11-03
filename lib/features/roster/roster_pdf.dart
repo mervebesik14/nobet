@@ -110,7 +110,7 @@ Future<Uint8List> buildRosterPdf({
   return doc.save();
 }
 
-const _weekendColor = PdfColor.fromInt(0xFFE3ECEB);
+const _weekendColor = PdfColor.fromInt(0xFFCAE2DC);
 const _holidayColor = PdfColor.fromInt(0xFFF6E1C4);
 const _groupColor = PdfColor.fromInt(0xFFB9E9E1);
 const _missingColor = PdfColor.fromInt(0xFFF9D6D2);
