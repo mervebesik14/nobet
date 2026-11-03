@@ -132,6 +132,8 @@ class RosterExcel {
               final code? when code != '24' => dayCell(code, d, strong: true),
               _ => dayCell(shiftHours, d, strong: true),
             }
+          else if (plan.assignments[d]?.extraShiftOf(row.id) case final code?)
+            dayCell(code, d, fill: _dayShift, strong: true)
           else if (onDayShift.contains((row.id, d)))
             dayCell('7A', d, fill: _dayShift, strong: true)
           else if (leaveOn[d] case final type?)

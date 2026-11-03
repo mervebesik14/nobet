@@ -42,17 +42,20 @@ class RosterEditor {
         final nurses = [...current.nurseIds];
         // 16A koltuğun özelliğidir: yerine geçen de 16A tutar.
         final night = [...current.shift16aIds];
+        final custom = {...current.customShifts};
         if (oldId != null) {
           final i = nurses.indexOf(oldId);
           if (i < 0) {
             throw const RosterEditException('Değiştirilecek kişi o gün yok.');
           }
           final was16a = night.remove(oldId);
+          final code = custom.remove(oldId);
           if (newId == null) {
             nurses.removeAt(i);
           } else {
             nurses[i] = newId;
             if (was16a) night.add(newId);
+            if (code != null) custom[newId] = code;
           }
         } else if (newId != null) {
           if (nurses.length >= nursesPerDay) {
@@ -60,7 +63,11 @@ class RosterEditor {
           }
           nurses.add(newId);
         }
-        updated = current.copyWith(nurseIds: nurses, shift16aIds: night);
+        updated = current.copyWith(
+          nurseIds: nurses,
+          shift16aIds: night,
+          customShifts: custom,
+        );
       case Role.radiologyTech:
         final slotId = secondary ? current.tech16bId : current.techId;
         if (oldId != null && slotId != oldId) {
@@ -76,6 +83,7 @@ class RosterEditor {
         } else {
           // 16A koltuğun özelliğidir: yerine geçen de 16A tutar.
           final was16a = oldId != null && current.is16a(oldId);
+          final code = oldId == null ? null : current.customShiftOf(oldId);
           updated = newId == null
               ? current.copyWith(clearTech: true)
               : current.copyWith(
@@ -85,6 +93,11 @@ class RosterEditor {
                       if (id != oldId) id,
                     if (was16a) newId,
                   ],
+                  customShifts: {
+                    for (final e in current.customShifts.entries)
+                      if (e.key != oldId) e.key: e.value,
+                    newId: ?code,
+                  },
                 );
         }
     }
@@ -211,6 +224,65 @@ class RosterEditor {
           for (final id in [...current.nurseIds, ?current.techId])
             if (ids.contains(id)) id,
         ],
+        // 16A ile özel mesai birlikte olmaz.
+        customShifts: {
+          for (final e in current.customShifts.entries)
+            if (e.key != personId) e.key: e.value,
+        },
+      ),
+    };
+  }
+
+  /// [day] gününde koltuktaki (hemşire ya da 24 teknikeri) [personId]'nin
+  /// vardiyasını [code] özel mesaisine çevirir; [code] null ise 24'e döner.
+  /// 16A işareti düşer.
+  static Map<int, DayAssignment> setCustomShift(
+    Map<int, DayAssignment> assignments, {
+    required int day,
+    required String personId,
+    required String? code,
+  }) {
+    final current = assignments[day];
+    if (current == null ||
+        !(current.nurseIds.contains(personId) || current.techId == personId)) {
+      throw const RosterEditException('Bu kişi o gün 24 nöbette değil.');
+    }
+    return {
+      ...assignments,
+      day: current.copyWith(
+        shift16aIds: [
+          for (final id in current.shift16aIds)
+            if (id != personId) id,
+        ],
+        customShifts: {
+          for (final e in current.customShifts.entries)
+            if (e.key != personId) e.key: e.value,
+          personId: ?code,
+        },
+      ),
+    };
+  }
+
+  /// [day] gününde koltukta olmayan [personId]'ye ek özel mesai [code]
+  /// yazar; [code] null ise kaldırır.
+  static Map<int, DayAssignment> setExtraShift(
+    Map<int, DayAssignment> assignments, {
+    required int day,
+    required String personId,
+    required String? code,
+  }) {
+    final current = assignments[day] ?? DayAssignment(day: day);
+    if (code != null && current.includes(personId)) {
+      throw const RosterEditException('Bu kişi o gün nöbette.');
+    }
+    return {
+      ...assignments,
+      day: current.copyWith(
+        extraShifts: {
+          for (final e in current.extraShifts.entries)
+            if (e.key != personId) e.key: e.value,
+          personId: ?code,
+        },
       ),
     };
   }
@@ -229,13 +301,23 @@ class RosterEditor {
       nurseIds: current.nurseIds,
       techId: secondary ? keepOther : personId,
       tech16bId: secondary ? personId : keepOther,
-      // 16B'ye geçen teknikerin 16A işareti düşer.
+      // 16B'ye geçen teknikerin 16A işareti ve özel mesaisi düşer.
       shift16aIds: [
         for (final id in current.shift16aIds)
           if (current.nurseIds.contains(id) ||
               id == (secondary ? keepOther : personId))
             id,
       ],
+      customShifts: {
+        for (final e in current.customShifts.entries)
+          if (current.nurseIds.contains(e.key) ||
+              e.key == (secondary ? keepOther : personId))
+            e.key: e.value,
+      },
+      extraShifts: {
+        for (final e in current.extraShifts.entries)
+          if (e.key != personId) e.key: e.value,
+      },
     );
     return {...assignments, day: updated};
   }

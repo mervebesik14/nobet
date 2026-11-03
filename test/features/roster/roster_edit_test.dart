@@ -500,6 +500,79 @@ void main() {
     expect(a.shift16aIds, ['t0']);
   });
 
+  testWidgets('özel mesai: dokununca 19A yazılır, çevrilir; ek mesai G', (
+    tester,
+  ) async {
+    await boxes.settings.put(
+      'roster',
+      const RosterSettings(
+        customShifts: [
+          CustomShift(code: '19A', startMinute: 780, hours: 19),
+          CustomShift(code: 'G', hours: 6, fillsSeat: false),
+        ],
+      ),
+    );
+    await pumpRoster(tester);
+
+    // 3 Ekim'de Ayşe nöbetçi: 19A olarak değiştir.
+    await tester.tap(cell('n0', 3));
+    await tester.pumpAndSettle();
+    await tester.tap(inSheet('19A olarak değiştir'));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.shiftCode('n0'), '19A');
+    expect(
+      find.descendant(of: cell('n0', 3), matching: find.text('19A')),
+      findsOneWidget,
+    );
+
+    // Geri 24.
+    await tester.tap(cell('n0', 3));
+    await tester.pumpAndSettle();
+    await tester.tap(inSheet('24 olarak değiştir'));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.customShifts, isEmpty);
+
+    // Boş hücreye ek mesai G: koltuk doldurmaz.
+    await tester.tap(cell('n0', 4));
+    await tester.pumpAndSettle();
+    await tester.tap(inSheet('G yaz'));
+    await tester.pumpAndSettle();
+    final a = saved().assignments[4]!;
+    expect(a.extraShifts, {'n0': 'G'});
+    expect(a.includes('n0'), isFalse);
+    expect(
+      find.descendant(of: cell('n0', 4), matching: find.text('G')),
+      findsOneWidget,
+    );
+
+    // Kaldır.
+    await tester.tap(cell('n0', 4));
+    await tester.pumpAndSettle();
+    await tester.tap(inSheet('G mesaisini kaldır'));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[4]!.extraShifts, isEmpty);
+
+    // Boş hücreye 19A yaz: koltuk doluysa kimin yerine diye sorulur.
+    final day4 = saved().assignments[4]!.nurseIds;
+    await tester.tap(cell('n0', 4));
+    await tester.pumpAndSettle();
+    await tester.tap(inSheet('19A yaz'));
+    await tester.pumpAndSettle();
+    expect(find.text('Kimin yerine 19A?'), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(SimpleDialog),
+        matching: find.text(_nurses[int.parse(day4.first.substring(1))]),
+      ),
+    );
+    await tester.pumpAndSettle();
+    if (find.text('Yine de yap').evaluate().isNotEmpty) {
+      await tester.tap(find.text('Yine de yap'));
+      await tester.pumpAndSettle();
+    }
+    expect(saved().assignments[4]!.shiftCode('n0'), '19A');
+  });
+
   testWidgets('takas yapısal olarak olamıyorsa açıklar', (tester) async {
     await pumpRoster(tester);
 

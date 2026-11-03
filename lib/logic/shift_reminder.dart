@@ -31,14 +31,15 @@ class ShiftReminder {
     final items = <ShiftReminderItem>[];
     for (final plan in plans) {
       for (final a in plan.assignments.values) {
-        if (!a.personIds.contains(personId)) continue;
+        final extra = a.extraShiftOf(personId);
+        if (!a.personIds.contains(personId) && extra == null) continue;
         final day = DateTime(plan.year, plan.month, a.day);
         final at = DateTime(day.year, day.month, day.day - 1, hour, minute);
         if (!at.isAfter(now)) continue;
         items.add((
           at: at,
           shiftDay: day,
-          shift: a.shiftCode(personId),
+          shift: extra ?? a.shiftCode(personId),
           nurseIds: a.nurseIds,
           techIds: [?a.techId, ?a.tech16bId],
         ));

@@ -8,6 +8,8 @@ class DayAssignment {
     this.techId,
     this.tech16bId,
     this.shift16aIds = const [],
+    this.customShifts = const {},
+    this.extraShifts = const {},
   });
 
   /// Ayın günü (1..31).
@@ -28,6 +30,15 @@ class DayAssignment {
   /// kurallarda nöbet sayılır, 16 saat.
   final List<String> shift16aIds;
 
+  /// Koltuktaki kişi → özel mesai adı ([CustomShift.fillsSeat] açık olan,
+  /// ör. "19A"). Hemşire koltuğu ya da teknikerin 24 koltuğu; 16A gibi
+  /// koltuğun özelliğidir.
+  final Map<String, String> customShifts;
+
+  /// Koltukta olmayan kişi → ek özel mesai adı (koltuk doldurmayan özel
+  /// mesai; kurallarda nöbet sayılmaz).
+  final Map<String, String> extraShifts;
+
   /// 16A vardiyasının saati.
   static const shift16aHours = 16;
 
@@ -45,12 +56,24 @@ class DayAssignment {
       shift16aIds.contains(personId) &&
       (nurseIds.contains(personId) || techId == personId);
 
-  /// Kişinin bu günkü vardiyası: "16B", "16A" ya da "24".
+  /// [personId] koltukta mı (hemşire ya da teknikerin 24 koltuğu)?
+  bool _inMainSeat(String personId) =>
+      nurseIds.contains(personId) || techId == personId;
+
+  /// Koltuktaki kişinin özel mesaisi (ör. "19A"); yoksa null.
+  String? customShiftOf(String personId) =>
+      _inMainSeat(personId) ? customShifts[personId] : null;
+
+  /// Koltukta olmayan kişinin ek özel mesaisi; yoksa null.
+  String? extraShiftOf(String personId) =>
+      includes(personId) ? null : extraShifts[personId];
+
+  /// Kişinin bu günkü vardiyası: "16B", "16A", özel mesai adı ya da "24".
   String shiftCode(String personId) => isSecondaryTech(personId)
       ? '16B'
       : is16a(personId)
       ? '16A'
-      : '24';
+      : customShiftOf(personId) ?? '24';
 
   DayAssignment copyWith({
     List<String>? nurseIds,
@@ -59,6 +82,8 @@ class DayAssignment {
     String? tech16bId,
     bool clearTech16b = false,
     List<String>? shift16aIds,
+    Map<String, String>? customShifts,
+    Map<String, String>? extraShifts,
   }) {
     final nurses = nurseIds ?? this.nurseIds;
     final tech = clearTech ? null : (techId ?? this.techId);
@@ -72,6 +97,18 @@ class DayAssignment {
         for (final id in shift16aIds ?? this.shift16aIds)
           if (nurses.contains(id) || id == tech) id,
       ],
+      customShifts: {
+        for (final e in (customShifts ?? this.customShifts).entries)
+          if (nurses.contains(e.key) || e.key == tech) e.key: e.value,
+      },
+      // Koltuğa yazılanın ek mesaisi düşer.
+      extraShifts: {
+        for (final e in (extraShifts ?? this.extraShifts).entries)
+          if (!nurses.contains(e.key) &&
+              e.key != tech &&
+              e.key != (clearTech16b ? null : (tech16bId ?? this.tech16bId)))
+            e.key: e.value,
+      },
     );
   }
 
@@ -81,6 +118,8 @@ class DayAssignment {
     'techId': techId,
     'tech16bId': tech16bId,
     if (shift16aIds.isNotEmpty) 'nurse16aIds': shift16aIds,
+    if (customShifts.isNotEmpty) 'customShifts': customShifts,
+    if (extraShifts.isNotEmpty) 'extraShifts': extraShifts,
   };
 
   factory DayAssignment.fromJson(Map<String, dynamic> json) => DayAssignment(
@@ -89,6 +128,10 @@ class DayAssignment {
     techId: json['techId'] as String?,
     tech16bId: json['tech16bId'] as String?,
     shift16aIds: (json['nurse16aIds'] as List? ?? const []).cast<String>(),
+    customShifts: (json['customShifts'] as Map? ?? const {})
+        .cast<String, String>(),
+    extraShifts: (json['extraShifts'] as Map? ?? const {})
+        .cast<String, String>(),
   );
 
   @override
@@ -98,7 +141,15 @@ class DayAssignment {
       const ListEquality<String>().equals(other.nurseIds, nurseIds) &&
       other.techId == techId &&
       other.tech16bId == tech16bId &&
-      const ListEquality<String>().equals(other.shift16aIds, shift16aIds);
+      const ListEquality<String>().equals(other.shift16aIds, shift16aIds) &&
+      const MapEquality<String, String>().equals(
+        other.customShifts,
+        customShifts,
+      ) &&
+      const MapEquality<String, String>().equals(
+        other.extraShifts,
+        extraShifts,
+      );
 
   @override
   int get hashCode => Object.hash(
@@ -107,6 +158,8 @@ class DayAssignment {
     techId,
     tech16bId,
     const ListEquality<String>().hash(shift16aIds),
+    const MapEquality<String, String>().hash(customShifts),
+    const MapEquality<String, String>().hash(extraShifts),
   );
 
   @override

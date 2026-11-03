@@ -268,10 +268,12 @@ class _RosterTableState extends State<RosterTable> {
                   leave: personDays.contains(d) ? null : leaveOn[d],
                   label:
                       _labelFor(row.id, d, personDays.contains(d)) ??
+                      plan.assignments[d]?.extraShiftOf(row.id) ??
                       (onDayShift.contains((row.id, d)) ? '7A' : null),
                   isDayShift:
                       !personDays.contains(d) &&
-                      onDayShift.contains((row.id, d)),
+                      (onDayShift.contains((row.id, d)) ||
+                          plan.assignments[d]?.extraShiftOf(row.id) != null),
                   columnColor: highlighted
                       ? Color.alphaBlend(
                           scheme.primary.withValues(alpha: 0.06),

@@ -120,7 +120,9 @@ class RosterImport {
     required Iterable<Person> people,
     int techsPerDay = 1,
     int shiftHours = 24,
+    Iterable<CustomShift> customShifts = const [],
   }) {
+    final customByCode = {for (final c in customShifts) _code(c.code): c};
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final warnings = <String>[];
 
@@ -170,6 +172,8 @@ class RosterImport {
     final tech24 = {for (var d = 1; d <= days; d++) d: <String>[]};
     final tech16 = {for (var d = 1; d <= days; d++) d: <String>[]};
     final nurse16a = {for (var d = 1; d <= days; d++) d: <String>[]};
+    final customSeat = {for (var d = 1; d <= days; d++) d: <String, String>{}};
+    final extra = {for (var d = 1; d <= days; d++) d: <String, String>{}};
     final leaves = <LeaveType, Map<String, List<int>>>{};
     final techDayShifts = <String, List<int>>{};
     final matched = <String>{};
@@ -218,6 +222,21 @@ class RosterImport {
         if (_leaveCodes[code] case final type?) {
           ((leaves[type] ??= {})[person.id] ??= []).add(d);
           matched.add(person.id);
+          continue;
+        }
+        if (customByCode[code] case final def?) {
+          matched.add(person.id);
+          if (!def.fillsSeat) {
+            extra[d]![person.id] = def.code;
+            continue;
+          }
+          shiftCount++;
+          customSeat[d]![person.id] = def.code;
+          if (person.role == Role.nurse) {
+            nurses[d]!.add(person.id);
+          } else {
+            tech24[d]!.add(person.id);
+          }
           continue;
         }
         final is16 = code == '16B' || code == '16';
@@ -276,6 +295,19 @@ class RosterImport {
           for (final id in [...?nurse16a[d]])
             if ((nurses[d]?.contains(id) ?? false) || id == t24.firstOrNull) id,
         ],
+        customShifts: {
+          for (final e in (customSeat[d] ?? const <String, String>{}).entries)
+            if ((nurses[d]?.contains(e.key) ?? false) ||
+                e.key == t24.firstOrNull)
+              e.key: e.value,
+        },
+        extraShifts: {
+          for (final e in (extra[d] ?? const <String, String>{}).entries)
+            if (!(nurses[d]?.contains(e.key) ?? false) &&
+                !t24.contains(e.key) &&
+                !t16.contains(e.key))
+              e.key: e.value,
+        },
       );
     }
 

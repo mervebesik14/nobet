@@ -1,3 +1,7 @@
+import 'package:collection/collection.dart';
+
+import 'custom_shift.dart';
+
 /// Nöbet dağıtım kuralları ve mesai hesabı ayarları.
 class RosterSettings {
   const RosterSettings({
@@ -12,6 +16,7 @@ class RosterSettings {
     this.holidayCountsAsWeekend = true,
     this.halfDayHolidayIsHalfWorkday = true,
     this.halfDayRequiredHours = 5,
+    this.customShifts = const [],
   });
 
   /// Her gün nöbet tutacak hemşire sayısı.
@@ -49,6 +54,13 @@ class RosterSettings {
   /// Hafta içine denk gelen arife gününün gerektirdiği çalışma saati.
   final double halfDayRequiredHours;
 
+  /// Kullanıcının tanımladığı özel mesailer (ör. 19A).
+  final List<CustomShift> customShifts;
+
+  /// [code] adlı özel mesai; yoksa null.
+  CustomShift? customShift(String code) =>
+      customShifts.firstWhereOrNull((s) => s.code == code);
+
   RosterSettings copyWith({
     int? nursesPerDay,
     int? techsPerDay,
@@ -62,6 +74,7 @@ class RosterSettings {
     bool? holidayCountsAsWeekend,
     bool? halfDayHolidayIsHalfWorkday,
     double? halfDayRequiredHours,
+    List<CustomShift>? customShifts,
   }) {
     return RosterSettings(
       nursesPerDay: nursesPerDay ?? this.nursesPerDay,
@@ -82,6 +95,7 @@ class RosterSettings {
       halfDayHolidayIsHalfWorkday:
           halfDayHolidayIsHalfWorkday ?? this.halfDayHolidayIsHalfWorkday,
       halfDayRequiredHours: halfDayRequiredHours ?? this.halfDayRequiredHours,
+      customShifts: customShifts ?? this.customShifts,
     );
   }
 
@@ -97,6 +111,8 @@ class RosterSettings {
     'holidayCountsAsWeekend': holidayCountsAsWeekend,
     'halfDayHolidayIsHalfWorkday': halfDayHolidayIsHalfWorkday,
     'halfDayRequiredHours': halfDayRequiredHours,
+    if (customShifts.isNotEmpty)
+      'customShifts': [for (final s in customShifts) s.toJson()],
   };
 
   /// Eksik alanlar varsayılan değerini alır (eski yedeklerle uyum için).
@@ -124,6 +140,10 @@ class RosterSettings {
       halfDayRequiredHours:
           (json['halfDayRequiredHours'] as num?)?.toDouble() ??
           d.halfDayRequiredHours,
+      customShifts: [
+        for (final s in json['customShifts'] as List? ?? const [])
+          CustomShift.fromJson((s as Map).cast<String, dynamic>()),
+      ],
     );
   }
 
@@ -140,7 +160,11 @@ class RosterSettings {
       other.forbidConsecutiveDays == forbidConsecutiveDays &&
       other.holidayCountsAsWeekend == holidayCountsAsWeekend &&
       other.halfDayHolidayIsHalfWorkday == halfDayHolidayIsHalfWorkday &&
-      other.halfDayRequiredHours == halfDayRequiredHours;
+      other.halfDayRequiredHours == halfDayRequiredHours &&
+      const ListEquality<CustomShift>().equals(
+        other.customShifts,
+        customShifts,
+      );
 
   @override
   int get hashCode => Object.hash(
@@ -155,5 +179,6 @@ class RosterSettings {
     holidayCountsAsWeekend,
     halfDayHolidayIsHalfWorkday,
     halfDayRequiredHours,
+    const ListEquality<CustomShift>().hash(customShifts),
   );
 }

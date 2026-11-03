@@ -233,23 +233,27 @@ class _TodayCard extends ConsumerWidget {
     );
 
     Widget day(DayOverview d, String label) {
+      // Koltuktaki kişinin 16A / özel mesai eki.
+      String seat(String id) {
+        final code = d.shift16aIds.contains(id) ? '16A' : d.customShifts[id];
+        return code == null ? name(id) : '${name(id)} ($code)';
+      }
+
       final lines = <(String, String)>[
         if (d.nurseIds.isNotEmpty)
-          (
-            'Hemşire',
-            [
-              for (final id in d.nurseIds)
-                d.shift16aIds.contains(id) ? '${name(id)} (16A)' : name(id),
-            ].join(', '),
-          ),
-        if (d.techId case final id?)
-          (
-            'Radyoloji',
-            d.shift16aIds.contains(id) ? '${name(id)} (16A)' : name(id),
-          ),
+          ('Hemşire', [for (final id in d.nurseIds) seat(id)].join(', ')),
+        if (d.techId case final id?) ('Radyoloji', seat(id)),
         if (d.tech16bId != null) ('16B', name(d.tech16bId!)),
         if (d.dayShiftIds.isNotEmpty)
           ('7A', d.dayShiftIds.map(name).join(', ')),
+        if (d.extraShifts.isNotEmpty)
+          (
+            'Ek mesai',
+            [
+              for (final e in d.extraShifts.entries)
+                '${name(e.key)} (${e.value})',
+            ].join(', '),
+          ),
       ];
       final onDuty =
           self != null &&

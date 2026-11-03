@@ -361,6 +361,10 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     // Serbest düzenlemede mesai günü dokundukça: boş → 24 → 7A → boş
     // (sorumlu hemşire 7A'ya çevrilmez; hafta sonu/tatilde 24 → boş).
     if (_freeEdit && _techHas7A(cell, role)) return _removeTechDayShift(cell);
+    if (_freeEdit &&
+        _plan.assignments[cell.day]?.extraShiftOf(cell.personId) != null) {
+      return _setExtraShift(cell, null);
+    }
     if (_freeEdit && onShiftHere && _isWorkday(cell.day) && !_isCharge(cell)) {
       return _writeTechDayShift(cell);
     }
@@ -450,9 +454,10 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     if (current.includes(id)) {
       // Dolu koltuğu düzenle: kişi 24 mü 16B mi oturuyorsa o koltuk.
       final secondary = current.isSecondaryTech(id);
-      final shift = role == Role.radiologyTech
-          ? (secondary ? ' · 16B' : ' · 24')
-          : (current.is16a(id) ? ' · 16A' : '');
+      final code = current.shiftCode(id);
+      final shift = role == Role.radiologyTech || code != '24'
+          ? ' · $code'
+          : '';
       result = await showEditSheet(
         context,
         title: '${_name(id)} · ${_dayLabel(day)}$shift',
@@ -822,7 +827,133 @@ class _RosterPageState extends ConsumerState<RosterPage> {
           onSelected: () =>
               nurse ? _writeDayShift(cell) : _writeTechDayShift(cell),
         ),
+      ..._customShiftOptions(cell, role),
     ];
+  }
+
+  /// Ayarlar'da tanımlı özel mesailer (ör. 19A) için seçenekler: koltuktaki
+  /// kişinin vardiyasını çevirmek, boş hücreye yazmak, ek mesaiyi kaldırmak.
+  List<EditOption> _customShiftOptions(RosterCell cell, Role role) {
+    final plan = _plan;
+    final defs = ref.read(rosterSettingsProvider).customShifts;
+    final current = plan.assignments[cell.day] ?? DayAssignment(day: cell.day);
+    final id = cell.personId;
+    final onShift = current.includes(id);
+    final mainSeat = current.nurseIds.contains(id) || current.techId == id;
+    final code = current.customShiftOf(id);
+    final extra = current.extraShiftOf(id);
+    EditOption action(
+      String title,
+      Future<void> Function() run, {
+      String? subtitle,
+      IconData icon = Icons.more_time,
+    }) => EditOption(
+      title: title,
+      subtitle: subtitle,
+      icon: icon,
+      result: plan.assignments,
+      onSelected: run,
+    );
+    return [
+      if (extra != null)
+        action(
+          '$extra mesaisini kaldır',
+          () => _setExtraShift(cell, null),
+          icon: Icons.remove_circle_outline,
+        ),
+      if (code != null)
+        action(
+          '24 olarak değiştir',
+          () => _setCustomShift(cell, null),
+          subtitle: '$code yerine 24 nöbet tutar.',
+        ),
+      for (final def in defs)
+        if (def.fillsSeat) ...[
+          if (mainSeat && code != def.code)
+            action(
+              '${def.code} olarak değiştir',
+              () => _setCustomShift(cell, def.code),
+              subtitle: def.description,
+            ),
+          if (!onShift)
+            action(
+              '${def.code} yaz',
+              () => _write16a(cell, role, code: def.code),
+              subtitle:
+                  '${def.description}; '
+                  '${role == Role.nurse ? 'bir hemşire koltuğunu' : '24 koltuğunu'} '
+                  'doldurur.',
+            ),
+        ] else if (extra != def.code)
+          action(
+            onShift ? '${def.code} olarak değiştir' : '${def.code} yaz',
+            () => _setExtraShift(cell, def.code),
+            subtitle: onShift
+                ? 'Nöbeti kalkar; ${def.description}.'
+                : def.description,
+          ),
+    ];
+  }
+
+  /// Koltuktaki kişinin vardiyasını özel mesai [code] yapar (null → 24).
+  Future<void> _setCustomShift(RosterCell cell, String? code) async {
+    final plan = _plan;
+    try {
+      final after = RosterEditor.setCustomShift(
+        plan.assignments,
+        day: cell.day,
+        personId: cell.personId,
+        code: code,
+      );
+      await _apply(
+        after,
+        message:
+            '${_name(cell.personId)} ${formatDayMonth(cell.day, plan.month)} '
+            '${code ?? '24'} olarak değiştirildi.',
+      );
+    } on RosterEditException catch (e) {
+      _notify(e.message);
+    }
+  }
+
+  /// Kişiye [cell] gününde ek özel mesai [code] yazar (null → kaldırır).
+  /// Kişi o gün nöbetteyse nöbeti kalkar.
+  Future<void> _setExtraShift(RosterCell cell, String? code) async {
+    final plan = _plan;
+    final current = plan.assignments[cell.day];
+    try {
+      var after = plan.assignments;
+      if (code != null && (current?.includes(cell.personId) ?? false)) {
+        after = RosterEditor.replace(
+          after,
+          day: cell.day,
+          role: current!.nurseIds.contains(cell.personId)
+              ? Role.nurse
+              : Role.radiologyTech,
+          oldId: cell.personId,
+          newId: null,
+          nursesPerDay: ref.read(effectiveSettingsProvider).nursesPerDay,
+          secondary: current.isSecondaryTech(cell.personId),
+        );
+      }
+      after = RosterEditor.setExtraShift(
+        after,
+        day: cell.day,
+        personId: cell.personId,
+        code: code,
+      );
+      await _apply(
+        after,
+        message: code == null
+            ? '${_name(cell.personId)} ${formatDayMonth(cell.day, plan.month)} '
+                  '${current?.extraShiftOf(cell.personId) ?? 'ek'} mesaisi '
+                  'kaldırıldı.'
+            : '${_name(cell.personId)} ${formatDayMonth(cell.day, plan.month)} '
+                  '$code yazıldı.',
+      );
+    } on RosterEditException catch (e) {
+      _notify(e.message);
+    }
   }
 
   /// [day] gününde 7A var mı? Sorumlu hemşire tanımlıyken mesai günleri
@@ -1007,28 +1138,40 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   /// Hemşireyi [cell] gününe 16A yazar: boş koltuk varsa oraya, yoksa
   /// seçilen hemşirenin yerine. Tekniker 24 koltuğuna (doluysa oradakinin
   /// yerine) 16A yazılır.
-  Future<void> _write16a(RosterCell cell, Role role) async {
+  Future<void> _write16a(RosterCell cell, Role role, {String? code}) async {
     final plan = _plan;
+    // [code] verilirse 16A yerine o özel mesai yazılır.
+    final label = code ?? '16A';
+    Map<int, DayAssignment> mark(Map<int, DayAssignment> a) => code == null
+        ? RosterEditor.set16a(
+            a,
+            day: cell.day,
+            personId: cell.personId,
+            night: true,
+          )
+        : RosterEditor.setCustomShift(
+            a,
+            day: cell.day,
+            personId: cell.personId,
+            code: code,
+          );
     if (role == Role.radiologyTech) {
       final replaced = plan.assignments[cell.day]?.techId;
       try {
-        final after = RosterEditor.set16a(
+        final after = mark(
           RosterEditor.setTechSeat(
             plan.assignments,
             day: cell.day,
             personId: cell.personId,
             secondary: false,
           ),
-          day: cell.day,
-          personId: cell.personId,
-          night: true,
         );
         if (!await _confirmViolations(after)) return;
         await _apply(
           after,
           message:
               '${_name(cell.personId)} ${formatDayMonth(cell.day, plan.month)} '
-              "16A'ya yazıldı"
+              '$label yazıldı'
               '${replaced == null || replaced == cell.personId ? '' : ' (${_name(replaced)} yerine)'}.',
         );
       } on RosterEditException catch (e) {
@@ -1043,7 +1186,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       replaced = await showDialog<String>(
         context: context,
         builder: (context) => SimpleDialog(
-          title: const Text('Kimin yerine 16A?'),
+          title: Text('Kimin yerine $label?'),
           children: [
             for (final other in current.nurseIds)
               SimpleDialogOption(
@@ -1064,18 +1207,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         newId: cell.personId,
         nursesPerDay: nursesPerDay,
       );
-      after = RosterEditor.set16a(
-        after,
-        day: cell.day,
-        personId: cell.personId,
-        night: true,
-      );
+      after = mark(after);
       if (!await _confirmViolations(after)) return;
       await _apply(
         after,
         message:
             '${_name(cell.personId)} ${formatDayMonth(cell.day, plan.month)} '
-            "16A'ya yazıldı"
+            '$label yazıldı'
             '${replaced == null ? '' : ' (${_name(replaced)} yerine)'}.',
       );
     } on RosterEditException catch (e) {
@@ -1376,6 +1514,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             dayShifts: dayShifts,
           ),
           dayShifts: dayShifts,
+          customShifts: ref.read(rosterSettingsProvider).customShifts,
           now: ref.read(clockProvider)(),
         );
         await services.shareFile(
@@ -1423,7 +1562,11 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     PersonalRosterData data,
     Iterable<DayShift> dayShifts,
   ) async {
-    final events = RosterCalendar.events(data: data, dayShifts: dayShifts);
+    final events = RosterCalendar.events(
+      data: data,
+      dayShifts: dayShifts,
+      customShifts: ref.read(rosterSettingsProvider).customShifts,
+    );
     if (events.isEmpty) {
       _notify('${data.person.name}: bu ay takvime eklenecek nöbet yok.');
       return;
@@ -1532,7 +1675,12 @@ class _RosterPageState extends ConsumerState<RosterPage> {
           if (data.shifts.isEmpty && data.dayShiftDays.isEmpty) continue;
           files.add((
             bytes: utf8.encode(
-              RosterCalendar.ics(data: data, dayShifts: dayShifts, now: now),
+              RosterCalendar.ics(
+                data: data,
+                dayShifts: dayShifts,
+                customShifts: ref.read(rosterSettingsProvider).customShifts,
+                now: now,
+              ),
             ),
             name: 'nobet-${fileSlug(person.name)}-${plan.year}-$month.ics',
             mime: RosterCalendar.mimeType,

@@ -156,6 +156,9 @@ class RosterSummary {
     // 16B (hafif) vardiyadaki tekniker günleri; çalışılan saat farklı.
     final secondary = <String, Set<int>>{};
     final night = <String, Set<int>>{};
+    final customDays = <String, Set<int>>{};
+    final customHours = <String, double>{};
+    final extraHours = <String, double>{};
     for (final a in assignments.values) {
       for (final id in a.nurseIds) {
         (worked[id] ??= {}).add(a.day);
@@ -172,6 +175,23 @@ class RosterSummary {
       }
       for (final id in a.shift16aIds) {
         if (a.is16a(id)) (night[id] ??= {}).add(a.day);
+      }
+      // Özel mesailer: koltuktaki 24 yerine kendi saati; ek olanlar
+      // çalışılan saate eklenir. Tanımı silinmişse koltuktaki 24 sayılır.
+      for (final id in a.customShifts.keys) {
+        final code = a.customShiftOf(id);
+        if (code == null || a.is16a(id)) continue;
+        if (settings.customShift(code) case final def?) {
+          (customDays[id] ??= {}).add(a.day);
+          customHours[id] = (customHours[id] ?? 0) + def.hours;
+        }
+      }
+      for (final id in a.extraShifts.keys) {
+        if (a.extraShiftOf(id) case final code?) {
+          if (settings.customShift(code) case final def?) {
+            extraHours[id] = (extraHours[id] ?? 0) + def.hours;
+          }
+        }
       }
     }
 
@@ -200,7 +220,8 @@ class RosterSummary {
       final days = worked[id] ?? const <int>{};
       final light = secondary[id] ?? const <int>{};
       final nights = night[id] ?? const <int>{};
-      final full = days.length - light.length - nights.length;
+      final custom = customDays[id] ?? const <int>{};
+      final full = days.length - light.length - nights.length - custom.length;
       // İzin günleri (yıllık + şua) kişinin gereken saatinden düşülür
       // (altına inmez).
       final leave = leaveDays[id] ?? const <int>[];
@@ -226,6 +247,8 @@ class RosterSummary {
               calc.workedHours(full) +
               light.length * settings.secondaryTechShiftHours +
               nights.length * DayAssignment.shift16aHours +
+              (customHours[id] ?? 0) +
+              (extraHours[id] ?? 0) +
               (dayHours[id] ?? 0),
           requiredHours: personRequired,
           dayShifts: dayCount[id] ?? 0,

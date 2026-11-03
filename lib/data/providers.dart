@@ -49,9 +49,14 @@ class RosterSettingsController extends Notifier<RosterSettings> {
     await ref.read(settingsRepositoryProvider).save(settings);
   }
 
+  /// Kurallar ve saatler varsayılana döner; özel mesai tanımları kalır.
   Future<void> reset() async {
-    state = const RosterSettings();
+    final custom = state.customShifts;
     await ref.read(settingsRepositoryProvider).reset();
+    state = const RosterSettings();
+    if (custom.isNotEmpty) {
+      await update(const RosterSettings().copyWith(customShifts: custom));
+    }
   }
 }
 

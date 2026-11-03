@@ -7,6 +7,7 @@ import 'package:nobet_listesi/data/hive_adapters.dart';
 
 extension HiveRegistrar on HiveInterface {
   void registerAdapters() {
+    registerAdapter(CustomShiftAdapter());
     registerAdapter(DayAssignmentAdapter());
     registerAdapter(HolidayAdapter());
     registerAdapter(MonthPlanAdapter());
@@ -18,6 +19,7 @@ extension HiveRegistrar on HiveInterface {
 
 extension IsolatedHiveRegistrar on IsolatedHiveInterface {
   void registerAdapters() {
+    registerAdapter(CustomShiftAdapter());
     registerAdapter(DayAssignmentAdapter());
     registerAdapter(HolidayAdapter());
     registerAdapter(MonthPlanAdapter());

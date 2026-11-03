@@ -13,5 +13,6 @@ import '../models/models.dart';
   AdapterSpec<DayAssignment>(),
   AdapterSpec<MonthPlan>(),
   AdapterSpec<RosterSettings>(),
+  AdapterSpec<CustomShift>(),
 ])
 part 'hive_adapters.g.dart';

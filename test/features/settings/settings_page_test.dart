@@ -96,6 +96,62 @@ void main() {
     expect(find.text('3-5 olur, 3-5-7 olmaz.'), findsOneWidget);
   });
 
+  testWidgets('özel mesai tanımlanır, düzenlenir, silinir; sıfırlamada kalır', (
+    tester,
+  ) async {
+    await pump(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('custom-shift-add')));
+    await tester.tap(find.byKey(const ValueKey('custom-shift-add')));
+    await tester.pumpAndSettle();
+
+    // Ayrılmış ad reddedilir.
+    await tester.enterText(
+      find.byKey(const ValueKey('custom-shift-code')),
+      '16a',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('custom-shift-hours')),
+      '19',
+    );
+    await tester.tap(find.text('Kaydet'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('hazır bir vardiya'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('custom-shift-code')),
+      '19a',
+    );
+    await tester.tap(find.text('Kaydet'));
+    await tester.pumpAndSettle();
+    expect(saved().customShifts, [const CustomShift(code: '19A', hours: 19)]);
+    expect(find.text('08:00 · 19 sa · nöbet koltuğu'), findsOneWidget);
+
+    // Düzenle: ek mesai yap, süre 7,5.
+    await tester.tap(find.byKey(const ValueKey('custom-shift-19A')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('custom-shift-hours')),
+      '7,5',
+    );
+    await tester.tap(find.byKey(const ValueKey('custom-shift-seat')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Kaydet'));
+    await tester.pumpAndSettle();
+    expect(saved().customShifts.single.hours, 7.5);
+    expect(saved().customShifts.single.fillsSeat, isFalse);
+
+    // Varsayılanlara dönünce tanım kalır.
+    await tester.tap(find.text('Varsayılanlara dön'));
+    await tester.pumpAndSettle();
+    expect(saved().customShifts, hasLength(1));
+
+    await tester.tap(find.byKey(const ValueKey('custom-shift-19A')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sil'));
+    await tester.pumpAndSettle();
+    expect(saved().customShifts, isEmpty);
+  });
+
   testWidgets('sınırlar: tekniker 0-1, zincir en az 1', (tester) async {
     await pump(tester);
     await tester.tap(find.byTooltip('Günlük radyoloji teknikeri sayısı azalt'));

@@ -229,6 +229,8 @@ pw.Widget _rosterTable({
                 color: columnColor(d),
                 bold: true,
               )
+            else if (plan.assignments[d]?.extraShiftOf(row.id) case final code?)
+              cell(code, color: _dayShiftColor, bold: true)
             else if (onDayShift.contains((row.id, d)))
               cell('7A', color: _dayShiftColor, bold: true)
             else if (leaveOn[d] case final type?)

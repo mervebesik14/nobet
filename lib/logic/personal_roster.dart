@@ -11,12 +11,16 @@ class PersonalShift {
     required this.nurses,
     required this.techs,
     this.isWeekend = false,
+    this.isExtra = false,
   });
 
   final int day;
 
-  /// Kişinin kendi vardiyası: "24", "16B" ya da "16A".
+  /// Kişinin kendi vardiyası: "24", "16B", "16A" ya da özel mesai adı.
   final String shift;
+
+  /// Koltuk doldurmayan ek özel mesai mi (nöbet sayılmaz)?
+  final bool isExtra;
 
   /// O gün nöbetçi hemşireler (kişi dahil).
   final List<String> nurses;
@@ -51,7 +55,8 @@ class PersonalRosterData {
   /// İzin türü → günler (yalnız boş olmayanlar).
   final Map<LeaveType, List<int>> leaves;
 
-  int get weekendShifts => shifts.where((s) => s.isWeekend).length;
+  int get weekendShifts =>
+      shifts.where((s) => s.isWeekend && !s.isExtra).length;
 
   int get leaveDayCount => leaves.values.fold(0, (s, d) => s + d.length);
 
@@ -83,10 +88,12 @@ class PersonalRoster {
 
     final shifts = <PersonalShift>[
       for (var d = 1; d <= plan.daysInMonth; d++)
-        if (plan.assignments[d] case final a? when a.includes(person.id))
+        if (plan.assignments[d] case final a?
+            when a.includes(person.id) || a.extraShiftOf(person.id) != null)
           PersonalShift(
+            isExtra: !a.includes(person.id),
             day: d,
-            shift: a.shiftCode(person.id),
+            shift: a.extraShiftOf(person.id) ?? a.shiftCode(person.id),
             nurses: [
               for (final id in a.nurseIds)
                 a.is16a(id) ? '${name(id)} (16A)' : name(id),

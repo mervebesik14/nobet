@@ -1,3 +1,4 @@
+import '../models/models.dart';
 import 'day_shift_planner.dart';
 import 'personal_roster.dart';
 
@@ -82,21 +83,25 @@ class RosterCalendar {
 
   /// [data] kişisinin nöbetleri ve [dayShifts] içindeki kendi 7A'ları,
   /// güne göre sıralı. Hem dosyaya hem doğrudan telefon takvimine yazılır.
+  /// Özel mesailer [customShifts] tanımındaki başlangıç ve süreyle yazılır.
   static List<CalendarEntry> events({
     required PersonalRosterData data,
     Iterable<DayShift> dayShifts = const [],
+    Iterable<CustomShift> customShifts = const [],
   }) {
+    final custom = {for (final c in customShifts) c.code: c};
     final person = data.person;
     final out = <(int, CalendarEntry)>[];
     void add({
       int hour = startHour,
+      int minute = 0,
       required String kind,
       required int day,
       required Duration length,
       required String title,
       String? description,
     }) {
-      final start = DateTime(data.year, data.month, day, hour);
+      final start = DateTime(data.year, data.month, day, hour, minute);
       out.add((
         day,
         (
@@ -112,6 +117,21 @@ class RosterCalendar {
     }
 
     for (final s in data.shifts) {
+      if (custom[s.shift] case final c?) {
+        add(
+          hour: c.startMinute ~/ 60,
+          minute: c.startMinute % 60,
+          kind: s.shift.toLowerCase(),
+          day: s.day,
+          length: Duration(minutes: (c.hours * 60).round()),
+          title: s.isExtra ? s.shift : 'Nöbet (${s.shift})',
+          description: [
+            'Hemşire: ${s.nurses.join(', ')}',
+            if (s.techs.isNotEmpty) 'Radyoloji: ${s.techs.join(', ')}',
+          ].join('\n'),
+        );
+        continue;
+      }
       // 16B: 08:00–24:00; 16A: 16:00–ertesi 08:00; 24: 08–08.
       final short = s.shift == '16B' || s.shift == '16A';
       add(
@@ -144,6 +164,7 @@ class RosterCalendar {
   static String ics({
     required PersonalRosterData data,
     Iterable<DayShift> dayShifts = const [],
+    Iterable<CustomShift> customShifts = const [],
     required DateTime now,
   }) {
     final person = data.person;
@@ -156,7 +177,11 @@ class RosterCalendar {
       'X-WR-CALNAME:${_escape('${person.name} nöbetleri')}',
     ];
 
-    for (final e in events(data: data, dayShifts: dayShifts)) {
+    for (final e in events(
+      data: data,
+      dayShifts: dayShifts,
+      customShifts: customShifts,
+    )) {
       lines.addAll([
         'BEGIN:VEVENT',
         'UID:${e.uid}',

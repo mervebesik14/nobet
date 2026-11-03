@@ -16,6 +16,7 @@ import '../month/month_reminder_notifications.dart';
 import '../people/people_controller.dart';
 import 'auto_backups_page.dart';
 import 'backup_actions.dart';
+import 'custom_shift_dialog.dart';
 import 'report_info.dart';
 import 'shift_reminder_notifications.dart';
 
@@ -190,6 +191,39 @@ class SettingsPage extends ConsumerWidget {
                 leading: const Icon(Icons.restart_alt),
                 title: const Text('Varsayılanlara dön'),
                 onTap: () => controller.reset(),
+              ),
+            ],
+          ),
+          const PillHeader('Özel mesailer'),
+          GroupCard(
+            children: [
+              for (final c in s.customShifts)
+                ListTile(
+                  key: ValueKey('custom-shift-${c.code}'),
+                  leading: CircleAvatar(
+                    radius: 18,
+                    child: Text(
+                      c.code,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  title: Text(c.code),
+                  subtitle: Text(c.description),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => _editCustomShift(context, ref, c),
+                ),
+              ListTile(
+                key: const ValueKey('custom-shift-add'),
+                leading: const Icon(Icons.add_circle_outline),
+                title: const Text('Yeni mesai tanımla'),
+                subtitle: const Text(
+                  'Ad, başlangıç saati ve süre (ör. 19A, 13:00, 19 saat). '
+                  'Listede hücreye dokununca seçilir.',
+                ),
+                onTap: () => _editCustomShift(context, ref, null),
               ),
             ],
           ),
@@ -628,6 +662,40 @@ class SettingsPage extends ConsumerWidget {
 }
 
 /// − değer + biçiminde sayı ayarı.
+/// Özel mesai ekler, düzenler ya da siler.
+Future<void> _editCustomShift(
+  BuildContext context,
+  WidgetRef ref,
+  CustomShift? initial,
+) async {
+  final s = ref.read(rosterSettingsProvider);
+  final result = await showDialog<CustomShift>(
+    context: context,
+    builder: (_) => CustomShiftDialog(
+      initial: initial,
+      others: [
+        for (final c in s.customShifts)
+          if (c.code != initial?.code) c,
+      ],
+    ),
+  );
+  if (result == null) return;
+  final list = [...s.customShifts];
+  final i = initial == null
+      ? -1
+      : list.indexWhere((c) => c.code == initial.code);
+  if (identical(result, CustomShiftDialog.deleted)) {
+    if (i >= 0) list.removeAt(i);
+  } else if (i >= 0) {
+    list[i] = result;
+  } else {
+    list.add(result);
+  }
+  await ref
+      .read(rosterSettingsProvider.notifier)
+      .update(s.copyWith(customShifts: list));
+}
+
 class _NumberSetting extends StatelessWidget {
   const _NumberSetting({
     required this.title,

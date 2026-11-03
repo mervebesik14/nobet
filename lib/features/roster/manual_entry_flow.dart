@@ -152,6 +152,7 @@ Future<bool> _importExcel(BuildContext context, WidgetRef ref) async {
       people: ref.read(peopleProvider),
       techsPerDay: settings.techsPerDay,
       shiftHours: settings.shiftHours,
+      customShifts: settings.customShifts,
     );
   } on XlsxFormatException catch (e) {
     _notify(context, e.message);

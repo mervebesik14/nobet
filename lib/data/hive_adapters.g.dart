@@ -170,13 +170,19 @@ class DayAssignmentAdapter extends TypeAdapter<DayAssignment> {
       shift16aIds: fields[4] == null
           ? const []
           : (fields[4] as List).cast<String>(),
+      customShifts: fields[5] == null
+          ? const {}
+          : (fields[5] as Map).cast<String, String>(),
+      extraShifts: fields[6] == null
+          ? const {}
+          : (fields[6] as Map).cast<String, String>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, DayAssignment obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.day)
       ..writeByte(1)
@@ -186,7 +192,11 @@ class DayAssignmentAdapter extends TypeAdapter<DayAssignment> {
       ..writeByte(3)
       ..write(obj.tech16bId)
       ..writeByte(4)
-      ..write(obj.shift16aIds);
+      ..write(obj.shift16aIds)
+      ..writeByte(5)
+      ..write(obj.customShifts)
+      ..writeByte(6)
+      ..write(obj.extraShifts);
   }
 
   @override
@@ -343,13 +353,16 @@ class RosterSettingsAdapter extends TypeAdapter<RosterSettings> {
       halfDayRequiredHours: fields[9] == null
           ? 5
           : (fields[9] as num).toDouble(),
+      customShifts: fields[11] == null
+          ? const []
+          : (fields[11] as List).cast<CustomShift>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, RosterSettings obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(12)
       ..writeByte(0)
       ..write(obj.nursesPerDay)
       ..writeByte(1)
@@ -371,7 +384,9 @@ class RosterSettingsAdapter extends TypeAdapter<RosterSettings> {
       ..writeByte(9)
       ..write(obj.halfDayRequiredHours)
       ..writeByte(10)
-      ..write(obj.secondaryTechShiftHours);
+      ..write(obj.secondaryTechShiftHours)
+      ..writeByte(11)
+      ..write(obj.customShifts);
   }
 
   @override
@@ -381,6 +396,49 @@ class RosterSettingsAdapter extends TypeAdapter<RosterSettings> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is RosterSettingsAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
+class CustomShiftAdapter extends TypeAdapter<CustomShift> {
+  @override
+  final typeId = 6;
+
+  @override
+  CustomShift read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return CustomShift(
+      code: fields[0] as String,
+      startMinute: fields[1] == null ? 8 * 60 : (fields[1] as num).toInt(),
+      hours: (fields[2] as num).toDouble(),
+      fillsSeat: fields[3] == null ? true : fields[3] as bool,
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, CustomShift obj) {
+    writer
+      ..writeByte(4)
+      ..writeByte(0)
+      ..write(obj.code)
+      ..writeByte(1)
+      ..write(obj.startMinute)
+      ..writeByte(2)
+      ..write(obj.hours)
+      ..writeByte(3)
+      ..write(obj.fillsSeat);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CustomShiftAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }
