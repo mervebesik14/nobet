@@ -7,6 +7,7 @@ class PersonTotals {
     this.religiousHolidayShifts = 0,
     this.everyOtherDayPairs = 0,
     this.longGaps = 0,
+    this.dayShifts = 0,
     this.workedHours = 0,
     this.requiredHours = 0,
     this.overtimeHours = 0,
@@ -26,6 +27,9 @@ class PersonTotals {
 
   /// Nöbetler arası 4–5 günlük boşluk sayısı.
   final int longGaps;
+
+  /// 7A (gündüz mesaisi) gün sayısı.
+  final int dayShifts;
   final double workedHours;
   final double requiredHours;
 
@@ -47,6 +51,7 @@ class PersonTotals {
     religiousHolidayShifts: religiousHolidayShifts + o.religiousHolidayShifts,
     everyOtherDayPairs: everyOtherDayPairs + o.everyOtherDayPairs,
     longGaps: longGaps + o.longGaps,
+    dayShifts: dayShifts + o.dayShifts,
     workedHours: workedHours + o.workedHours,
     requiredHours: requiredHours + o.requiredHours,
     overtimeHours: overtimeHours + o.overtimeHours,

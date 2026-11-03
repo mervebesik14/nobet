@@ -4,9 +4,15 @@ import 'package:nobet_listesi/logic/totals_columns.dart';
 
 void main() {
   test('değerler, sıra ve adlardan okuma', () {
-    const t = PersonTotals(shifts: 9, weekendShifts: 3, overtimeHours: 12.5);
+    const t = PersonTotals(
+      shifts: 9,
+      weekendShifts: 3,
+      overtimeHours: 12.5,
+      dayShifts: 4,
+    );
     expect(TotalsColumn.shifts.valueOf(t), 9);
     expect(TotalsColumn.overtime.valueOf(t), 12.5);
+    expect(TotalsColumn.dayShifts.valueOf(t), 4);
     expect(TotalsColumn.ordered({TotalsColumn.overtime, TotalsColumn.shifts}), [
       TotalsColumn.shifts,
       TotalsColumn.overtime,

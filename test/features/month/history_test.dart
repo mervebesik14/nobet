@@ -196,7 +196,8 @@ void main() {
     final n1Holiday = october.assignments[29]!.nurseIds.contains('n1') ? 1 : 0;
     expect(cell(n1, 5), '$n1Holiday'); // resmi tatil nöbeti
     expect(cell(n1, 6), '0'); // dini bayram nöbeti
-    expect(cell(n1, 8), '${(15 + n1October) * 24}'); // çalışılan saat
+    expect(cell(n1, 8), '0'); // 7A gün
+    expect(cell(n1, 9), '${(15 + n1October) * 24}'); // çalışılan saat
 
     // Aylara göre karşılaştırma: Eylül ve Ekim sütunları, ölçü değişir.
     await tester.dragUntilVisible(

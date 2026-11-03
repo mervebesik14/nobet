@@ -150,4 +150,32 @@ void main() {
     expect(s.byId['b']!.availableDays, 28); // 3 gün izin
     expect(s.byId['n']!.availableDays, 16); // 16–31 Ekim
   });
+
+  test('7A günleri ay ay toplanır', () {
+    // Eylül 2026: 7 (Pzt) ve 8 Eylül teknikere elle 7A; Ekim'de 6 Ekim.
+    final s = YearlySummary.build(
+      year: 2026,
+      plans: [
+        plans[0].copyWith(
+          techDayShifts: const {
+            't': [7, 8],
+          },
+        ),
+        plans[1].copyWith(
+          techDayShifts: const {
+            't': [6],
+          },
+        ),
+      ],
+      people: people,
+      holidays: holidays,
+      settings: const RosterSettings(),
+    );
+    expect(s.byId['t']!.dayShifts, 3);
+    expect(
+      s.rows.firstWhere((r) => r.personId == 't').byMonth[9]!.dayShifts,
+      2,
+    );
+    expect(s.byId['b']!.dayShifts, 0);
+  });
 }
