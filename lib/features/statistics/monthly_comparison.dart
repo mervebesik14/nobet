@@ -14,7 +14,8 @@ enum ComparisonMetric {
   weekend('Hafta sonu', 'hafta sonu nöbeti'),
   national('Resmi tatil', 'resmi tatil nöbeti'),
   longGaps('4–5 gün ara', '4–5 günlük ara'),
-  dayShifts('7A', '7A günü');
+  dayShifts('7A', '7A günü'),
+  attendedDays('Geldiği gün', 'gün hastanede');
 
   const ComparisonMetric(this.label, this.unit);
 
@@ -30,6 +31,7 @@ enum ComparisonMetric {
     religious => t.religiousHolidayShifts,
     longGaps => t.longGaps,
     dayShifts => t.dayShifts,
+    attendedDays => t.attendedDays,
     overtime => t.overtimeHours,
   };
 }

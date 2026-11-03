@@ -37,6 +37,7 @@ class YearlyExcel {
       'Dini bayram nöbeti',
       'Gün aşırı çift',
       '7A gün',
+      'Geldiği gün',
       'Çalışılan saat',
       'Fazla mesai',
     ];
@@ -57,6 +58,7 @@ class YearlyExcel {
             n(r.totals.religiousHolidayShifts),
             n(r.totals.everyOtherDayPairs),
             n(r.totals.dayShifts),
+            n(r.totals.attendedDays),
             n(r.totals.workedHours),
             n(r.totals.overtimeHours),
           ],

@@ -21,6 +21,7 @@ class YearlyReport {
     YearlyMetric('Resmi tatil nöbeti', (t) => t.nationalHolidayShifts),
     YearlyMetric('4–5 gün ara', (t) => t.longGaps),
     YearlyMetric('7A gün', (t) => t.dayShifts),
+    YearlyMetric('Geldiği gün', (t) => t.attendedDays),
   ];
 
   /// Bu kadar farkın altı "ortalamaya yakın" sayılır (renksiz).

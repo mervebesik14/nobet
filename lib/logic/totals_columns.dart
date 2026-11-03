@@ -10,6 +10,7 @@ enum TotalsColumn {
   everyOtherDay('Gün aşırı çift'),
   longGaps('4–5 gün ara'),
   dayShifts('7A gün'),
+  attendedDays('Geldiği gün'),
   worked('Çalışılan saat'),
   required('Gereken saat'),
   overtime('Fazla saat');
@@ -26,6 +27,7 @@ enum TotalsColumn {
     everyOtherDay => t.everyOtherDayPairs,
     longGaps => t.longGaps,
     dayShifts => t.dayShifts,
+    attendedDays => t.attendedDays,
     worked => t.workedHours,
     required => t.requiredHours,
     overtime => t.overtimeHours,

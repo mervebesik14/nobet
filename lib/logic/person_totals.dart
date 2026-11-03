@@ -8,6 +8,7 @@ class PersonTotals {
     this.everyOtherDayPairs = 0,
     this.longGaps = 0,
     this.dayShifts = 0,
+    this.attendedDays = 0,
     this.workedHours = 0,
     this.requiredHours = 0,
     this.overtimeHours = 0,
@@ -30,6 +31,9 @@ class PersonTotals {
 
   /// 7A (gündüz mesaisi) gün sayısı.
   final int dayShifts;
+
+  /// Hastaneye geldiği gün sayısı (nöbet, 7A ya da ek mesai olan günler).
+  final int attendedDays;
   final double workedHours;
   final double requiredHours;
 
@@ -52,6 +56,7 @@ class PersonTotals {
     everyOtherDayPairs: everyOtherDayPairs + o.everyOtherDayPairs,
     longGaps: longGaps + o.longGaps,
     dayShifts: dayShifts + o.dayShifts,
+    attendedDays: attendedDays + o.attendedDays,
     workedHours: workedHours + o.workedHours,
     requiredHours: requiredHours + o.requiredHours,
     overtimeHours: overtimeHours + o.overtimeHours,

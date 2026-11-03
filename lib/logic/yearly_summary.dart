@@ -167,6 +167,7 @@ class YearlySummary {
           everyOtherDayPairs: r.everyOtherDayPairs,
           longGaps: r.longGaps,
           dayShifts: r.dayShifts,
+          attendedDays: r.attendedDays,
           workedHours: r.workedHours,
           requiredHours: r.requiredHours,
           overtimeHours: r.overtimeHours,

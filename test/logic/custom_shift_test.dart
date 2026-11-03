@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:nobet_listesi/logic/day_shift_planner.dart';
 import 'package:nobet_listesi/logic/personal_roster.dart';
 import 'package:nobet_listesi/logic/roster_calendar.dart';
 import 'package:nobet_listesi/logic/roster_editor.dart';
@@ -59,6 +60,31 @@ void main() {
     expect(hours('b'), 24);
     expect(hours('c'), 6);
     expect(s.people.firstWhere((p) => p.personId == 'c').shifts, 0);
+  });
+
+  test('geldiği gün: nöbet, 7A ve ek mesai günleri bir kez sayılır', () {
+    final s = RosterSummary.build(
+      year: 2026,
+      month: 11,
+      assignments: const {
+        3: day3,
+        4: DayAssignment(day: 4, nurseIds: ['b', 'c'], techId: 't'),
+      },
+      people: people,
+      holidays: const [],
+      settings: settings,
+      // Ayşe 5'inde 7A; Banu nöbetli olduğu 3'ünde de 7A (tek gün).
+      dayShifts: const [
+        DayShift(day: 5, personId: 'a', hours: 7, isSubstitute: false),
+        DayShift(day: 3, personId: 'b', hours: 7, isSubstitute: false),
+      ],
+    );
+    int days(String id) =>
+        s.people.firstWhere((p) => p.personId == id).attendedDays;
+    expect(days('a'), 2); // 3 (19A) + 5 (7A)
+    expect(days('b'), 2); // 3, 4
+    expect(days('c'), 2); // 3 (ek G) + 4
+    expect(days('t'), 2);
   });
 
   test(

@@ -26,6 +26,7 @@ class PersonSummary {
     this.dayShifts = 0,
     this.isChargeNurse = false,
     this.longGaps = 0,
+    this.attendedDays = 0,
   });
 
   final String personId;
@@ -53,6 +54,10 @@ class PersonSummary {
 
   /// Nöbetler arası 4–5 günlük boşluk sayısı (bkz. [ShiftGaps]).
   final int longGaps;
+
+  /// Hastaneye geldiği gün sayısı: nöbet (24 / 16B / 16A / özel mesai),
+  /// 7A ya da ek mesai başladığı ayrı günler (aynı gün bir kez).
+  final int attendedDays;
 
   /// Bunların kaçı 16B (hafif) vardiyası; teknikerler için anlamlıdır.
   final int secondaryShifts;
@@ -198,7 +203,17 @@ class RosterSummary {
     // Kişi → 7A gün sayısı ve saati.
     final dayCount = <String, int>{};
     final dayHours = <String, double>{};
+    // Kişi → hastaneye geldiği günler (nöbet, 7A, ek mesai).
+    final attended = <String, Set<int>>{
+      for (final e in worked.entries) e.key: {...e.value},
+    };
+    for (final a in assignments.values) {
+      for (final id in a.extraShifts.keys) {
+        if (a.extraShiftOf(id) != null) (attended[id] ??= {}).add(a.day);
+      }
+    }
     for (final s in dayShifts) {
+      (attended[s.personId] ??= {}).add(s.day);
       dayCount[s.personId] = (dayCount[s.personId] ?? 0) + 1;
       dayHours[s.personId] = (dayHours[s.personId] ?? 0) + s.hours;
     }
@@ -253,6 +268,7 @@ class RosterSummary {
           requiredHours: personRequired,
           dayShifts: dayCount[id] ?? 0,
           isChargeNurse: person?.isChargeNurse ?? false,
+          attendedDays: attended[id]?.length ?? 0,
           longGaps: ShiftGaps.longCount(
             days,
             absent: {...leave, ...?person?.inactiveDaysIn(year, month)},
