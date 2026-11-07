@@ -1,3 +1,5 @@
+import 'every_other_day_chains.dart';
+
 /// Bir kişinin birden çok ay boyunca biriken nöbet toplamları.
 class PersonTotals {
   const PersonTotals({
@@ -6,6 +8,7 @@ class PersonTotals {
     this.nationalHolidayShifts = 0,
     this.religiousHolidayShifts = 0,
     this.everyOtherDayPairs = 0,
+    this.everyOtherDayChains = const [],
     this.longGaps = 0,
     this.dayShifts = 0,
     this.attendedDays = 0,
@@ -25,6 +28,34 @@ class PersonTotals {
   /// Tam gün dini bayram (Ramazan / Kurban) nöbetleri.
   final int religiousHolidayShifts;
   final int everyOtherDayPairs;
+
+  /// Gün aşırı zincirler (ay ay; yıllık toplamda arka arkaya eklenir).
+  final List<List<int>> everyOtherDayChains;
+
+  /// Gün aşırı zincirlerdeki toplam nöbet günü.
+  int get everyOtherDayDays =>
+      everyOtherDayChains.fold(0, (s, c) => s + c.length);
+
+  /// En uzun gün aşırı zincirin nöbet sayısı (zincir yoksa 0).
+  int get longestChain =>
+      everyOtherDayChains.fold(0, (m, c) => c.length > m ? c.length : m);
+
+  /// Zincir uzunluğu → kaç tane, kısadan uzuna.
+  Map<int, int> get chainCounts {
+    final out = <int, int>{};
+    for (final c in everyOtherDayChains) {
+      out[c.length] = (out[c.length] ?? 0) + 1;
+    }
+    return Map.fromEntries(
+      out.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
+    );
+  }
+
+  /// "2'li × 3 · 3'lü × 1"; zincir yoksa boş.
+  String get chainSummary => [
+    for (final e in chainCounts.entries)
+      '${EveryOtherDayChains.lengthLabel(e.key)} × ${e.value}',
+  ].join(' · ');
 
   /// Nöbetler arası 4–5 günlük boşluk sayısı.
   final int longGaps;
@@ -54,6 +85,7 @@ class PersonTotals {
     nationalHolidayShifts: nationalHolidayShifts + o.nationalHolidayShifts,
     religiousHolidayShifts: religiousHolidayShifts + o.religiousHolidayShifts,
     everyOtherDayPairs: everyOtherDayPairs + o.everyOtherDayPairs,
+    everyOtherDayChains: [...everyOtherDayChains, ...o.everyOtherDayChains],
     longGaps: longGaps + o.longGaps,
     dayShifts: dayShifts + o.dayShifts,
     attendedDays: attendedDays + o.attendedDays,

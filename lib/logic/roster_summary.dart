@@ -1,3 +1,4 @@
+import 'every_other_day_chains.dart';
 import '../models/day_assignment.dart';
 import 'day_shift_planner.dart';
 import '../models/holiday.dart';
@@ -27,6 +28,7 @@ class PersonSummary {
     this.isChargeNurse = false,
     this.longGaps = 0,
     this.attendedDays = 0,
+    this.everyOtherDayChains = const [],
   });
 
   final String personId;
@@ -41,6 +43,9 @@ class PersonSummary {
   /// Tam gün dini bayram (Ramazan / Kurban) nöbetleri.
   final int religiousHolidayShifts;
   final int everyOtherDayPairs;
+
+  /// Gün aşırı zincirler (ör. [3, 5, 7]); bkz. [EveryOtherDayChains].
+  final List<List<int>> everyOtherDayChains;
 
   /// 24/16B nöbet saatleri + 7A saatleri.
   final double workedHours;
@@ -255,6 +260,7 @@ class RosterSummary {
           nationalHolidayShifts: days.where(nationalDays.contains).length,
           religiousHolidayShifts: days.where(religiousDays.contains).length,
           everyOtherDayPairs: RosterGenerator.everyOtherDayPairs(days),
+          everyOtherDayChains: EveryOtherDayChains.of(days),
           // 24 vardiyaları tam saat, 16B vardiyaları kısa saat, 16A'lar
           // 16 saat sayılır. 7A günleri o günün mesai saati kadar
           // eklenir.

@@ -178,4 +178,42 @@ void main() {
     );
     expect(s.byId['b']!.dayShifts, 0);
   });
+
+  test('gün aşırı zincirler ay ay tutulur ve toplanır', () {
+    final s = YearlySummary.build(
+      year: 2026,
+      plans: [
+        // Eylül: Ayşe 1-3-5-7 (4'lü); Ekim: 10-12 (2'li) ve 20-22-24 (3'lü).
+        plan(9, {
+          1: ['b'],
+          3: ['b'],
+          5: ['b'],
+          7: ['b'],
+        }, 't'),
+        plan(10, {
+          10: ['b'],
+          12: ['b'],
+          20: ['b'],
+          22: ['b'],
+          24: ['b'],
+        }, 't'),
+      ],
+      people: people,
+      holidays: holidays,
+      settings: const RosterSettings(),
+    );
+    final b = s.byId['b']!;
+    expect(b.everyOtherDayDays, 9);
+    expect(b.longestChain, 4);
+    expect(b.chainCounts, {2: 1, 3: 1, 4: 1});
+    expect(b.chainSummary, "2'li × 1 · 3'lü × 1 · 4'lü × 1");
+    final row = s.rows.firstWhere((r) => r.personId == 'b');
+    expect(row.byMonth[9]!.everyOtherDayChains, [
+      [1, 3, 5, 7],
+    ]);
+    expect(row.byMonth[10]!.everyOtherDayChains, [
+      [10, 12],
+      [20, 22, 24],
+    ]);
+  });
 }

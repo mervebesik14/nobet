@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
+import '../../logic/every_other_day_chains.dart';
 import '../../logic/file_names.dart';
 import '../../logic/totals_columns.dart';
 import '../../logic/turkish_dates.dart';
@@ -278,6 +279,8 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
                       numeric: true,
                     ),
                     DataColumn(label: Text('Gün aşırı\nçift'), numeric: true),
+                    DataColumn(label: Text('Gün aşırı\ngün'), numeric: true),
+                    DataColumn(label: Text('En uzun\nzincir'), numeric: true),
                     DataColumn(label: Text('7A\ngün'), numeric: true),
                     DataColumn(label: Text('Geldiği\ngün'), numeric: true),
                     DataColumn(label: Text('Çalışılan\nsaat'), numeric: true),
@@ -295,6 +298,8 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
                           DataCell(Text(fmt(r.totals.nationalHolidayShifts))),
                           DataCell(Text(fmt(r.totals.religiousHolidayShifts))),
                           DataCell(Text(fmt(r.totals.everyOtherDayPairs))),
+                          DataCell(Text(fmt(r.totals.everyOtherDayDays))),
+                          DataCell(Text(fmt(r.totals.longestChain))),
                           DataCell(Text(fmt(r.totals.dayShifts))),
                           DataCell(Text(fmt(r.totals.attendedDays))),
                           DataCell(Text(fmt(r.totals.workedHours))),
@@ -305,11 +310,104 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
                 ),
               ),
             ),
+          if (summary.rows.any(
+            (r) => r.totals.everyOtherDayChains.isNotEmpty,
+          )) ...[
+            const PillHeader('Gün aşırı nöbetler', end: 'Dokun: ayrıntı'),
+            GroupCard(
+              children: [
+                for (final r in summary.rows)
+                  if (r.totals.everyOtherDayChains.isNotEmpty)
+                    ListTile(
+                      key: ValueKey('chains-${r.personId}'),
+                      title: Text(r.name),
+                      subtitle: Text(r.totals.chainSummary),
+                      trailing: Text(
+                        '${r.totals.everyOtherDayDays} gün',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      onTap: () => _showChains(context, _year, summary, r),
+                    ),
+              ],
+            ),
+          ],
           if (summary.rows.isNotEmpty) MonthlyComparison(summary: summary),
         ],
       ),
     );
   }
+}
+
+/// Kişinin yıl içindeki gün aşırı zincirleri, ay ay.
+void _showChains(
+  BuildContext context,
+  int year,
+  YearlySummary summary,
+  YearlyRow row,
+) {
+  final theme = Theme.of(context);
+  final t = row.totals;
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (context) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+        ),
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          children: [
+            Text(
+              '${row.name} · $year gün aşırı',
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Toplam ${t.everyOtherDayDays} gün, '
+              '${t.everyOtherDayChains.length} zincir; en uzun '
+              '${EveryOtherDayChains.lengthLabel(t.longestChain)}.',
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                for (final e in t.chainCounts.entries)
+                  Chip(
+                    label: Text(
+                      '${EveryOtherDayChains.lengthLabel(e.key)} × ${e.value}',
+                    ),
+                  ),
+              ],
+            ),
+            const Divider(),
+            for (final m in summary.months)
+              if (row.byMonth[m]?.everyOtherDayChains case final chains?
+                  when chains.isNotEmpty)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(turkishMonthNames[m - 1]),
+                  subtitle: Text(
+                    [
+                      for (final c in chains)
+                        '${EveryOtherDayChains.format(c)} '
+                            '(${EveryOtherDayChains.lengthLabel(c.length)})',
+                    ].join(' · '),
+                  ),
+                  trailing: Text(
+                    '${chains.fold(0, (s, c) => s + c.length)} gün',
+                  ),
+                ),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 /// Kişinin yıllık toplam nöbeti: ad, görev etiketi, ay sayısı ve çubuk.

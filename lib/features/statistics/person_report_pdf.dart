@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
+import '../../logic/every_other_day_chains.dart';
 import '../../logic/person_totals.dart';
 import '../../logic/totals_columns.dart';
 import '../../logic/turkish_dates.dart';
@@ -226,6 +227,38 @@ Future<Uint8List> buildPersonReportPdf({
               ),
           ],
         ),
+        if ((has(TotalsColumn.everyOtherDay) ||
+                has(TotalsColumn.everyOtherDayDays) ||
+                has(TotalsColumn.longestChain)) &&
+            t.everyOtherDayChains.isNotEmpty) ...[
+          pw.SizedBox(height: 14),
+          pw.Text(
+            'Gün aşırı zincirler',
+            style: pw.TextStyle(
+              fontSize: 12,
+              fontWeight: pw.FontWeight.bold,
+              color: _primary,
+            ),
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            'Toplam ${t.everyOtherDayDays} gün, '
+            '${t.everyOtherDayChains.length} zincir (${t.chainSummary}).',
+            style: const pw.TextStyle(fontSize: 9),
+          ),
+          pw.SizedBox(height: 4),
+          for (final m in summary.months)
+            if (row.byMonth[m]?.everyOtherDayChains case final chains?
+                when chains.isNotEmpty)
+              pw.Padding(
+                padding: const pw.EdgeInsets.only(top: 2),
+                child: pw.Text(
+                  '${turkishMonthNames[m - 1]}: '
+                  '${[for (final c in chains) '${EveryOtherDayChains.format(c)} (${EveryOtherDayChains.lengthLabel(c.length)})'].join(' · ')}',
+                  style: const pw.TextStyle(fontSize: 9),
+                ),
+              ),
+        ],
         pw.SizedBox(height: 10),
         pw.Text(
           'Rol ortalaması aynı görevdeki kişilerin (sorumlu hemşire hariç) '

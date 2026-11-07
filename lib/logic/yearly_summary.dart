@@ -165,6 +165,7 @@ class YearlySummary {
           nationalHolidayShifts: r.nationalHolidayShifts,
           religiousHolidayShifts: r.religiousHolidayShifts,
           everyOtherDayPairs: r.everyOtherDayPairs,
+          everyOtherDayChains: r.everyOtherDayChains,
           longGaps: r.longGaps,
           dayShifts: r.dayShifts,
           attendedDays: r.attendedDays,
