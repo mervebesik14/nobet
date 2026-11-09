@@ -217,6 +217,8 @@ class _RequestCollectPageState extends ConsumerState<RequestCollectPage> {
                     for (final MapEntry(key: type, value: days)
                         in r.leaves.entries)
                       '${type.label}: ${RequestParser.compactDays(days)}',
+                    if (r.preferred.isNotEmpty)
+                      'Tercih: ${RequestParser.compactDays(r.preferred)}',
                     if (r.overtime) 'Fazla mesai istiyor',
                   ].join('\n'),
                 ),

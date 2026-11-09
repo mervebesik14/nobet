@@ -69,7 +69,7 @@ types:
         index: 6
   MonthPlan:
     typeId: 4
-    nextIndex: 16
+    nextIndex: 17
     fields:
       year:
         index: 0
@@ -103,6 +103,8 @@ types:
         index: 14
       techDayShifts:
         index: 15
+      preferredDays:
+        index: 16
   RosterSettings:
     typeId: 5
     nextIndex: 12

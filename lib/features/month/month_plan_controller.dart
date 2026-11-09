@@ -93,10 +93,25 @@ class MonthPlanController extends Notifier<MonthPlan> {
   Future<bool> toggleUnavailable(String personId, int day) {
     final days = {...state.unavailableDaysOf(personId)};
     if (!days.remove(day)) days.add(day);
-    // Bir gün hem istenmeyen hem seçilmiş nöbet günü olamaz.
+    // Bir gün hem istenmeyen hem seçilmiş/tercih edilen gün olamaz.
     final requested = {...state.requestedShiftsOf(personId)}..removeAll(days);
-    return _setDays(personId, days, requested: requested);
+    final preferred = {...state.preferredDaysOf(personId)}..removeAll(days);
+    return _setDays(personId, days, requested: requested, preferred: preferred);
   }
+
+  /// Kişinin [day] gününü tercih ettiği gün yapar ya da bundan çıkarır.
+  /// İstenmeyen günlerdeyse oradan çıkar. Kilitli ayda false döner.
+  Future<bool> togglePreferred(String personId, int day) {
+    final preferred = {...state.preferredDaysOf(personId)};
+    if (!preferred.remove(day)) preferred.add(day);
+    final days = {...state.unavailableDaysOf(personId)}..removeAll(preferred);
+    return _setDays(personId, days, preferred: preferred);
+  }
+
+  /// Kişinin bu aydaki tercih ettiği günleri kaldırır.
+  Future<bool> clearPreferred(String personId) => _setDays(personId, {
+    ...state.unavailableDaysOf(personId),
+  }, preferred: const {});
 
   /// Kişinin [day] gününü nöbet tutacağı gün yapar ya da bundan çıkarır.
   /// İstenmeyen günlerdeyse oradan çıkar. Kilitli ayda false döner.
@@ -226,9 +241,18 @@ class MonthPlanController extends Notifier<MonthPlan> {
     final unavailable = {...plan.unavailableDays};
     final requested = {...plan.requestedShifts};
     final overtime = {...plan.overtimeRequests};
+    final preferred = {...plan.preferredDays};
     for (final MapEntry(key: id, value: r) in requests.entries) {
       final days = {...plan.unavailableDaysOf(id), ...r.unavailable};
       if (days.isNotEmpty) unavailable[id] = days.toList()..sort();
+      // İstemediği gün tercihten önce gelir.
+      final liked = {...plan.preferredDaysOf(id), ...r.preferred}
+        ..removeAll(days);
+      if (liked.isEmpty) {
+        preferred.remove(id);
+      } else {
+        preferred[id] = liked.toList()..sort();
+      }
       final kept = plan.requestedShiftsOf(id).where((d) => !days.contains(d));
       if (kept.isEmpty) {
         requested.remove(id);
@@ -241,6 +265,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       unavailableDays: unavailable,
       requestedShifts: requested,
       overtimeRequests: overtime,
+      preferredDays: preferred,
     );
     for (final MapEntry(key: id, value: r) in requests.entries) {
       for (final MapEntry(key: type, value: days) in r.leaves.entries) {
@@ -257,6 +282,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
     String personId,
     Set<int> days, {
     Set<int>? requested,
+    Set<int>? preferred,
   }) async {
     if (state.isLocked) return false;
     // Boş kayıt bırakılmaz: kişi yalnızca gerçekten günü varsa bu planda
@@ -276,6 +302,9 @@ class MonthPlanController extends Notifier<MonthPlan> {
       requestedShifts: requested == null
           ? null
           : put(state.requestedShifts, requested),
+      preferredDays: preferred == null
+          ? null
+          : put(state.preferredDays, preferred),
     );
     await ref.read(monthPlanRepositoryProvider).save(state);
     return true;
@@ -308,6 +337,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       sickLeave: state.sickLeave,
       requestedShifts: clearRequests ? const {} : state.requestedShifts,
       overtimeRequests: clearRequests ? const {} : state.overtimeRequests,
+      preferredDays: clearRequests ? const {} : state.preferredDays,
       nurseOnly: state.nurseOnly,
     );
     await ref.read(monthPlanRepositoryProvider).save(state);
@@ -494,6 +524,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
       seed: seed ?? ref.read(rosterSeedProvider)(),
       previousMonthTail: previousMonthTail(),
       overtimeRequests: plan.overtimeRequests,
+      preferredDays: plan.preferredDays,
       overtimePriority: RequestFulfillment.overtimePriority(
         year: plan.year,
         month: plan.month,

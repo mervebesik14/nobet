@@ -93,6 +93,7 @@ class RosterGenerator {
     this.overtimeRequests = const {},
     this.overtimeAllowance = 2,
     this.overtimePriority = const {},
+    this.preferredDays = const {},
     this.requestedShifts = const {},
     this.absentDays = const {},
     this.existing,
@@ -134,6 +135,10 @@ class RosterGenerator {
   /// Daha önce fazla mesai isteği karşılanmamış kişiler: bu ay yine
   /// isterlerse payları bir nöbet fazladır (önce onlara verilir).
   final Set<String> overtimePriority;
+
+  /// Kişi → nöbet tutmayı tercih ettiği günler; kesin kural değil, adaleti
+  /// bozmadan mümkünse verilir.
+  final Map<String, List<int>> preferredDays;
 
   /// Tatil günü → aynı tatilin önceki seferinde nöbet tutanlar
   /// ([HolidayHistory]). Bu kişiler o günlere mümkünse yazılmaz (ay içi
@@ -209,6 +214,13 @@ class RosterGenerator {
   /// Art arda iki hafta sonunda nöbet (yorgunluk) için her seferlik küçük
   /// ceza; ayrıca kişiler arasında dengelenir.
   static const consecutiveWeekendPenalty = 0.05;
+
+  /// Tercih edilen güne düşen her nöbet için puandan düşülen küçük ödül;
+  /// adalet (ay içi ve yıl içi) her zaman önce gelir.
+  static const preferredDayBonus = 0.5;
+
+  /// Açgözlü seçimde tercih edilen güne yazmanın avantajı.
+  static const preferredDayGreedy = 3.0;
 
   /// 5 günlük boşluklar herkese eşit sayıda düşmezse (biri 1, diğerleri 0
   /// gibi) farkın her birimi için ceza; eşitlenemiyorsa 5 gün kimseye
@@ -296,6 +308,9 @@ class RosterGenerator {
     final techRng = Random(seed + 1);
     final weekend = weekendDays(year, month, holidays, settings);
     final weekendBlocks = FatigueScore.weekendBlocks(year, month);
+    final preferredSets = {
+      for (final e in preferredDays.entries) e.key: e.value.toSet(),
+    };
     final national = holidayDays(year, month, holidays, religious: false);
     final religious = holidayDays(year, month, holidays, religious: true);
 
@@ -320,6 +335,7 @@ class RosterGenerator {
       available: availableOf(nurseMembers),
       weekend: weekend,
       weekendBlocks: weekendBlocks,
+      preferred: preferredSets,
       national: national,
       religious: religious,
       lastHoliday: previousHolidayWorkers,
@@ -353,6 +369,7 @@ class RosterGenerator {
         available: techAvailable,
         weekend: weekend,
         weekendBlocks: weekendBlocks,
+        preferred: preferredSets,
         national: national,
         religious: religious,
         lastHoliday: previousHolidayWorkers,
@@ -382,6 +399,7 @@ class RosterGenerator {
         available: techAvailable,
         weekend: weekend,
         weekendBlocks: weekendBlocks,
+        preferred: preferredSets,
         national: national,
         religious: religious,
         lastHoliday: previousHolidayWorkers,
@@ -457,6 +475,7 @@ class _RoleSolver {
     required this.available,
     required this.weekend,
     this.weekendBlocks = const [],
+    this.preferred = const {},
     this.national = const {},
     this.religious = const {},
     this.lastHoliday = const {},
@@ -550,6 +569,9 @@ class _RoleSolver {
 
   /// Ayın hafta sonları (Cmt–Paz); art arda hafta sonu dengesi için.
   final List<List<int>> weekendBlocks;
+
+  /// Kişi → tercih ettiği günler (yumuşak).
+  final Map<String, Set<int>> preferred;
 
   /// Tam gün resmi (ulusal) tatiller; nöbetleri ayrıca dengelenir.
   final Set<int> national;
@@ -814,11 +836,25 @@ class _RoleSolver {
         yearly(pairs, ytdPairs) +
         0.75 * totalPairs +
         RosterGenerator.consecutiveWeekendPenalty *
-            consecutiveWeekends.fold(0, (a, b) => a + b) +
+            consecutiveWeekends.fold(0, (a, b) => a + b) -
+        RosterGenerator.preferredDayBonus * _preferredHits() +
         _emptySlots() * RosterGenerator.emptySlotPenalty +
         RosterGenerator.changePenalty * _changes() +
         _repeatHolidayWeight * _holidayRepeats() +
         reserveCost;
+  }
+
+  /// Tercih edilen günlere düşen nöbet sayısı.
+  int _preferredHits() {
+    var n = 0;
+    for (final MapEntry(key: id, value: days) in preferred.entries) {
+      final worked = _worked[id];
+      if (worked == null) continue;
+      for (final d in days) {
+        if (worked.contains(d)) n++;
+      }
+    }
+    return n;
   }
 
   /// Geçen sefer de aynı tatilde tutanların bu seferki o gün nöbetleri.
@@ -983,6 +1019,9 @@ class _RoleSolver {
     // Nöbetler aralıklı dağılsın: 3 gün arayla nöbete küçük ceza.
     if (_works(id, d - 3) || _works(id, d + 3)) cost += 1;
     cost += _adjacentWeekendCost(weekendBlocks, d, (x) => _works(id, x));
+    if (preferred[id]?.contains(d) ?? false) {
+      cost -= RosterGenerator.preferredDayGreedy;
+    }
     return cost;
   }
 
@@ -1321,6 +1360,7 @@ class _TechSolver {
     required this.available,
     required this.weekend,
     this.weekendBlocks = const [],
+    this.preferred = const {},
     this.national = const {},
     this.religious = const {},
     this.lastHoliday = const {},
@@ -1356,6 +1396,9 @@ class _TechSolver {
 
   /// Ayın hafta sonları (Cmt–Paz); art arda hafta sonu dengesi için.
   final List<List<int>> weekendBlocks;
+
+  /// Kişi → tercih ettiği günler (yumuşak).
+  final Map<String, Set<int>> preferred;
 
   /// Tam gün resmi (ulusal) tatiller; nöbetleri ayrıca dengelenir.
   final Set<int> national;
@@ -1590,8 +1633,21 @@ class _TechSolver {
                 over(_pairs24)) +
         0.75 * totalPairs +
         RosterGenerator.changePenalty * _changes() +
-        _RoleSolver._repeatHolidayWeight * _holidayRepeats() +
+        _RoleSolver._repeatHolidayWeight * _holidayRepeats() -
+        RosterGenerator.preferredDayBonus * _preferredHits() +
         empty;
+  }
+
+  int _preferredHits() {
+    var n = 0;
+    for (final MapEntry(key: id, value: wanted) in preferred.entries) {
+      final a = _w24[id], b = _w16[id];
+      if (a == null || b == null) continue;
+      for (final d in wanted) {
+        if (a.contains(d) || b.contains(d)) n++;
+      }
+    }
+    return n;
   }
 
   int _holidayRepeats() {
@@ -1721,6 +1777,9 @@ class _TechSolver {
     // Fazla mesai payı yalnız 24 (ağır) vardiyaya uygulanır.
     final own = is16b ? _w16[id]!.length : _w24[id]!.length - _allow(id);
     var cost = (own + 1 - mean) * 10 + ytd[id]! * 1.0;
+    if (preferred[id]?.contains(d) ?? false) {
+      cost -= RosterGenerator.preferredDayGreedy;
+    }
 
     if (weekend.contains(d)) {
       cost += (_weekendCount(id) + 1 - weekend.length * 2 / n) * 10;

@@ -184,6 +184,10 @@ void main() {
     expect(find.text('Yıllık izin'), findsOneWidget);
     expect(find.text('Şua izni'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Yıllık izin'));
+
+    await tester.pumpAndSettle();
+
     await tester.tap(find.text('Yıllık izin'));
     await tester.pumpAndSettle();
     expect(find.textContaining('gereken saatten düşülür'), findsOneWidget);
@@ -209,6 +213,31 @@ void main() {
     expect(find.text('4 gün yıllık izin'), findsOneWidget);
   });
 
+  testWidgets('Tercih edilen günler: seçilir, istenmeyen günle çakışmaz', (
+    tester,
+  ) async {
+    await seed(_team);
+    await pumpPage(tester);
+    await tester.tap(find.text('Ali'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('İstenmeyen günler'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('12'));
+    await tester.pumpAndSettle();
+    expect(boxes.monthPlans.get('2026-10')!.unavailableDaysOf('t1'), [12]);
+
+    await tester.tap(find.text('Tercih'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('12').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('15').last);
+    await tester.pumpAndSettle();
+    final plan = boxes.monthPlans.get('2026-10')!;
+    expect(plan.preferredDaysOf('t1'), [12, 15]);
+    // 12 tercih olunca istenmeyen günlerden çıkar.
+    expect(plan.unavailableDaysOf('t1'), isEmpty);
+  });
+
   testWidgets('Şua izni ayrı sekmede tutulur, yıllık izinden bağımsız', (
     tester,
   ) async {
@@ -219,6 +248,8 @@ void main() {
     await tester.pumpAndSettle();
     // Kaydırılabilir sekme çubuğunda üçüncü sekmeyi görünür yap.
     await tester.drag(find.byType(TabBar), const Offset(-300, 0));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Şua izni'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Şua izni'));
     await tester.pumpAndSettle();
@@ -248,6 +279,8 @@ void main() {
     await tester.tap(find.text('Ali'));
     await tester.pumpAndSettle();
     await tester.drag(find.byType(TabBar), const Offset(-400, 0));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Rapor'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Rapor'));
     await tester.pumpAndSettle();
@@ -290,6 +323,8 @@ void main() {
     // Yıllık izin: 26 Ekim'de başlar, Kasım'a geçilip 6 Kasım'da biter.
     await tester.tap(find.byTooltip('Önceki ay'));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Yıllık izin'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Yıllık izin'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('26'));
@@ -331,6 +366,8 @@ void main() {
     await pumpPage(tester);
 
     await tester.tap(find.text('Ali'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Yıllık izin'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Yıllık izin'));
     await tester.pumpAndSettle();

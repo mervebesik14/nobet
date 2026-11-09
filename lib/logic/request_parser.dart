@@ -8,10 +8,14 @@ class PersonRequest {
     this.unavailable = const {},
     this.leaves = const {},
     this.overtime = false,
+    this.preferred = const {},
   });
 
   /// Nöbet tutamayacağı günler.
   final Set<int> unavailable;
+
+  /// Nöbet tutmayı tercih ettiği günler (yumuşak istek).
+  final Set<int> preferred;
 
   /// İzin türü → günler.
   final Map<LeaveType, Set<int>> leaves;
@@ -20,7 +24,10 @@ class PersonRequest {
   final bool overtime;
 
   bool get isEmpty =>
-      unavailable.isEmpty && leaves.values.every((d) => d.isEmpty) && !overtime;
+      unavailable.isEmpty &&
+      preferred.isEmpty &&
+      leaves.values.every((d) => d.isEmpty) &&
+      !overtime;
 
   PersonRequest merge(PersonRequest other) => PersonRequest(
     unavailable: {...unavailable, ...other.unavailable},
@@ -30,6 +37,7 @@ class PersonRequest {
           t: {...?leaves[t], ...?other.leaves[t]},
     },
     overtime: overtime || other.overtime,
+    preferred: {...preferred, ...other.preferred},
   );
 }
 
@@ -100,6 +108,7 @@ class RequestParser {
         '(ör. 3, 7, 12-14)\n'
         'İzin varsa: izin 20-24\n'
         'Şua izni: şua 5-9 · Rapor: rapor 2-3\n'
+        'Tercih ettiğin günler: tercih 12, 15\n'
         'Fazla mesai istiyorsan: fazla mesai istiyorum\n'
         'Uygun olmayan gün yoksa: yok';
   }
@@ -122,6 +131,15 @@ class RequestParser {
     'gelemiyor',
     'müsait değil',
     'uygun değil',
+  ];
+
+  /// Önündeki (ve sonraki) günleri tercih edilen gün yapan sözcük başları.
+  static const _preferredWords = [
+    'tercih',
+    'isterim',
+    'istiyorum',
+    'uygunum',
+    'müsaitim',
   ];
 
   static const _leaveWords = {
@@ -268,6 +286,9 @@ class RequestParser {
     var mode = 'unavailable'; // ya da LeaveType.name
     // Son virgül grubundaki günler: "olmaz" geriye dönük uygulansın.
     var group = <int>[];
+    // Son anahtar sözcükten / satır sonundan beri varsayılan kipte
+    // yazılan günler: "12, 15 istiyorum" hepsini tercih yapar.
+    var run = <int>[];
     final assigned = <int, String>{};
 
     void put(int d) {
@@ -277,6 +298,7 @@ class RequestParser {
       }
       assigned[d] = mode;
       group.add(d);
+      if (mode == 'unavailable') run.add(d);
     }
 
     for (final m in token.allMatches(text)) {
@@ -304,21 +326,38 @@ class RequestParser {
         if (leave != null) {
           mode = leave.name;
           group = [];
+          run = [];
         } else if (_unavailableWords.any(word.startsWith)) {
           for (final d in group) {
             assigned[d] = 'unavailable';
           }
           mode = 'unavailable';
           group = [];
+          run = [];
+        } else if (_preferredWords.any(word.startsWith)) {
+          // "12, 15 istiyorum": önündeki günler; "tercih 12, 15": sonraki
+          // günler de ("izin istiyorum 20-24" izin kalır).
+          for (final d in run) {
+            assigned[d] = 'preferred';
+          }
+          if (word.startsWith('tercih')) mode = 'preferred';
+          group = [];
+          run = [];
         }
       } else if (m[5] != null) {
         group = [];
-        if (m[5] == '\n' || m[5] == '.') mode = 'unavailable';
+        if (m[5] == '\n' || m[5] == '.') {
+          mode = 'unavailable';
+          run = [];
+        }
       }
     }
+    final preferred = <int>{};
     for (final MapEntry(key: d, value: kind) in assigned.entries) {
       if (kind == 'unavailable') {
         unavailable.add(d);
+      } else if (kind == 'preferred') {
+        preferred.add(d);
       } else {
         (leaves[LeaveType.values.byName(kind)] ??= {}).add(d);
       }
@@ -328,6 +367,7 @@ class RequestParser {
         unavailable: unavailable,
         leaves: leaves,
         overtime: overtime,
+        preferred: preferred,
       ),
       skipped,
     );

@@ -39,6 +39,7 @@ class MonthPlan {
     this.dayShiftOverrides = const {},
     this.handovers = const {},
     this.techDayShifts = const {},
+    this.preferredDays = const {},
   });
 
   final int year;
@@ -102,6 +103,14 @@ class MonthPlan {
   /// ([dayShiftOverrides]). Aynı gün 24 / 16B nöbeti yazılınca o günün 7A'sı
   /// düşer; liste yeniden oluşturulunca temizlenir.
   final Map<String, List<int>> techDayShifts;
+
+  /// Kişi kimliği → nöbet tutmayı tercih ettiği günler. Kesin kural değil:
+  /// üretici adaleti bozmadan mümkünse bu günleri verir.
+  final Map<String, List<int>> preferredDays;
+
+  /// Kişinin tercih ettiği günler.
+  List<int> preferredDaysOf(String personId) =>
+      preferredDays[personId] ?? const [];
 
   static String handoverKey(String personId, int day) => '$personId:$day';
 
@@ -188,6 +197,7 @@ class MonthPlan {
   bool get hasPersonRequests =>
       unavailableDays.values.any((d) => d.isNotEmpty) ||
       requestedShifts.values.any((d) => d.isNotEmpty) ||
+      preferredDays.values.any((d) => d.isNotEmpty) ||
       overtimeRequests.isNotEmpty;
 
   /// Kişi isteklerinin kısa dökümü, satır satır ("• 3 kişi: 7 istenmeyen
@@ -204,6 +214,8 @@ class MonthPlan {
         line(unavailableDays, 'istenmeyen gün'),
       if (requestedShifts.values.any((d) => d.isNotEmpty))
         line(requestedShifts, 'seçilen nöbet günü'),
+      if (preferredDays.values.any((d) => d.isNotEmpty))
+        line(preferredDays, 'tercih edilen gün'),
       if (overtimeRequests.isNotEmpty)
         '• ${overtimeRequests.length} kişi: fazla mesai isteği',
     ].join('\n');
@@ -247,6 +259,7 @@ class MonthPlan {
     Map<int, String>? dayShiftOverrides,
     Map<String, String>? handovers,
     Map<String, List<int>>? techDayShifts,
+    Map<String, List<int>>? preferredDays,
     bool clearGenerated = false,
   }) {
     return MonthPlan(
@@ -266,6 +279,7 @@ class MonthPlan {
       dayShiftOverrides: dayShiftOverrides ?? this.dayShiftOverrides,
       handovers: handovers ?? this.handovers,
       techDayShifts: techDayShifts ?? this.techDayShifts,
+      preferredDays: preferredDays ?? this.preferredDays,
     );
   }
 
@@ -291,6 +305,7 @@ class MonthPlan {
     },
     'handovers': handovers,
     'techDayShifts': techDayShifts,
+    if (preferredDays.isNotEmpty) 'preferredDays': preferredDays,
   };
 
   factory MonthPlan.fromJson(Map<String, dynamic> json) {
@@ -331,6 +346,10 @@ class MonthPlan {
       },
       requestedShifts: {
         for (final e in (json['requestedShifts'] as Map? ?? const {}).entries)
+          e.key as String: (e.value as List).cast<int>(),
+      },
+      preferredDays: {
+        for (final e in (json['preferredDays'] as Map? ?? const {}).entries)
           e.key as String: (e.value as List).cast<int>(),
       },
       dayShiftOverrides: {
@@ -377,7 +396,8 @@ class MonthPlan {
         dayShiftOverrides,
       ) &&
       const MapEquality<String, String>().equals(other.handovers, handovers) &&
-      _unavailableEquality.equals(other.techDayShifts, techDayShifts);
+      _unavailableEquality.equals(other.techDayShifts, techDayShifts) &&
+      _unavailableEquality.equals(other.preferredDays, preferredDays);
 
   @override
   int get hashCode => Object.hash(
@@ -397,6 +417,7 @@ class MonthPlan {
     const MapEquality<int, String>().hash(dayShiftOverrides),
     const MapEquality<String, String>().hash(handovers),
     _unavailableEquality.hash(techDayShifts),
+    _unavailableEquality.hash(preferredDays),
   );
 
   @override

@@ -36,6 +36,10 @@ class _RequestedTab extends _Tab {
   const _RequestedTab();
 }
 
+class _PreferredTab extends _Tab {
+  const _PreferredTab();
+}
+
 class _LeaveTab extends _Tab {
   const _LeaveTab(this.type);
   final LeaveType type;
@@ -49,7 +53,9 @@ class _UnavailableDaysPageState extends ConsumerState<UnavailableDaysPage>
   late final List<_Tab> _tabList = [
     const _UnavailableTab(),
     if (person.isChargeNurse && person.role == Role.nurse)
-      const _RequestedTab(),
+      const _RequestedTab()
+    else
+      const _PreferredTab(),
     for (final type in LeaveType.values) _LeaveTab(type),
   ];
 
@@ -79,6 +85,10 @@ class _UnavailableDaysPageState extends ConsumerState<UnavailableDaysPage>
         plan.requestedShiftsOf(person.id).isNotEmpty,
         () => controller.clearRequestedShifts(person.id),
       ),
+      _PreferredTab() => (
+        plan.preferredDaysOf(person.id).isNotEmpty,
+        () => controller.clearPreferred(person.id),
+      ),
       _LeaveTab(:final type) => (
         plan.leaveOf(person.id, type).isNotEmpty,
         () => controller.clearLeave(person.id, type),
@@ -102,6 +112,7 @@ class _UnavailableDaysPageState extends ConsumerState<UnavailableDaysPage>
                 text: switch (tab) {
                   _UnavailableTab() => 'İstenmeyen günler',
                   _RequestedTab() => 'Nöbet günleri',
+                  _PreferredTab() => 'Tercih',
                   _LeaveTab(:final type) => type.label,
                 },
               ),
@@ -127,6 +138,10 @@ class _UnavailableDaysPageState extends ConsumerState<UnavailableDaysPage>
                       person: person,
                       requested: true,
                     ),
+                    _PreferredTab() => _CalendarEditor(
+                      person: person,
+                      preferred: true,
+                    ),
                     _LeaveTab(:final type) => _LeaveEditor(
                       person: person,
                       type: type,
@@ -144,10 +159,17 @@ class _UnavailableDaysPageState extends ConsumerState<UnavailableDaysPage>
 /// Takvimden tek tek gün seçme sekmesi. [requested] ise sorumlu hemşirenin
 /// nöbet tutacağı günler; değilse istenmeyen günler (+ fazla mesai).
 class _CalendarEditor extends ConsumerWidget {
-  const _CalendarEditor({required this.person, this.requested = false});
+  const _CalendarEditor({
+    required this.person,
+    this.requested = false,
+    this.preferred = false,
+  });
 
   final Person person;
   final bool requested;
+
+  /// Tercih edilen günler (yumuşak istek).
+  final bool preferred;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -156,6 +178,8 @@ class _CalendarEditor extends ConsumerWidget {
     final selected =
         (requested
                 ? plan.requestedShiftsOf(person.id)
+                : preferred
+                ? plan.preferredDaysOf(person.id)
                 : plan.unavailableDaysOf(person.id))
             .toSet();
     final holidays = {
@@ -167,8 +191,16 @@ class _CalendarEditor extends ConsumerWidget {
     final lastDay = DateTime(plan.year, plan.month, plan.daysInMonth);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final mark = requested ? scheme.primary : scheme.error;
-    final onMark = requested ? scheme.onPrimary : scheme.onError;
+    final mark = requested
+        ? scheme.primary
+        : preferred
+        ? scheme.tertiary
+        : scheme.error;
+    final onMark = requested
+        ? scheme.onPrimary
+        : preferred
+        ? scheme.onTertiary
+        : scheme.onError;
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -182,6 +214,10 @@ class _CalendarEditor extends ConsumerWidget {
           plan.isLocked
               ? 'Bu ay kilitli; ${requested ? 'nöbet günleri' : 'istenmeyen günler'} '
                     'değiştirilemez.'
+              : preferred
+              ? 'Nöbet tutmayı tercih ettiği günlere dokunun. Kesin değildir: '
+                    'liste oluşturulurken adaleti bozmadan mümkünse bu '
+                    'günler verilir. Seçili: ${selected.length} gün'
               : requested
               ? 'Nöbet tutacağı günlere dokunun; liste oluşturulurken bu '
                     'günlere nöbet yazılır. Seçilmeyen günlerde 24 yazılmaz; '
@@ -205,6 +241,8 @@ class _CalendarEditor extends ConsumerWidget {
             if (plan.isLocked) return;
             if (requested) {
               controller.toggleRequestedShift(person.id, day.day);
+            } else if (preferred) {
+              controller.togglePreferred(person.id, day.day);
             } else {
               controller.toggleUnavailable(person.id, day.day);
             }
@@ -222,8 +260,19 @@ class _CalendarEditor extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 16),
-        _Legend(items: [(mark, requested ? 'Nöbet tutacak' : 'İstemiyor')]),
-        if (!requested) ...[
+        _Legend(
+          items: [
+            (
+              mark,
+              requested
+                  ? 'Nöbet tutacak'
+                  : preferred
+                  ? 'Tercih ediyor'
+                  : 'İstemiyor',
+            ),
+          ],
+        ),
+        if (!requested && !preferred) ...[
           const Divider(height: 32),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,

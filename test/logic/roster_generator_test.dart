@@ -551,6 +551,42 @@ void main() {
       expect(n1, greaterThan(n2));
     });
 
+    test('tercih edilen günler adaleti bozmadan çoğunlukla verilir', () {
+      // n1 ayın tek günlerinden 6'sını, n2 hafta sonlarından 3'ünü ister.
+      const wanted = {
+        'n1': [3, 7, 11, 15, 19, 23],
+        'n2': [10, 17, 24],
+      };
+      var hits = 0, base = 0;
+      for (final seed in [1, 2, 3]) {
+        RosterGenerator gen({required bool prefs}) => RosterGenerator(
+          year: 2026,
+          month: 10,
+          people: people,
+          holidays: holidays,
+          settings: settings,
+          seed: seed,
+          preferredDays: prefs ? wanted : const {},
+          attempts: 150,
+        );
+        final w = workedDays(gen(prefs: true).generate());
+        final w0 = workedDays(gen(prefs: false).generate());
+        int count(Map<String, Set<int>> w) => [
+          for (final e in wanted.entries)
+            for (final d in e.value)
+              if (w[e.key]!.contains(d)) d,
+        ].length;
+        hits += count(w);
+        base += count(w0);
+        // Adalet yine korunur.
+        expect(
+          spread([for (var i = 1; i <= 7; i++) w['n$i']!.length]),
+          lessThanOrEqualTo(1),
+        );
+      }
+      expect(hits, greaterThan(base));
+    });
+
     test('2 teknikerde fazla mesai 24 sayısını artırır', () {
       const s = RosterSettings(techsPerDay: 2);
       final r = RosterGenerator(

@@ -7,6 +7,7 @@ enum RequestKind {
   unavailable('İstemediği gün'),
   leave('İzin'),
   shiftDay('Seçtiği nöbet günü'),
+  preferred('Tercih ettiği gün'),
   overtime('Fazla mesai');
 
   const RequestKind(this.label);
@@ -108,6 +109,17 @@ class RequestFulfillment {
           kind: RequestKind.shiftDay,
           met: days.contains(d),
           detail: '${formatDayMonth(d, m)} nöbet istedi',
+        ));
+      }
+    }
+    for (final e in plan.preferredDays.entries) {
+      final days = daysOf(e.key);
+      for (final d in {...e.value}.toList()..sort()) {
+        add(e.key, (
+          month: m,
+          kind: RequestKind.preferred,
+          met: days.contains(d),
+          detail: '${formatDayMonth(d, m)} tercih etti',
         ));
       }
     }

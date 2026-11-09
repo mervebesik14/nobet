@@ -100,4 +100,21 @@ void main() {
     expect(r.requests['e']!.unavailable, {10, 11, 12});
     expect(r.requests['f']!.unavailable, {20, 21, 22});
   });
+
+  test('tercih edilen günler', () {
+    const people = [Person(id: 'a', name: 'Ayşe', role: Role.nurse)];
+    PersonRequest r(String body) => RequestParser.parse(
+      text: 'Ayşe: $body',
+      people: people,
+      year: 2026,
+      month: 12,
+    ).requests['a']!;
+    expect(r('12, 15 istiyorum').preferred, {12, 15});
+    expect(r('tercih 3, 5. 8 olmaz').preferred, {3, 5});
+    expect(r('tercih 3, 5. 8 olmaz').unavailable, {8});
+    // "izin istiyorum 20-22" izin kalır.
+    final leave = r('izin istiyorum 20-22');
+    expect(leave.preferred, isEmpty);
+    expect(leave.leaves[LeaveType.annual], {20, 21, 22});
+  });
 }
