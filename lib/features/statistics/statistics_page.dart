@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../logic/every_other_day_chains.dart';
+import '../../logic/request_fulfillment.dart';
 import '../../logic/file_names.dart';
 import '../../logic/totals_columns.dart';
 import '../../logic/turkish_dates.dart';
@@ -154,6 +155,11 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
       settings: ref.watch(rosterSettingsProvider),
     );
     String fmt(num v) => SummaryTable.fmt(v);
+    final requests = RequestFulfillment.forYear(
+      year: _year,
+      plans: ref.watch(monthPlanRepositoryProvider).getAll(),
+      people: ref.watch(peopleProvider),
+    );
 
     final brand = context.brand;
     final maxShifts = summary.rows.fold<num>(
@@ -333,11 +339,94 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
               ],
             ),
           ],
+          if (requests.isNotEmpty) ...[
+            const PillHeader('İstek karşılanma', end: 'Dokun: ayrıntı'),
+            GroupCard(
+              children: [
+                for (final r in requests)
+                  ListTile(
+                    key: ValueKey('requests-${r.personId}'),
+                    title: Text(r.name),
+                    subtitle: Text(r.breakdown),
+                    trailing: Text(
+                      '%${r.percent}',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: r.percent < 100 ? theme.colorScheme.error : null,
+                      ),
+                    ),
+                    onTap: () => _showRequests(context, _year, r),
+                  ),
+              ],
+            ),
+          ],
           if (summary.rows.isNotEmpty) MonthlyComparison(summary: summary),
         ],
       ),
     );
   }
+}
+
+/// Kişinin yıl içindeki istekleri: karşılanmayanlar ay ay, sonra döküm.
+void _showRequests(BuildContext context, int year, PersonRequests r) {
+  final theme = Theme.of(context);
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (context) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+        ),
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          children: [
+            Text(
+              '${r.name} · $year istekleri',
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${r.total} isteğin ${r.met} tanesi karşılandı (%${r.percent}).',
+            ),
+            const SizedBox(height: 4),
+            Text(r.breakdown, style: theme.textTheme.bodySmall),
+            const Divider(),
+            if (r.unmet.isEmpty)
+              const Text('Bütün istekleri karşılandı.')
+            else ...[
+              Text('Karşılanmayanlar', style: theme.textTheme.titleSmall),
+              for (final i in r.unmet)
+                ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(
+                    Icons.error_outline,
+                    color: theme.colorScheme.error,
+                  ),
+                  title: Text(
+                    '${turkishMonthNames[i.month - 1]} · ${i.kind.label}',
+                  ),
+                  subtitle: Text(i.detail),
+                ),
+              if (r.unmet.any((i) => i.kind == RequestKind.overtime))
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Fazla mesai isteği karşılanmayan kişi, sonraki ay yine '
+                    'isterse liste oluşturulurken önce ona fazla nöbet '
+                    'verilir.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+            ],
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 /// Kişinin yıl içindeki gün aşırı zincirleri, ay ay.

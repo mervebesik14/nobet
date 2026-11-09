@@ -16,6 +16,7 @@ import '../../logic/roster_excel.dart';
 import '../../logic/roster_generator.dart';
 import '../../logic/roster_summary.dart';
 import '../../logic/roster_validator.dart';
+import '../../logic/shift_explainer.dart';
 import '../../logic/shift_gaps.dart';
 import '../../logic/summary_columns.dart';
 import '../../logic/turkish_collation.dart';
@@ -463,6 +464,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         title: '${_name(id)} · ${_dayLabel(day)}$shift',
         actions: [
           EditOption(
+            title: 'Neden bu nöbet?',
+            subtitle: 'Neden bu kişi, neden başkası değil.',
+            icon: Icons.help_outline,
+            result: plan.assignments,
+            onSelected: () => _showWhy(cell),
+          ),
+          EditOption(
             title: 'Nöbeti kaldır',
             subtitle: 'Koltuk boş kalır.',
             icon: Icons.remove_circle_outline,
@@ -895,6 +903,83 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     ];
   }
 
+  /// "Neden bu nöbet?": kişinin bu ayki durumu ve aynı roldeki diğerlerinin
+  /// o gün neden nöbette olmadığı.
+  Future<void> _showWhy(RosterCell cell) async {
+    final plan = _plan;
+    final x = ShiftExplainer.explain(
+      plan: plan,
+      people: ref.read(peopleProvider),
+      personId: cell.personId,
+      day: cell.day,
+      settings: ref.read(effectiveSettingsProvider),
+      blockReasons: ref.read(blockReasonsProvider),
+      weekendDays: RosterGenerator.weekendDays(
+        plan.year,
+        plan.month,
+        ref.read(holidaysProvider),
+        ref.read(effectiveSettingsProvider),
+      ),
+    );
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.8,
+            ),
+            child: ListView(
+              key: const ValueKey('why-sheet'),
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              children: [
+                Text(x.title, style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                for (final w in x.warnings)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      w,
+                      style: TextStyle(color: theme.colorScheme.error),
+                    ),
+                  ),
+                for (final f in x.facts)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text('• $f'),
+                  ),
+                if (x.others.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Neden başkası değil?',
+                    style: theme.textTheme.titleSmall,
+                  ),
+                  for (final o in x.others)
+                    ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(o.name),
+                      subtitle: Text(o.reason),
+                    ),
+                ],
+                const SizedBox(height: 8),
+                Text(
+                  'Açıklama listenin şu anki hâline göredir; elle yapılan '
+                  'değişiklikler de hesaba katılır.',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   /// Koltuktaki kişinin vardiyasını özel mesai [code] yapar (null → 24).
   Future<void> _setCustomShift(RosterCell cell, String? code) async {
     final plan = _plan;
@@ -1317,6 +1402,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                       Navigator.of(context).pop(secondary ? '24' : '16b'),
                 ),
               ListTile(
+                key: const ValueKey('why-shift'),
+                leading: const Icon(Icons.help_outline),
+                title: const Text('Neden bu nöbet?'),
+                subtitle: const Text('Neden bu kişi, neden başkası değil.'),
+                onTap: () => Navigator.of(context).pop('why'),
+              ),
+              ListTile(
                 leading: const Icon(Icons.swap_horiz),
                 title: const Text('Başka bir nöbetle takas et'),
                 subtitle: const Text(
@@ -1413,6 +1505,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         await _set16a(cell, night: false);
       case 'n16a-new':
         await _write16a(cell, role);
+      case 'why':
+        await _showWhy(cell);
       case 'swap':
         setState(() => _swapFrom = cell);
     }

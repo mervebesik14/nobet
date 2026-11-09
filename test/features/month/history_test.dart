@@ -204,6 +204,44 @@ void main() {
     expect(find.text("1-3-5-7 (4'lü) · 20-22 (2'li)"), findsOneWidget);
   });
 
+  testWidgets('İstatistik: istek karşılanma oranı ve ayrıntı', (tester) async {
+    // Eylül 2026: Hemşire 1 2'sini istemedi ama yazıldı; 5'i karşılandı.
+    await boxes.monthPlans.put(
+      '2026-09',
+      MonthPlan(
+        year: 2026,
+        month: 9,
+        assignments: {
+          for (final d in [1, 2, 4])
+            d: DayAssignment(day: d, nurseIds: const ['n1']),
+        },
+        unavailableDays: const {
+          'n1': [2, 5],
+        },
+      ),
+    );
+    await pumpStatistics(tester);
+    final tile = find.byKey(const ValueKey('requests-n1'));
+    await tester.dragUntilVisible(
+      tile,
+      find.byType(ListView).first,
+      const Offset(0, -300),
+    );
+    expect(
+      find.descendant(of: tile, matching: find.text('%50')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: tile, matching: find.text('İstemediği gün 1/2')),
+      findsOneWidget,
+    );
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    expect(find.text('Hemşire 1 · 2026 istekleri'), findsOneWidget);
+    expect(find.text('Eylül · İstemediği gün'), findsOneWidget);
+    expect(find.text('2 Eylül istemedi'), findsOneWidget);
+  });
+
   testWidgets('Yıllık Özet: dahil aylar ve kişi başı toplamlar', (
     tester,
   ) async {

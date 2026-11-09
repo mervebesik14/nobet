@@ -91,6 +91,7 @@ class RosterGenerator {
     this.yearToDate = const {},
     this.overtimeRequests = const {},
     this.overtimeAllowance = 2,
+    this.overtimePriority = const {},
     this.requestedShifts = const {},
     this.absentDays = const {},
     this.existing,
@@ -128,6 +129,10 @@ class RosterGenerator {
 
   /// Fazla mesai isteyene tanınan ek nöbet payı.
   final int overtimeAllowance;
+
+  /// Daha önce fazla mesai isteği karşılanmamış kişiler: bu ay yine
+  /// isterlerse payları bir nöbet fazladır (önce onlara verilir).
+  final Set<String> overtimePriority;
 
   /// Tatil günü → aynı tatilin önceki seferinde nöbet tutanlar
   /// ([HolidayHistory]). Bu kişiler o günlere mümkünse yazılmaz (ay içi
@@ -174,7 +179,9 @@ class RosterGenerator {
   /// 0). Adalet puanında ve açgözlü seçimde kişinin sayısından düşülür.
   Map<String, int> _allowanceFor(List<Person> members) => {
     for (final p in members)
-      p.id: overtimeRequests.contains(p.id) ? overtimeAllowance : 0,
+      p.id: overtimeRequests.contains(p.id)
+          ? overtimeAllowance + (overtimePriority.contains(p.id) ? 1 : 0)
+          : 0,
   };
 
   /// Rol başına açgözlü deneme sayısı.

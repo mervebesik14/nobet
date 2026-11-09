@@ -528,6 +528,29 @@ void main() {
       );
     });
 
+    test('isteği önceden karşılanmayan önceliklidir', () {
+      var n1 = 0, n2 = 0;
+      for (final seed in [1, 2, 3, 4]) {
+        final w = workedDays(
+          RosterGenerator(
+            year: 2026,
+            month: 10,
+            people: people,
+            holidays: holidays,
+            settings: settings,
+            seed: seed,
+            overtimeRequests: const {'n1', 'n2'},
+            overtimePriority: const {'n1'},
+            attempts: 150,
+          ).generate(),
+        );
+        expect(w['n1']!.length, greaterThanOrEqualTo(w['n2']!.length));
+        n1 += w['n1']!.length;
+        n2 += w['n2']!.length;
+      }
+      expect(n1, greaterThan(n2));
+    });
+
     test('2 teknikerde fazla mesai 24 sayısını artırır', () {
       const s = RosterSettings(techsPerDay: 2);
       final r = RosterGenerator(

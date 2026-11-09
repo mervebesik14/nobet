@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/month_plan_repository.dart';
 import '../../data/providers.dart';
 import '../../data/turkish_holidays.dart';
+import '../../logic/request_fulfillment.dart';
 import '../../logic/holiday_history.dart';
 import '../../logic/request_parser.dart';
 import '../../logic/roster_options.dart';
@@ -492,6 +493,12 @@ class MonthPlanController extends Notifier<MonthPlan> {
       seed: seed ?? ref.read(rosterSeedProvider)(),
       previousMonthTail: previousMonthTail(),
       overtimeRequests: plan.overtimeRequests,
+      overtimePriority: RequestFulfillment.overtimePriority(
+        year: plan.year,
+        month: plan.month,
+        plans: ref.read(monthPlanRepositoryProvider).getAll(),
+        people: ref.read(peopleProvider),
+      ),
       requestedShifts: computeRequiredShifts(
         plan,
         ref.read(holidaysProvider),

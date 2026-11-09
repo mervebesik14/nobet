@@ -813,6 +813,47 @@ void main() {
     expect(saved().assignments[14]!.nurseIds, contains('n0'));
   });
 
+  testWidgets('Neden bu nöbet? açıklaması basılı tutunca ve dokununca', (
+    tester,
+  ) async {
+    await pumpRoster(
+      tester,
+      unavailable: {
+        'n2': [3],
+      },
+    );
+    await tester.longPress(cell('n0', 3));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('why-shift')));
+    await tester.pumpAndSettle();
+    final sheet = find.byKey(const ValueKey('why-sheet'));
+    expect(sheet, findsOneWidget);
+    expect(
+      find.descendant(
+        of: sheet,
+        matching: find.text('Ayşe · 3 Ekim Cumartesi'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: sheet, matching: find.text('Neden başkası değil?')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: sheet, matching: find.text('istemediği gün')),
+      findsOneWidget,
+    );
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    // Dokununca açılan sayfada da var.
+    await tester.tap(cell('n0', 3));
+    await tester.pumpAndSettle();
+    await tester.tap(inSheet('Neden bu nöbet?'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('why-sheet')), findsOneWidget);
+  });
+
   testWidgets('basılı tut → Sil: nöbet doğrudan silinir', (tester) async {
     await pumpRoster(tester);
     await tester.longPress(cell('n0', 3));
