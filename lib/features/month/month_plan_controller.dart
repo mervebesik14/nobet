@@ -502,6 +502,52 @@ class MonthPlanController extends Notifier<MonthPlan> {
     return (result: result, changed: changed);
   }
 
+  /// "Ya şöyle olursa": [personId] [days] günlerinde [type] izinli (null
+  /// ise istemediği gün) olsaydı liste en az değişiklikle nasıl olurdu.
+  /// Hiçbir şey kaydedilmez; sonucu [applyPreview] uygular.
+  Future<({MonthPlan plan, RosterResult result})?> previewAbsence(
+    String personId,
+    LeaveType? type,
+    Iterable<int> days,
+  ) async {
+    if (!state.hasRoster) return null;
+    final base = state;
+    final hypo = type == null
+        ? base.copyWith(
+            unavailableDays: {
+              ...base.unavailableDays,
+              personId: {...base.unavailableDaysOf(personId), ...days}.toList()
+                ..sort(),
+            },
+          )
+        : base.withLeave(personId, type, {
+            ...base.leaveOf(personId, type),
+            ...days,
+          });
+    final result = await ref.read(rosterRunnerProvider)(
+      _generator(hypo, onlyNurses: hypo.nurseOnly, existing: hypo.assignments),
+    );
+    return (
+      plan: hypo.copyWith(assignments: result.assignments),
+      result: result,
+    );
+  }
+
+  /// [previewAbsence] sonucunu kaydeder (izin/istemediği gün ve yeni liste
+  /// birlikte); geçmişe [title] ile yazılır. Kilitli ayda false.
+  Future<bool> applyPreview(MonthPlan preview, {required String title}) async {
+    if (state.isLocked ||
+        preview.year != state.year ||
+        preview.month != state.month) {
+      return false;
+    }
+    final before = state;
+    state = preview;
+    await ref.read(monthPlanRepositoryProvider).save(state);
+    await _record(title, before);
+    return true;
+  }
+
   RosterGenerator _generator(
     MonthPlan plan, {
     required bool onlyNurses,

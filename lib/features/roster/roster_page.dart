@@ -39,6 +39,7 @@ import 'overtime_report_pdf.dart';
 import 'personal_roster_pdf.dart';
 import 'swap_log_page.dart';
 import 'text_edit_page.dart';
+import 'what_if_page.dart';
 import 'whatsapp_send_page.dart';
 import 'roster_history_page.dart';
 import 'roster_pdf.dart';
@@ -912,6 +913,16 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 : def.description,
           ),
     ];
+  }
+
+  /// "Ya şöyle olursa" deneme sayfası; uygulanırsa bildirim gösterilir.
+  Future<void> _whatIf() async {
+    if (!_ensureUnlocked()) return;
+    setState(() => _swapFrom = null);
+    final message = await Navigator.of(
+      context,
+    ).push<String>(MaterialPageRoute(builder: (_) => const WhatIfPage()));
+    if (message != null && mounted) _notify(message);
   }
 
   /// Yazarak düzenleme: komutlar tek seferde uygulanır (tek "Geri al").
@@ -2426,6 +2437,15 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                             ),
                             label: const Text('Yazarak düzenle'),
                             onPressed: _textEdit,
+                          ),
+                          ActionChip(
+                            key: const ValueKey('what-if'),
+                            avatar: const Icon(
+                              Icons.science_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('Ya şöyle olursa'),
+                            onPressed: _whatIf,
                           ),
                         ],
                       ),

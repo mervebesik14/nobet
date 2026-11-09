@@ -906,6 +906,36 @@ void main() {
     expect(saved().leaveOf('n0', LeaveType.sick), [3]);
   });
 
+  testWidgets('ya şöyle olursa: kaydetmeden dener, uygulayınca kaydeder', (
+    tester,
+  ) async {
+    await pumpRoster(tester);
+    await tester.tap(find.byKey(const ValueKey('what-if')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('what-if-person')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ayşe').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('what-if-start')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('3').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('what-if-try')));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('nöbet değişir'), findsOneWidget);
+    // Henüz kaydedilmedi.
+    expect(saved().assignments[3]!.nurseIds, contains('n0'));
+    expect(saved().annualLeaveOf('n0'), isEmpty);
+
+    await tester.tap(find.byKey(const ValueKey('what-if-apply')));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.nurseIds, isNot(contains('n0')));
+    expect(saved().assignments[3]!.nurseIds, hasLength(2));
+    expect(saved().annualLeaveOf('n0'), [3]);
+    expect(find.textContaining('uygulandı'), findsOneWidget);
+  });
+
   testWidgets('basılı tut → Sil: nöbet doğrudan silinir', (tester) async {
     await pumpRoster(tester);
     await tester.longPress(cell('n0', 3));
