@@ -33,6 +33,7 @@ import '../../data/providers.dart';
 import '../../shared/calendar_service.dart';
 import '../../shared/platform_services.dart';
 import '../../shared/providers.dart';
+import 'change_notice_page.dart';
 import 'edit_sheet.dart';
 import '../settings/report_info.dart';
 import 'overtime_report_pdf.dart';
@@ -2090,6 +2091,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
           summaryColumns: columns,
         );
         await services.shareFile(xlsx, '$fileBase.xlsx', XlsxWriter.mimeType);
+        await markPublished(ref, plan);
         return;
       }
       final fonts = await services.loadPdfFonts();
@@ -2116,6 +2118,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             _ShareAction.overtimeReport ||
             _ShareAction.whatsAppEach ||
             _ShareAction.swapLog ||
+            _ShareAction.notifyChanges ||
             _ShareAction.allPersonalPdf ||
             _ShareAction.allPersonalCalendar ||
             _ShareAction.excel:
@@ -2128,6 +2131,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         case _ShareAction.print:
           await services.printPdf(pdf, title);
       }
+      // Herkese giden liste: sonraki değişiklikler buna göre bildirilir.
+      await markPublished(ref, plan);
     } catch (e) {
       if (mounted) _notify('Paylaşılamadı: $e');
     }
@@ -2232,16 +2237,25 @@ class _RosterPageState extends ConsumerState<RosterPage> {
               _ShareAction.swapLog => Navigator.of(context).push(
                 MaterialPageRoute<void>(builder: (_) => const SwapLogPage()),
               ),
-              _ShareAction.whatsAppEach => Navigator.of(context).push(
+              _ShareAction.notifyChanges => Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => WhatsAppSendPage(
-                    personIds: [for (final r in rows) r.id],
-                    dayShifts: dayShifts,
-                    weekendDays: weekendDays,
-                    holidayDays: holidayDays,
-                  ),
+                  builder: (_) => const ChangeNoticePage(),
                 ),
               ),
+              _ShareAction.whatsAppEach => () async {
+                await markPublished(ref, plan);
+                if (!context.mounted) return;
+                await Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => WhatsAppSendPage(
+                      personIds: [for (final r in rows) r.id],
+                      dayShifts: dayShifts,
+                      weekendDays: weekendDays,
+                      holidayDays: holidayDays,
+                    ),
+                  ),
+                );
+              }(),
               _ShareAction.overtimeReport => _shareOvertimeReport(
                 plan,
                 summary,
@@ -2322,6 +2336,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 child: ListTile(
                   leading: Icon(Icons.swap_horiz),
                   title: Text('Takas defteri'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.notifyChanges,
+                child: ListTile(
+                  leading: Icon(Icons.campaign_outlined),
+                  title: Text('Değişiklikleri bildir'),
                 ),
               ),
               PopupMenuItem(
@@ -2724,6 +2745,7 @@ enum _ShareAction {
   overtimeReport,
   whatsAppEach,
   swapLog,
+  notifyChanges,
 }
 
 /// Vurgulanan kişinin özeti: tablonun üstünde, kapatılabilir.

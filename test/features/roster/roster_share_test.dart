@@ -103,6 +103,43 @@ void main() {
     expect(isPdf(services.lastPdf), isTrue);
   });
 
+  testWidgets('değişiklik bildirimi: paylaşılandan sonra değişen kişiler', (
+    tester,
+  ) async {
+    await pump(tester);
+    // Henüz paylaşılmadı.
+    await choose(tester, 'Değişiklikleri bildir');
+    expect(find.byKey(const ValueKey('mark-published')), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    await choose(tester, 'PDF olarak paylaş', details: false);
+    expect(boxes.meta.get('publishedRoster/2026-10'), isNotNull);
+
+    // 1 Ekim'de Banu çıkar.
+    await tester.longPress(find.byKey(const ValueKey('cell-b-1')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sil'));
+    await tester.pumpAndSettle();
+    expect(boxes.monthPlans.get('2026-10')!.assignments[1]!.nurseIds, ['a']);
+    services.calls.clear();
+    await choose(tester, 'Değişiklikleri bildir');
+    expect(find.byKey(const ValueKey('notice-b')), findsOneWidget);
+    expect(find.byKey(const ValueKey('notice-a')), findsNothing);
+    expect(find.text('1 Ekim Perşembe: 24 kaldırıldı'), findsOneWidget);
+    await tester.tap(find.text('Gönder'));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(services.calls, ['shareText']);
+    await tester.tap(find.byKey(const ValueKey('notice-done')));
+    await tester.pumpAndSettle();
+    await choose(tester, 'Değişiklikleri bildir');
+    expect(
+      find.text('Paylaşılan listeden bu yana değişiklik yok.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('tüm liste: önce ne paylaşılacağı sorulur', (tester) async {
     await pump(tester);
     await choose(tester, 'PDF olarak paylaş');
