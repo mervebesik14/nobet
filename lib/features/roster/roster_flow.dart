@@ -8,6 +8,7 @@ import '../../logic/feasibility_checker.dart';
 import '../../logic/manual_edits.dart';
 import '../../logic/roster_generator.dart';
 import '../../logic/roster_options.dart';
+import '../../shared/widgets/motion.dart';
 import '../people/people_controller.dart';
 import '../month/month_plan_controller.dart';
 
@@ -113,18 +114,7 @@ Future<bool> generateRoster(BuildContext context, WidgetRef ref) async {
   showDialog<void>(
     context: context,
     barrierDismissible: false,
-    builder: (_) => const PopScope(
-      canPop: false,
-      child: AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 24),
-            Expanded(child: Text('Liste oluşturuluyor…')),
-          ],
-        ),
-      ),
-    ),
+    builder: (_) => const PopScope(canPop: false, child: GeneratingDialog()),
   );
   final count = ref.read(rosterOptionCountProvider);
   final RosterResult result;

@@ -316,6 +316,9 @@ class _DayHero extends StatelessWidget {
           ],
         ),
         borderRadius: BorderRadius.circular(26),
+        border: Theme.of(context).brightness == Brightness.dark
+            ? Border.all(color: const Color(0xFF3DDC97).withValues(alpha: 0.35))
+            : null,
         boxShadow: [
           BoxShadow(
             color: brand.headerEnd.withValues(alpha: 0.45),

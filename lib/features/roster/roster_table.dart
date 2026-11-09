@@ -5,6 +5,7 @@ import '../../logic/day_shift_planner.dart';
 import '../../models/models.dart';
 import '../../shared/app_colors.dart';
 import '../../shared/person_colors.dart';
+import '../../shared/widgets/motion.dart';
 
 /// Tablodaki bir kişi satırı.
 typedef RosterRow = ({String id, String name, Role role});
@@ -431,10 +432,11 @@ class _RosterTableState extends State<RosterTable> {
     if (onTap == null && onLongPress == null) {
       return KeyedSubtree(key: key, child: child);
     }
-    return InkWell(
+    return Pressable(
       key: key,
       onTap: onTap,
       onLongPress: onLongPress,
+      scale: 0.88,
       child: child,
     );
   }
@@ -493,8 +495,9 @@ class _RosterTableState extends State<RosterTable> {
     if (label != null) {
       // Vardiya: kendi renginde hap (24 yeşil, 16A mor, 16B lacivert, 7A
       // turuncu, özel mesai camgöbeği); ihlalde kırmızı.
+      // İhlal: iki temada da beyaz yazının okunduğu koyu kırmızı.
       final pill = violated
-          ? scheme.error
+          ? const Color(0xFFD32F2F)
           : scheme.shiftColor(label, extra: isDayShift);
       child = Container(
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),

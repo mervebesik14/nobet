@@ -47,18 +47,20 @@ class BrandColors extends ThemeExtension<BrandColors> {
     divider: Color(0xFFE6EEEB),
   );
 
+  /// Gerçek koyu tasarım: siyaha yakın zemin, derin yeşil başlık, parlak
+  /// nane-yeşili vurgular (gece nöbetinde göz yormaz).
   static const dark = BrandColors(
-    headerStart: Color(0xFF117A60),
-    headerEnd: Color(0xFF094A3C),
+    headerStart: Color(0xFF0F5C49),
+    headerEnd: Color(0xFF05231B),
     onHeader: Colors.white,
-    onHeaderMuted: Color(0xCCFFFFFF),
-    background: Color(0xFF0D1613),
-    card: Color(0xFF17221F),
-    pill: Color(0xFF1C3D34),
-    onPill: Color(0xFF7FDDBF),
-    stepper: Color(0xFF13735B),
-    stepperValue: Color(0xFF238A70),
-    divider: Color(0xFF24312D),
+    onHeaderMuted: Color(0xB3E6FFF5),
+    background: Color(0xFF050807),
+    card: Color(0xFF101614),
+    pill: Color(0xFF0E2B22),
+    onPill: Color(0xFF5BF0B4),
+    stepper: Color(0xFF1AAE7C),
+    stepperValue: Color(0xFF26C98F),
+    divider: Color(0xFF1A2420),
   );
 
   /// Başlık zemini.
@@ -100,34 +102,39 @@ extension BrandContext on BuildContext {
 ThemeData brandTheme(Brightness brightness) {
   final dark = brightness == Brightness.dark;
   final brand = dark ? BrandColors.dark : BrandColors.light;
-  final primary = dark ? const Color(0xFF3DBF99) : const Color(0xFF0F7A61);
+  final primary = dark ? const Color(0xFF3DDC97) : const Color(0xFF0F7A61);
   final scheme =
       ColorScheme.fromSeed(
         seedColor: const Color(0xFF0F7A61),
         brightness: brightness,
       ).copyWith(
         primary: primary,
-        onPrimary: dark ? const Color(0xFF00382B) : Colors.white,
+        onPrimary: dark ? const Color(0xFF00301F) : Colors.white,
         surface: brand.card,
-        onSurface: dark ? const Color(0xFFE3ECE9) : const Color(0xFF16211D),
+        onSurface: dark ? const Color(0xFFE8F2EE) : const Color(0xFF16211D),
         onSurfaceVariant: dark
-            ? const Color(0xFF9DB0AA)
+            ? const Color(0xFF8FA39C)
             : const Color(0xFF66766F),
         surfaceContainerLowest: brand.background,
         // Bilgi kartları (yedek, ay başı hatırlatması) nane tonunda.
         secondaryContainer: dark
-            ? const Color(0xFF16332B)
+            ? const Color(0xFF0C2A21)
             : const Color(0xFFDDF0EA),
         onSecondaryContainer: dark
             ? const Color(0xFFBFEBDD)
             : const Color(0xFF0D4F40),
         tertiaryContainer: dark
-            ? const Color(0xFF173A35)
+            ? const Color(0xFF0D2C28)
             : const Color(0xFFD5EEEA),
         onTertiaryContainer: dark
             ? const Color(0xFFB5E6DC)
             : const Color(0xFF0B4A42),
         outlineVariant: brand.divider,
+        // Koyu temada yüzey basamakları siyaha yakın zemine uysun.
+        surfaceContainerLow: dark ? const Color(0xFF0C1210) : null,
+        surfaceContainer: dark ? const Color(0xFF121A17) : null,
+        surfaceContainerHigh: dark ? const Color(0xFF18221E) : null,
+        surfaceContainerHighest: dark ? const Color(0xFF1E2925) : null,
       );
   final base = ThemeData(
     useMaterial3: true,

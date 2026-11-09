@@ -34,6 +34,7 @@ import '../../shared/calendar_service.dart';
 import '../../shared/person_colors.dart';
 import '../../shared/platform_services.dart';
 import '../../shared/providers.dart';
+import '../../shared/widgets/motion.dart';
 import 'change_notice_page.dart';
 import 'edit_sheet.dart';
 import '../settings/report_info.dart';
@@ -336,7 +337,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       ..hideCurrentSnackBar()
       ..showSnackBar(
         SnackBar(
-          content: Text(message),
+          content: SuccessMessage(message),
           action: SnackBarAction(
             label: 'Geri al',
             onPressed: () => controller.undoLast(),

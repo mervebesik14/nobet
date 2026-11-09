@@ -21,7 +21,7 @@ final selectedTabProvider = NotifierProvider<SelectedTabNotifier, int>(
 
 /// Beş sekmeli ana iskelet: Kişiler, Ay Planı, Tatiller, İstatistik,
 /// Ayarlar.
-class MainShell extends ConsumerWidget {
+class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
 
   static const _pages = <Widget>[
@@ -33,12 +33,48 @@ class MainShell extends ConsumerWidget {
   ];
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MainShell> createState() => _MainShellState();
+}
+
+class _MainShellState extends ConsumerState<MainShell>
+    with SingleTickerProviderStateMixin {
+  // Sekme değişince içerik hafifçe yukarı kayarak belirir.
+  late final _fade = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 260),
+    value: 1,
+  );
+  late final _curve = CurvedAnimation(
+    parent: _fade,
+    curve: Curves.easeOutCubic,
+  );
+
+  @override
+  void dispose() {
+    _curve.dispose();
+    _fade.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final index = ref.watch(selectedTabProvider);
+    ref.listen(selectedTabProvider, (prev, next) {
+      if (prev != next) _fade.forward(from: 0);
+    });
 
     return Scaffold(
       // IndexedStack: sekme değişince sayfaların durumu korunur.
-      body: IndexedStack(index: index, children: _pages),
+      body: FadeTransition(
+        opacity: _curve,
+        child: SlideTransition(
+          position: Tween(
+            begin: const Offset(0, 0.015),
+            end: Offset.zero,
+          ).animate(_curve),
+          child: IndexedStack(index: index, children: MainShell._pages),
+        ),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
         onDestinationSelected: ref.read(selectedTabProvider.notifier).select,

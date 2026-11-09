@@ -345,7 +345,7 @@ class GroupCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: dark
-              ? Colors.white.withValues(alpha: 0.06)
+              ? const Color(0xFF3DDC97).withValues(alpha: 0.10)
               : Colors.white.withValues(alpha: 0.9),
         ),
         boxShadow: [
