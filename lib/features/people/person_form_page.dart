@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../logic/phone_number.dart';
+import '../../shared/person_colors.dart';
 import '../../models/models.dart';
 import '../../shared/platform_services.dart';
 import '../../shared/providers.dart';
@@ -27,6 +28,9 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
   late Role _role;
   late bool _isActive;
   late bool _isChargeNurse;
+
+  /// Seçilen renk; null ise kimlikten otomatik.
+  int? _colorValue;
 
   /// İşe başlama tarihi (isteğe bağlı).
   DateTime? _startDate;
@@ -66,6 +70,7 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
         ? person.isActive
         : person.hasEndedInactivity(today);
     _isChargeNurse = person?.isChargeNurse ?? false;
+    _colorValue = person?.colorValue;
     _startDate = person?.startDate;
     _inactiveFrom = _isActive ? null : person?.inactiveFrom;
     _inactiveUntil = _isActive ? null : person?.inactiveUntil;
@@ -139,6 +144,7 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
         startDate: _startDate,
         phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
         annualLeaveDays: int.tryParse(_leaveDays.text.trim()),
+        colorValue: _colorValue,
       );
     } else {
       final messenger = ScaffoldMessenger.of(context);
@@ -153,6 +159,8 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
           clearPhone: _phone.text.trim().isEmpty,
           annualLeaveDays: int.tryParse(_leaveDays.text.trim()),
           clearAnnualLeaveDays: int.tryParse(_leaveDays.text.trim()) == null,
+          colorValue: _colorValue,
+          clearColor: _colorValue == null,
         ),
       );
       final from = _inactiveFrom;
@@ -265,6 +273,46 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
                     ? 'Gün sayısı yazın (ör. 20).'
                     : null;
               },
+            ),
+            const SizedBox(height: 24),
+            Text('Renk', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final c in [null, ...PersonColors.palette])
+                  GestureDetector(
+                    key: ValueKey('color-${c?.toARGB32() ?? 'auto'}'),
+                    onTap: () => setState(() => _colorValue = c?.toARGB32()),
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          width: 2.5,
+                          color: _colorValue == c?.toARGB32()
+                              ? Theme.of(context).colorScheme.onSurface
+                              : Colors.transparent,
+                        ),
+                      ),
+                      child: c == null
+                          ? PersonAvatar(
+                              name: _name.text.isEmpty ? '?' : _name.text,
+                              color: widget.person == null
+                                  ? PersonColors.palette.first
+                                  : PersonColors.forId(widget.person!.id),
+                              radius: 16,
+                            )
+                          : CircleAvatar(radius: 16, backgroundColor: c),
+                    ),
+                  ),
+              ],
+            ),
+            Text(
+              'İlki otomatik renk. Kişi listede, Bugün kartında ve '
+              'istatistikte bu renkle görünür.',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 24),
             Text('Görev', style: Theme.of(context).textTheme.titleSmall),

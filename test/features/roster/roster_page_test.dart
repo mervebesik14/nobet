@@ -110,7 +110,10 @@ void main() {
         .map((w) => find.byWidget(w))
         .where((f) => (tester.getCenter(f).dy - ayseRowY).abs() < 1)
         .where(
-          (f) => tester.widget<Text>(f).style?.fontWeight == FontWeight.bold,
+          // Vardiya hapı kalın yazılır (başlıktaki gün numaraları değil).
+          (f) =>
+              (tester.widget<Text>(f).style?.fontWeight?.value ?? 0) >=
+              FontWeight.w700.value,
         )
         .length;
     expect(ayseCells, ayseShifts);

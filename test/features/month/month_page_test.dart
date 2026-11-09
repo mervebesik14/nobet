@@ -582,10 +582,16 @@ void main() {
       find.descendant(of: card, matching: find.text('Nöbettesin')),
       findsOneWidget,
     );
+    // Nöbetçiler avatar ve adlarıyla; vardiya etiketi.
     expect(
-      find.descendant(of: card, matching: find.textContaining('Ayşe, Banu')),
+      find.descendant(of: card, matching: find.text('Ayşe')),
       findsOneWidget,
     );
+    expect(
+      find.descendant(of: card, matching: find.text('Banu')),
+      findsOneWidget,
+    );
+    expect(find.descendant(of: card, matching: find.text('24')), findsWidgets);
     // Yarın Kasım'da; Kasım listesi yok.
     expect(
       find.descendant(of: card, matching: find.text('Bu ayın listesi yok.')),

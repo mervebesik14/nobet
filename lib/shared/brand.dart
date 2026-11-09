@@ -157,7 +157,12 @@ ThemeData brandTheme(Brightness brightness) {
     ),
     cardTheme: CardThemeData(
       color: brand.card,
-      elevation: 0,
+      // Hafif marka tonlu gölge: kartlar zeminden "yüzer".
+      elevation: 1.5,
+      shadowColor: dark
+          ? Colors.black.withValues(alpha: 0.6)
+          : brand.headerEnd.withValues(alpha: 0.18),
+      surfaceTintColor: Colors.transparent,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       clipBehavior: Clip.antiAlias,

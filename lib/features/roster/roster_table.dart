@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../logic/day_shift_planner.dart';
 import '../../models/models.dart';
 import '../../shared/app_colors.dart';
+import '../../shared/person_colors.dart';
 
 /// Tablodaki bir kişi satırı.
 typedef RosterRow = ({String id, String name, Role role});
@@ -35,7 +36,11 @@ class RosterTable extends StatefulWidget {
     this.onMissingTap,
     this.highlightedId,
     this.onNameTap,
+    this.personColors = const {},
   });
+
+  /// Kişi → avatar rengi (yoksa kimliğinden).
+  final Map<String, Color> personColors;
 
   final MonthPlan plan;
 
@@ -227,17 +232,30 @@ class _RosterTableState extends State<RosterTable> {
             height: _rowHeight,
             alignment: Alignment.centerLeft,
             color: highlighted ? scheme.primaryContainer : null,
-            // Uzun isim iki satıra kayar (satır yüksekliği yeter).
-            child: Text(
-              row.name,
-              key: ValueKey('name-text-${row.id}'),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                height: 1.15,
-                fontWeight: highlighted ? FontWeight.w700 : null,
-                color: highlighted ? scheme.onPrimaryContainer : null,
-              ),
+            // Renkli baş harf + ad; uzun isim iki satıra kayar.
+            child: Row(
+              children: [
+                PersonAvatar(
+                  name: row.name,
+                  color:
+                      widget.personColors[row.id] ?? PersonColors.forId(row.id),
+                  radius: 11,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    row.name,
+                    key: ValueKey('name-text-${row.id}'),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      height: 1.15,
+                      fontWeight: highlighted ? FontWeight.w700 : null,
+                      color: highlighted ? scheme.onPrimaryContainer : null,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -455,37 +473,77 @@ class _RosterTableState extends State<RosterTable> {
     // Nöbet yoksa ama izin varsa izin yazısı/rengi gösterilir.
     final leaveTint = leave == null ? null : scheme.leaveBackground(leave);
     final leaveInk = leave == null ? null : scheme.leaveInk(leave);
-    final text = label ?? leave?.shortLabel;
-    final color = selected || strong
-        ? scheme.primary
+    // Hücre zemini: seçili / vurgulu satır / ihlal / izin / sütun rengi.
+    final color = selected
+        ? Color.alphaBlend(
+            scheme.primary.withValues(alpha: 0.28),
+            columnColor ?? scheme.surface,
+          )
         : violated
         ? scheme.dangerTint
-        : isDayShift
-        ? scheme.dayShiftTint
-        : leaveTint ?? columnColor;
-    final textColor = selected || strong
-        ? scheme.onPrimary
-        : violated
-        ? scheme.error
-        : isDayShift
-        ? scheme.dayShiftColor
-        : leaveInk ?? scheme.primary;
+        : strong
+        ? Color.alphaBlend(
+            scheme.primary.withValues(alpha: 0.12),
+            columnColor ?? scheme.surface,
+          )
+        : label == null
+        ? leaveTint ?? columnColor
+        : columnColor;
+    final Widget? child;
+    if (label != null) {
+      // Vardiya: kendi renginde hap (24 yeşil, 16A mor, 16B lacivert, 7A
+      // turuncu, özel mesai camgöbeği); ihlalde kırmızı.
+      final pill = violated
+          ? scheme.error
+          : scheme.shiftColor(label, extra: isDayShift);
+      child = Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color.lerp(pill, Colors.white, 0.12)!, pill],
+          ),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: pill.withValues(alpha: 0.35),
+              blurRadius: 4,
+              offset: const Offset(0, 1.5),
+            ),
+          ],
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              height: 1.1,
+            ),
+          ),
+        ),
+      );
+    } else if (leave != null) {
+      child = FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Text(
+          leave.shortLabel,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: leaveInk,
+          ),
+        ),
+      );
+    } else {
+      child = null;
+    }
     return box(
       width: _cellWidth,
       height: _rowHeight,
       color: color,
-      child: text == null
-          ? null
-          : FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                text,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
-                ),
-              ),
-            ),
+      child: child,
     );
   }
 }

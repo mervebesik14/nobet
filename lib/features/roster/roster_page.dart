@@ -31,6 +31,7 @@ import '../month/month_plan_controller.dart';
 import '../people/people_controller.dart';
 import '../../data/providers.dart';
 import '../../shared/calendar_service.dart';
+import '../../shared/person_colors.dart';
 import '../../shared/platform_services.dart';
 import '../../shared/providers.dart';
 import 'change_notice_page.dart';
@@ -2508,6 +2509,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             sliver: RosterTable(
               plan: plan,
               rows: rows,
+              personColors: {for (final p in people) p.id: PersonColors.of(p)},
               highlightedId: _highlightId,
               onNameTap: (id) =>
                   setState(() => _highlightId = _highlightId == id ? null : id),

@@ -71,6 +71,7 @@ class PeopleController extends Notifier<List<Person>> {
     DateTime? startDate,
     String? phone,
     int? annualLeaveDays,
+    int? colorValue,
   }) async {
     final person = Person(
       id: _uuid.v4(),
@@ -83,6 +84,7 @@ class PeopleController extends Notifier<List<Person>> {
           : DateTime(startDate.year, startDate.month, startDate.day),
       phone: phone,
       annualLeaveDays: annualLeaveDays,
+      colorValue: colorValue,
     );
     await _save(person);
     return person;

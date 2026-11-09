@@ -14,6 +14,7 @@ import '../../logic/yearly_excel.dart';
 import '../../logic/yearly_summary.dart';
 import '../../models/models.dart';
 import '../../shared/brand.dart';
+import '../../shared/person_colors.dart';
 import '../../shared/platform_services.dart';
 import '../../shared/widgets/column_picker_dialog.dart';
 import '../../shared/widgets/pdf_preview_page.dart';
@@ -256,6 +257,13 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
               children: [
                 for (final r in sorted)
                   _ShareBar(
+                    color: switch (ref
+                        .read(peopleProvider)
+                        .where((p) => p.id == r.personId)
+                        .firstOrNull) {
+                      final p? => PersonColors.of(p),
+                      null => PersonColors.forId(r.personId),
+                    },
                     name: r.name,
                     role: r.role,
                     months: r.totals.months,
@@ -621,6 +629,7 @@ void _showChains(
 /// Kişinin yıllık toplam nöbeti: ad, görev etiketi, ay sayısı ve çubuk.
 class _ShareBar extends StatelessWidget {
   const _ShareBar({
+    required this.color,
     required this.name,
     required this.role,
     required this.months,
@@ -628,6 +637,8 @@ class _ShareBar extends StatelessWidget {
     required this.max,
   });
 
+  /// Kişinin rengi (avatar ve çubuk).
+  final Color color;
   final String name;
   final Role role;
   final num months;
@@ -645,7 +656,6 @@ class _ShareBar extends StatelessWidget {
     final techColor = theme.brightness == Brightness.dark
         ? const Color(0xFF8C9EFF)
         : _techColor;
-    final color = isTech ? techColor : brand.stepper;
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
@@ -653,6 +663,8 @@ class _ShareBar extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         children: [
+          PersonAvatar(name: name, color: color, radius: 18),
+          const SizedBox(width: 12),
           Expanded(
             flex: 5,
             child: Column(

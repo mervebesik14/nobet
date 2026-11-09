@@ -45,78 +45,121 @@ class BrandHeader extends StatelessWidget implements PreferredSizeWidget {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
       child: Container(
+        clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           gradient: brand.headerGradient,
           borderRadius: const BorderRadius.vertical(
-            bottom: Radius.circular(28),
+            bottom: Radius.circular(32),
           ),
+          boxShadow: [
+            BoxShadow(
+              color: brand.headerEnd.withValues(alpha: 0.30),
+              blurRadius: 18,
+              spreadRadius: -10,
+              offset: const Offset(0, 12),
+            ),
+          ],
         ),
-        child: SafeArea(
-          bottom: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 16, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  height: 48,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: text.headlineMedium?.copyWith(
-                            color: brand.onHeader,
-                            fontWeight: FontWeight.w700,
+        child: CustomPaint(
+          painter: _HeaderGlowPainter(),
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 16, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 48,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: text.headlineMedium?.copyWith(
+                              color: brand.onHeader,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
-                      ),
-                      for (final a in actions) ...[const SizedBox(width: 8), a],
-                    ],
-                  ),
-                ),
-                if (subtitle != null)
-                  SizedBox(
-                    height: 24,
-                    child: Text(
-                      subtitle!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: text.bodyMedium?.copyWith(
-                        color: brand.onHeaderMuted,
-                      ),
+                        for (final a in actions) ...[
+                          const SizedBox(width: 8),
+                          a,
+                        ],
+                      ],
                     ),
                   ),
-                if (bottom != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12, right: 4),
-                    child: SizedBox(height: 48, child: bottom),
-                  ),
-                if (footer != null)
-                  SizedBox(
-                    height: 26,
-                    child: Align(
-                      alignment: Alignment.bottomCenter,
+                  if (subtitle != null)
+                    SizedBox(
+                      height: 24,
                       child: Text(
-                        footer!,
+                        subtitle!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: text.bodySmall?.copyWith(
+                        style: text.bodyMedium?.copyWith(
                           color: brand.onHeaderMuted,
                         ),
                       ),
                     ),
-                  ),
-              ],
+                  if (bottom != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12, right: 4),
+                      child: SizedBox(height: 48, child: bottom),
+                    ),
+                  if (footer != null)
+                    SizedBox(
+                      height: 26,
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Text(
+                          footer!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: text.bodySmall?.copyWith(
+                            color: brand.onHeaderMuted,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+}
+
+/// Başlıktaki yumuşak ışık halkaları: derinlik ve hareket hissi.
+class _HeaderGlowPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()..color = Colors.white.withValues(alpha: 0.07);
+    canvas.drawCircle(
+      Offset(size.width * 0.92, -size.height * 0.1),
+      size.height * 0.75,
+      paint,
+    );
+    paint.color = Colors.white.withValues(alpha: 0.05);
+    canvas.drawCircle(
+      Offset(size.width * 0.70, size.height * 1.05),
+      size.height * 0.45,
+      paint,
+    );
+    paint.color = Colors.white.withValues(alpha: 0.04);
+    canvas.drawCircle(
+      Offset(-size.width * 0.05, size.height * 0.2),
+      size.height * 0.35,
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_HeaderGlowPainter oldDelegate) => false;
 }
 
 /// Başlıktaki yarı saydam, köşeleri yuvarlak kare düğme.
@@ -292,20 +335,54 @@ class GroupCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (children.isEmpty) return const SizedBox.shrink();
-    return Card(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (var i = 0; i < children.length; i++) ...[
-            if (i > 0)
-              Divider(
-                height: 1,
-                indent: dividerIndent,
-                endIndent: dividerIndent,
-              ),
-            children[i],
-          ],
+    final brand = context.brand;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    // Yumuşak gölgeli, ince kenarlı "yüzen" kart.
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      decoration: BoxDecoration(
+        color: brand.card,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: dark
+              ? Colors.white.withValues(alpha: 0.06)
+              : Colors.white.withValues(alpha: 0.9),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: dark
+                ? Colors.black.withValues(alpha: 0.45)
+                : brand.headerEnd.withValues(alpha: 0.12),
+            blurRadius: 22,
+            spreadRadius: -8,
+            offset: const Offset(0, 10),
+          ),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: dark ? 0.2 : 0.03),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var i = 0; i < children.length; i++) ...[
+                if (i > 0)
+                  Divider(
+                    height: 1,
+                    indent: dividerIndent,
+                    endIndent: dividerIndent,
+                  ),
+                children[i],
+              ],
+            ],
+          ),
+        ),
       ),
     );
   }

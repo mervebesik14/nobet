@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../models/models.dart';
 import '../../logic/turkish_collation.dart';
 import '../../shared/brand.dart';
+import '../../shared/person_colors.dart';
 import '../../shared/providers.dart';
 import '../../shared/widgets/brand_widgets.dart';
 import '../../shared/widgets/placeholder_view.dart';
@@ -141,7 +142,6 @@ class _PersonTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final initial = person.name.isEmpty ? '?' : person.name.characters.first;
     final today = ref.watch(todayProvider);
     final activeNow = person.isActiveOn(today);
     final from = person.inactiveFrom;
@@ -150,19 +150,11 @@ class _PersonTile extends ConsumerWidget {
         ? null
         : '${person.role.label} · pasif: '
               '${inactivePeriodText(from, person.inactiveUntil)}';
-    final brand = context.brand;
     final tile = ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      leading: CircleAvatar(
-        radius: 22,
-        backgroundColor: person.colorValue != null
-            ? Color(person.colorValue!)
-            : brand.pill,
-        foregroundColor: brand.onPill,
-        child: Text(
-          initial,
-          style: const TextStyle(fontWeight: FontWeight.w700),
-        ),
+      leading: Opacity(
+        opacity: activeNow ? 1 : 0.45,
+        child: PersonAvatar.of(person, radius: 22),
       ),
       title: Text(person.name),
       subtitle:
