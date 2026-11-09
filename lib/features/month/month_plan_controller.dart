@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/month_plan_repository.dart';
 import '../../data/providers.dart';
 import '../../data/turkish_holidays.dart';
+import '../../logic/backup_picker.dart';
 import '../../logic/request_fulfillment.dart';
 import '../../logic/holiday_history.dart';
 import '../../logic/request_parser.dart';
@@ -930,6 +931,7 @@ typedef DayOverview = ({
   List<String> shift16aIds,
   Map<String, String> customShifts,
   Map<String, String> extraShifts,
+  List<String> backupIds,
   String? techId,
   String? tech16bId,
   List<String> dayShiftIds,
@@ -988,6 +990,7 @@ final todayOverviewProvider = Provider<List<DayOverview>>((ref) {
             shift16aIds: const <String>[],
             customShifts: const <String, String>{},
             extraShifts: const <String, String>{},
+            backupIds: const <String>[],
             techId: null,
             tech16bId: null,
             dayShiftIds: const <String>[],
@@ -1001,6 +1004,33 @@ final todayOverviewProvider = Provider<List<DayOverview>>((ref) {
           shift16aIds: a?.shift16aIds ?? const <String>[],
           customShifts: a?.customShifts ?? const <String, String>{},
           extraShifts: a?.extraShifts ?? const <String, String>{},
+          backupIds: [
+            for (final role in [
+              Role.nurse,
+              if (!plan.nurseOnly) Role.radiologyTech,
+            ])
+              for (final p in BackupPicker.candidates(
+                plan: plan,
+                people: people,
+                day: date.day,
+                role: role,
+                settings: effectiveSettings(base, nurseOnly: plan.nurseOnly),
+                blockReasons: computeBlockReasons(
+                  plan,
+                  holidays,
+                  repository: repo,
+                  people: people,
+                ),
+                weekendDays: RosterGenerator.weekendDays(
+                  plan.year,
+                  plan.month,
+                  holidays,
+                  effectiveSettings(base, nurseOnly: plan.nurseOnly),
+                ),
+                count: 1,
+              ))
+                p.id,
+          ],
           techId: a?.techId,
           tech16bId: a?.tech16bId,
           dayShiftIds: [

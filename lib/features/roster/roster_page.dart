@@ -6,10 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../logic/backup_picker.dart';
 import '../../logic/block_reason.dart';
 import '../../logic/day_shift_planner.dart';
 import '../../logic/file_names.dart';
 import '../../logic/personal_roster.dart';
+import '../../logic/phone_number.dart';
 import '../../logic/roster_calendar.dart';
 import '../../logic/roster_editor.dart';
 import '../../logic/roster_excel.dart';
@@ -465,6 +467,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         context,
         title: '${_name(id)} · ${_dayLabel(day)}$shift',
         actions: [
+          EditOption(
+            title: 'Gelemiyor: yedeği yaz',
+            subtitle: 'Kurala uyan yedeklerden biri yerine yazılır.',
+            icon: Icons.sick_outlined,
+            result: plan.assignments,
+            onSelected: () => _useBackup(cell, role),
+          ),
           EditOption(
             title: 'Neden bu nöbet?',
             subtitle: 'Neden bu kişi, neden başkası değil.',
@@ -960,6 +969,131 @@ class _RosterPageState extends ConsumerState<RosterPage> {
           ? r.done.single
           : '${r.done.length} değişiklik uygulandı.',
     );
+  }
+
+  /// Nöbetçi gelemiyor: kurala uyan yedeklerden biri seçilir, yerine
+  /// yazılır; istenirse o güne rapor işlenir ve yedeğe mesaj hazırlanır.
+  Future<void> _useBackup(RosterCell cell, Role role) async {
+    if (!_ensureUnlocked()) return;
+    final plan = _plan;
+    final settings = ref.read(effectiveSettingsProvider);
+    final current = plan.assignments[cell.day];
+    if (current == null || !current.includes(cell.personId)) return;
+    final backups = BackupPicker.candidates(
+      plan: plan,
+      people: ref.read(peopleProvider),
+      day: cell.day,
+      role: role,
+      settings: settings,
+      blockReasons: ref.read(blockReasonsProvider),
+      weekendDays: RosterGenerator.weekendDays(
+        plan.year,
+        plan.month,
+        ref.read(holidaysProvider),
+        settings,
+      ),
+      count: 3,
+    );
+    if (backups.isEmpty) {
+      _notify('Bu gün için kurala uyan yedek yok; listeden elle seçin.');
+      return;
+    }
+    var sick = true;
+    final picked = await showDialog<Person>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setLocal) => AlertDialog(
+          title: Text(
+            '${_name(cell.personId)} yerine kim? · ${_dayLabel(cell.day)}',
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final (i, p) in backups.indexed)
+                ListTile(
+                  key: ValueKey('backup-${p.id}'),
+                  leading: Icon(i == 0 ? Icons.star : Icons.person_outline),
+                  title: Text(p.name),
+                  subtitle: i == 0 ? const Text('Önerilen yedek') : null,
+                  onTap: () => Navigator.of(context).pop(p),
+                ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Rapor işle'),
+                subtitle: Text(
+                  '${_name(cell.personId)} için ${_dayLabel(cell.day)} rapor '
+                  'günü olarak kaydedilir.',
+                ),
+                value: sick,
+                onChanged: (v) => setLocal(() => sick = v),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Vazgeç'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+    final after = RosterEditor.replace(
+      plan.assignments,
+      day: cell.day,
+      role: role,
+      oldId: cell.personId,
+      newId: picked.id,
+      nursesPerDay: settings.nursesPerDay,
+      secondary: current.isSecondaryTech(cell.personId),
+    );
+    final controller = ref.read(monthPlanProvider.notifier);
+    if (sick &&
+        !plan.leaveOf(cell.personId, LeaveType.sick).contains(cell.day)) {
+      await controller.toggleLeave(cell.personId, LeaveType.sick, cell.day);
+    }
+    if (!mounted) return;
+    await _apply(
+      after,
+      message:
+          '${formatDayMonth(cell.day, plan.month)}: ${_name(cell.personId)} '
+          'yerine ${picked.name}.',
+    );
+    if (!mounted) return;
+    final text = BackupPicker.message(
+      plan: plan,
+      day: cell.day,
+      backupName: picked.name,
+      absentName: _name(cell.personId),
+      shift: after[cell.day]!.shiftCode(picked.id),
+    );
+    final tell = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${picked.name}: haber verilsin mi?'),
+        content: Text(text),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Sonra'),
+          ),
+          FilledButton(
+            key: const ValueKey('backup-message'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Mesaj gönder'),
+          ),
+        ],
+      ),
+    );
+    if (tell != true || !mounted) return;
+    final services = ref.read(platformServicesProvider);
+    final number = PhoneNumber.normalize(picked.phone);
+    final opened =
+        number != null &&
+        (await services.openUrl(PhoneNumber.whatsApp(number, text)) ||
+            await services.openUrl(PhoneNumber.whatsAppWeb(number, text)));
+    if (!opened) await services.shareText(text);
   }
 
   /// "Neden bu nöbet?": kişinin bu ayki durumu ve aynı roldeki diğerlerinin

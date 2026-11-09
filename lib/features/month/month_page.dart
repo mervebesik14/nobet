@@ -246,6 +246,7 @@ class _TodayCard extends ConsumerWidget {
         if (d.tech16bId != null) ('16B', name(d.tech16bId!)),
         if (d.dayShiftIds.isNotEmpty)
           ('7A', d.dayShiftIds.map(name).join(', ')),
+        if (d.backupIds.isNotEmpty) ('Yedek', d.backupIds.map(name).join(', ')),
         if (d.extraShifts.isNotEmpty)
           (
             'Ek mesai',

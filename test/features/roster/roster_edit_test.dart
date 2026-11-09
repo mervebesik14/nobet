@@ -881,6 +881,31 @@ void main() {
     expect(saved().assignments[3]!.nurseIds, ['n6', 'n0']);
   });
 
+  testWidgets('gelemiyor: yedek yazılır, rapor işlenir', (tester) async {
+    await pumpRoster(tester);
+    await tester.tap(cell('n0', 3));
+    await tester.pumpAndSettle();
+    await tester.tap(inSheet('Gelemiyor: yedeği yaz'));
+    await tester.pumpAndSettle();
+    expect(find.text('Önerilen yedek'), findsOneWidget);
+    final first = tester
+        .widgetList<ListTile>(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.byType(ListTile),
+          ),
+        )
+        .first;
+    final backupId = (first.key! as ValueKey<String>).value.substring(7);
+    await tester.tap(find.byWidget(first));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('haber verilsin mi?'), findsOneWidget);
+    await tester.tap(find.text('Sonra'));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.nurseIds, ['n6', backupId]);
+    expect(saved().leaveOf('n0', LeaveType.sick), [3]);
+  });
+
   testWidgets('basılı tut → Sil: nöbet doğrudan silinir', (tester) async {
     await pumpRoster(tester);
     await tester.longPress(cell('n0', 3));
