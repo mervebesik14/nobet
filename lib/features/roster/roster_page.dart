@@ -41,6 +41,7 @@ import '../settings/report_info.dart';
 import 'overtime_report_pdf.dart';
 import 'personal_roster_pdf.dart';
 import 'swap_log_page.dart';
+import 'person_calendar_page.dart';
 import 'text_edit_page.dart';
 import 'what_if_page.dart';
 import 'whatsapp_send_page.dart';
@@ -2469,6 +2470,21 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                             ),
                             label: const Text('Ya şöyle olursa'),
                             onPressed: _whatIf,
+                          ),
+                          ActionChip(
+                            key: const ValueKey('person-calendar'),
+                            avatar: const Icon(
+                              Icons.calendar_month_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('Kişi takvimi'),
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => PersonCalendarPage(
+                                  initialPersonId: _highlightId,
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),

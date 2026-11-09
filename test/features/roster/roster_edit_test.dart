@@ -936,6 +936,46 @@ void main() {
     expect(find.textContaining('uygulandı'), findsOneWidget);
   });
 
+  testWidgets('kişi takvimi: kişi seçilir, günlere dokunarak girilir', (
+    tester,
+  ) async {
+    await pumpRoster(tester);
+    await tester.tap(find.byKey(const ValueKey('person-calendar')));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Yukarıdan bir kişi seçin'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('pick-person-n0')));
+    await tester.pumpAndSettle();
+
+    // 3 Ekim Cmt nöbeti: dokununca silinir.
+    await tester.tap(find.byKey(const ValueKey('pcal-3')));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.nurseIds, isNot(contains('n0')));
+
+    // 5 Ekim Pzt dolu (n3, n4): kimin yerine sorulur.
+    await tester.tap(find.byKey(const ValueKey('pcal-5')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('instead-n3')));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[5]!.nurseIds, contains('n0'));
+    expect(saved().assignments[5]!.nurseIds, isNot(contains('n3')));
+
+    // Hafta içi: 24 → 7A → boş.
+    await tester.tap(find.byKey(const ValueKey('pcal-5')));
+    await tester.pumpAndSettle();
+    expect(saved().techDayShifts['n0'], [5]);
+    expect(saved().assignments[5]!.nurseIds, isNot(contains('n0')));
+    await tester.tap(find.byKey(const ValueKey('pcal-5')));
+    await tester.pumpAndSettle();
+    expect(saved().techDayShifts['n0'], isNull);
+
+    // Basılı tut: 7 Ekim nöbeti 16A'ya çevrilir.
+    await tester.longPress(find.byKey(const ValueKey('pcal-7')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('pick-16A')));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[7]!.shiftCode('n0'), '16A');
+  });
+
   testWidgets('basılı tut → Sil: nöbet doğrudan silinir', (tester) async {
     await pumpRoster(tester);
     await tester.longPress(cell('n0', 3));
