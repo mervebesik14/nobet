@@ -854,6 +854,33 @@ void main() {
     expect(find.byKey(const ValueKey('why-sheet')), findsOneWidget);
   });
 
+  testWidgets('yazarak düzenle: komutlar önizlenir, tek seferde uygulanır', (
+    tester,
+  ) async {
+    await pumpRoster(tester);
+    await tester.tap(find.byKey(const ValueKey('text-edit')));
+    await tester.pumpAndSettle();
+    // 3 Ekim: Gül (n6) ve Ayşe (n0); Hale (n7) yerine geçer. Zeynep yok.
+    await tester.enterText(
+      find.byKey(const ValueKey('text-edit-input')),
+      "Ayşe 3'ü Hale'yle değiştir\nZeynep 4",
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('3 Ekim: Ayşe yerine Hale'), findsOneWidget);
+    expect(find.text('Kişi adı bulunamadı.'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('text-edit-apply')));
+    await tester.pumpAndSettle();
+    if (find.text('Yine de yap').evaluate().isNotEmpty) {
+      await tester.tap(find.text('Yine de yap'));
+      await tester.pumpAndSettle();
+    }
+    expect(saved().assignments[3]!.nurseIds, ['n6', 'n7']);
+    expect(find.text('3 Ekim: Ayşe yerine Hale'), findsOneWidget); // bildirim
+    await tester.tap(find.text('Geri al'));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.nurseIds, ['n6', 'n0']);
+  });
+
   testWidgets('basılı tut → Sil: nöbet doğrudan silinir', (tester) async {
     await pumpRoster(tester);
     await tester.longPress(cell('n0', 3));

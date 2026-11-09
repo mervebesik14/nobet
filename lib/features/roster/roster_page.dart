@@ -18,6 +18,7 @@ import '../../logic/roster_summary.dart';
 import '../../logic/roster_validator.dart';
 import '../../logic/shift_explainer.dart';
 import '../../logic/shift_gaps.dart';
+import '../../logic/text_edits.dart';
 import '../../logic/summary_columns.dart';
 import '../../logic/turkish_collation.dart';
 import '../../logic/turkish_dates.dart';
@@ -35,6 +36,7 @@ import '../settings/report_info.dart';
 import 'overtime_report_pdf.dart';
 import 'personal_roster_pdf.dart';
 import 'swap_log_page.dart';
+import 'text_edit_page.dart';
 import 'whatsapp_send_page.dart';
 import 'roster_history_page.dart';
 import 'roster_pdf.dart';
@@ -901,6 +903,63 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 : def.description,
           ),
     ];
+  }
+
+  /// Yazarak düzenleme: komutlar tek seferde uygulanır (tek "Geri al").
+  Future<void> _textEdit() async {
+    if (!_ensureUnlocked()) return;
+    setState(() => _swapFrom = null);
+    final plan = _plan;
+    final settings = ref.read(effectiveSettingsProvider);
+    final edits = await Navigator.of(context).push<List<TextEdit>>(
+      MaterialPageRoute(
+        builder: (_) => TextEditPage(
+          plan: plan,
+          people: ref.read(peopleProvider),
+          codes: [for (final c in settings.customShifts) c.code],
+        ),
+      ),
+    );
+    if (edits == null || edits.isEmpty || !mounted) return;
+    final r = TextEdits.apply(
+      plan: plan,
+      edits: edits,
+      settings: settings,
+      holidays: ref.read(holidaysProvider),
+    );
+    if (r.errors.isNotEmpty) {
+      final go = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Bazıları uygulanamadı'),
+          content: Text(
+            '${r.errors.map((e) => '• $e').join('\n')}'
+            '${r.done.isEmpty ? '' : '\n\nKalan ${r.done.length} değişiklik uygulansın mı?'}',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Vazgeç'),
+            ),
+            if (r.done.isNotEmpty)
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Uygula'),
+              ),
+          ],
+        ),
+      );
+      if (go != true || !mounted) return;
+    }
+    if (r.done.isEmpty) return;
+    if (!await _confirmViolations(r.assignments)) return;
+    await _apply(
+      r.assignments,
+      techDayShifts: r.techDayShifts,
+      message: r.done.length == 1
+          ? r.done.single
+          : '${r.done.length} değişiklik uygulandı.',
+    );
   }
 
   /// "Neden bu nöbet?": kişinin bu ayki durumu ve aynı roldeki diğerlerinin
@@ -2212,11 +2271,29 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      FilterChip(
-                        avatar: const Icon(Icons.touch_app_outlined, size: 18),
-                        label: const Text('Serbest düzenleme'),
-                        selected: _freeEdit,
-                        onSelected: (v) => setState(() => _freeEdit = v),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          FilterChip(
+                            avatar: const Icon(
+                              Icons.touch_app_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('Serbest düzenleme'),
+                            selected: _freeEdit,
+                            onSelected: (v) => setState(() => _freeEdit = v),
+                          ),
+                          ActionChip(
+                            key: const ValueKey('text-edit'),
+                            avatar: const Icon(
+                              Icons.keyboard_outlined,
+                              size: 18,
+                            ),
+                            label: const Text('Yazarak düzenle'),
+                            onPressed: _textEdit,
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(
