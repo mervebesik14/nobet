@@ -5,6 +5,7 @@ import '../models/holiday.dart';
 import '../models/person.dart';
 import '../models/role.dart';
 import '../models/roster_settings.dart';
+import 'fatigue_score.dart';
 import 'person_totals.dart';
 import 'shift_gaps.dart';
 import 'turkish_collation.dart';
@@ -205,6 +206,10 @@ class RosterGenerator {
   /// başka türlü bir koltuk boş kalacaksa ([emptySlotPenalty]) aşılabilir.
   static const gapExcessPenalty = 150.0;
 
+  /// Art arda iki hafta sonunda nöbet (yorgunluk) için her seferlik küçük
+  /// ceza; ayrıca kişiler arasında dengelenir.
+  static const consecutiveWeekendPenalty = 0.05;
+
   /// 5 günlük boşluklar herkese eşit sayıda düşmezse (biri 1, diğerleri 0
   /// gibi) farkın her birimi için ceza; eşitlenemiyorsa 5 gün kimseye
   /// verilmez.
@@ -286,7 +291,11 @@ class RosterGenerator {
 
   RosterResult generate() {
     final rng = Random(seed);
+    // Teknikerlerin ayrı dizisi: hemşire çözümündeki değişiklik tekniker
+    // sonucunu kaydırmasın.
+    final techRng = Random(seed + 1);
     final weekend = weekendDays(year, month, holidays, settings);
+    final weekendBlocks = FatigueScore.weekendBlocks(year, month);
     final national = holidayDays(year, month, holidays, religious: false);
     final religious = holidayDays(year, month, holidays, religious: true);
 
@@ -310,6 +319,7 @@ class RosterGenerator {
       days: daysInMonth,
       available: availableOf(nurseMembers),
       weekend: weekend,
+      weekendBlocks: weekendBlocks,
       national: national,
       religious: religious,
       lastHoliday: previousHolidayWorkers,
@@ -342,6 +352,7 @@ class RosterGenerator {
         days: daysInMonth,
         available: techAvailable,
         weekend: weekend,
+        weekendBlocks: weekendBlocks,
         national: national,
         religious: religious,
         lastHoliday: previousHolidayWorkers,
@@ -351,7 +362,7 @@ class RosterGenerator {
         allowance: _allowanceFor(techMembers),
         fixed: _fixedFor(techMembers),
         settings: settings,
-      )._run(rng, attempts, existing);
+      )._run(techRng, attempts, existing);
       techScore = tech.score;
       for (var d = 1; d <= daysInMonth; d++) {
         assignments[d] = DayAssignment(
@@ -370,6 +381,7 @@ class RosterGenerator {
         days: daysInMonth,
         available: techAvailable,
         weekend: weekend,
+        weekendBlocks: weekendBlocks,
         national: national,
         religious: religious,
         lastHoliday: previousHolidayWorkers,
@@ -379,7 +391,7 @@ class RosterGenerator {
         allowance: _allowanceFor(techMembers),
         fixed: _fixedFor(techMembers),
         settings: settings,
-      )._run(rng, attempts, existing, (a) => [?a.techId]);
+      )._run(techRng, attempts, existing, (a) => [?a.techId]);
       techScore = techs.score;
       for (var d = 1; d <= daysInMonth; d++) {
         assignments[d] = DayAssignment(
@@ -444,6 +456,7 @@ class _RoleSolver {
     required this.days,
     required this.available,
     required this.weekend,
+    this.weekendBlocks = const [],
     this.national = const {},
     this.religious = const {},
     this.lastHoliday = const {},
@@ -534,6 +547,9 @@ class _RoleSolver {
   final int days;
   final Map<String, Set<int>> available;
   final Set<int> weekend;
+
+  /// Ayın hafta sonları (Cmt–Paz); art arda hafta sonu dengesi için.
+  final List<List<int>> weekendBlocks;
 
   /// Tam gün resmi (ulusal) tatiller; nöbetleri ayrıca dengelenir.
   final Set<int> national;
@@ -727,6 +743,10 @@ class _RoleSolver {
     final nationals = [for (final id in ids) _nationalCount(id)];
     final religiouses = [for (final id in ids) _religiousCount(id)];
     final pairs = [for (final id in ids) _pairs(id)];
+    final consecutiveWeekends = [
+      for (final id in ids)
+        FatigueScore.consecutiveWeekends(_worked[id]!, weekendBlocks),
+    ];
 
     double sq(List<int> values) {
       final mean = values.fold(0, (a, b) => a + b) / n;
@@ -775,6 +795,9 @@ class _RoleSolver {
                 sq(religiouses) +
                 sq(pairs) +
                 sq(longGaps)) +
+        // Art arda hafta sonu: hafif denge; ay içi nöbet adaleti ve yıl
+        // içi pay önce gelir.
+        RosterGenerator.consecutiveWeekendPenalty * sq(consecutiveWeekends) +
         RosterGenerator.spreadPenalty *
             (over(counts) +
                 over(weekends) +
@@ -790,6 +813,8 @@ class _RoleSolver {
         yearly(religiouses, ytdReligious) * _ytdHolidayScale +
         yearly(pairs, ytdPairs) +
         0.75 * totalPairs +
+        RosterGenerator.consecutiveWeekendPenalty *
+            consecutiveWeekends.fold(0, (a, b) => a + b) +
         _emptySlots() * RosterGenerator.emptySlotPenalty +
         RosterGenerator.changePenalty * _changes() +
         _repeatHolidayWeight * _holidayRepeats() +
@@ -957,6 +982,7 @@ class _RoleSolver {
     }
     // Nöbetler aralıklı dağılsın: 3 gün arayla nöbete küçük ceza.
     if (_works(id, d - 3) || _works(id, d + 3)) cost += 1;
+    cost += _adjacentWeekendCost(weekendBlocks, d, (x) => _works(id, x));
     return cost;
   }
 
@@ -1294,6 +1320,7 @@ class _TechSolver {
     required this.days,
     required this.available,
     required this.weekend,
+    this.weekendBlocks = const [],
     this.national = const {},
     this.religious = const {},
     this.lastHoliday = const {},
@@ -1326,6 +1353,9 @@ class _TechSolver {
   final int days;
   final Map<String, Set<int>> available;
   final Set<int> weekend;
+
+  /// Ayın hafta sonları (Cmt–Paz); art arda hafta sonu dengesi için.
+  final List<List<int>> weekendBlocks;
 
   /// Tam gün resmi (ulusal) tatiller; nöbetleri ayrıca dengelenir.
   final Set<int> national;
@@ -1691,6 +1721,7 @@ class _TechSolver {
     // Fazla mesai payı yalnız 24 (ağır) vardiyaya uygulanır.
     final own = is16b ? _w16[id]!.length : _w24[id]!.length - _allow(id);
     var cost = (own + 1 - mean) * 10 + ytd[id]! * 1.0;
+
     if (weekend.contains(d)) {
       cost += (_weekendCount(id) + 1 - weekend.length * 2 / n) * 10;
     }
@@ -1954,4 +1985,20 @@ class _TechSolver {
           '${formatDayMonth(d, month)}: $label eksik. ${reasons.join('; ')}.',
     );
   }
+}
+
+/// [d] bir hafta sonu günüyse ve kişi o hafta sonu henüz nöbette değilken
+/// bir önceki ya da sonraki hafta sonunda nöbetteyse açgözlü seçimde ceza
+/// (art arda hafta sonu yorgunluğu).
+double _adjacentWeekendCost(
+  List<List<int>> blocks,
+  int d,
+  bool Function(int) works,
+) {
+  final i = blocks.indexWhere((b) => b.contains(d));
+  if (i < 0 || blocks[i].any(works)) return 0;
+  var cost = 0.0;
+  if (i > 0 && blocks[i - 1].any(works)) cost += 0.5;
+  if (i + 1 < blocks.length && blocks[i + 1].any(works)) cost += 0.5;
+  return cost;
 }

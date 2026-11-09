@@ -202,6 +202,24 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Hemşire 1 · 2026 gün aşırı'), findsOneWidget);
     expect(find.text("1-3-5-7 (4'lü) · 20-22 (2'li)"), findsOneWidget);
+    await tester.tapAt(const Offset(10, 10));
+    await tester.pumpAndSettle();
+
+    // Yorgunluk: 6 nöbet + 4 gün aşırı çift + 2 hafta sonu × 0,5 = 11.
+    final fatigue = find.byKey(const ValueKey('fatigue-n1'));
+    await tester.dragUntilVisible(
+      fatigue,
+      find.byType(ListView).first,
+      const Offset(0, -300),
+    );
+    expect(
+      find.descendant(of: fatigue, matching: find.text('11')),
+      findsOneWidget,
+    );
+    await tester.tap(fatigue);
+    await tester.pumpAndSettle();
+    expect(find.text('Hemşire 1 · 2026 yorgunluk: 11'), findsOneWidget);
+    expect(find.text('Gün aşırı çift'), findsOneWidget);
   });
 
   testWidgets('İstatistik: istek karşılanma oranı ve ayrıntı', (tester) async {
@@ -270,9 +288,9 @@ void main() {
     final n1Holiday = october.assignments[29]!.nurseIds.contains('n1') ? 1 : 0;
     expect(cell(n1, 5), '$n1Holiday'); // resmi tatil nöbeti
     expect(cell(n1, 6), '0'); // dini bayram nöbeti
-    expect(cell(n1, 10), '0'); // 7A gün
-    expect(cell(n1, 11), '${15 + n1October}'); // geldiği gün
-    expect(cell(n1, 12), '${(15 + n1October) * 24}'); // çalışılan saat
+    expect(cell(n1, 11), '0'); // 7A gün
+    expect(cell(n1, 12), '${15 + n1October}'); // geldiği gün
+    expect(cell(n1, 13), '${(15 + n1October) * 24}'); // çalışılan saat
 
     // Aylara göre karşılaştırma: Eylül ve Ekim sütunları, ölçü değişir.
     await tester.dragUntilVisible(

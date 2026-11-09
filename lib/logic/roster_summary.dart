@@ -1,4 +1,5 @@
 import 'every_other_day_chains.dart';
+import 'fatigue_score.dart';
 import '../models/day_assignment.dart';
 import 'day_shift_planner.dart';
 import '../models/holiday.dart';
@@ -29,6 +30,8 @@ class PersonSummary {
     this.longGaps = 0,
     this.attendedDays = 0,
     this.everyOtherDayChains = const [],
+    this.consecutivePairs = 0,
+    this.consecutiveWeekends = 0,
   });
 
   final String personId;
@@ -46,6 +49,12 @@ class PersonSummary {
 
   /// Gün aşırı zincirler (ör. [3, 5, 7]); bkz. [EveryOtherDayChains].
   final List<List<int>> everyOtherDayChains;
+
+  /// Art arda (d, d+1) nöbet çifti sayısı.
+  final int consecutivePairs;
+
+  /// Art arda iki hafta sonunda da nöbet tutma sayısı.
+  final int consecutiveWeekends;
 
   /// 24/16B nöbet saatleri + 7A saatleri.
   final double workedHours;
@@ -261,6 +270,11 @@ class RosterSummary {
           religiousHolidayShifts: days.where(religiousDays.contains).length,
           everyOtherDayPairs: RosterGenerator.everyOtherDayPairs(days),
           everyOtherDayChains: EveryOtherDayChains.of(days),
+          consecutivePairs: FatigueScore.consecutivePairs(days),
+          consecutiveWeekends: FatigueScore.consecutiveWeekends(
+            days,
+            FatigueScore.weekendBlocks(year, month),
+          ),
           // 24 vardiyaları tam saat, 16B vardiyaları kısa saat, 16A'lar
           // 16 saat sayılır. 7A günleri o günün mesai saati kadar
           // eklenir.

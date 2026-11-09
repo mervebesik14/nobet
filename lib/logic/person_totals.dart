@@ -1,4 +1,5 @@
 import 'every_other_day_chains.dart';
+import 'fatigue_score.dart';
 
 /// Bir kişinin birden çok ay boyunca biriken nöbet toplamları.
 class PersonTotals {
@@ -9,6 +10,8 @@ class PersonTotals {
     this.religiousHolidayShifts = 0,
     this.everyOtherDayPairs = 0,
     this.everyOtherDayChains = const [],
+    this.consecutivePairs = 0,
+    this.consecutiveWeekends = 0,
     this.longGaps = 0,
     this.dayShifts = 0,
     this.attendedDays = 0,
@@ -31,6 +34,15 @@ class PersonTotals {
 
   /// Gün aşırı zincirler (ay ay; yıllık toplamda arka arkaya eklenir).
   final List<List<int>> everyOtherDayChains;
+
+  /// Art arda (d, d+1) nöbet çifti sayısı.
+  final int consecutivePairs;
+
+  /// Art arda iki hafta sonunda da nöbet tutma sayısı.
+  final int consecutiveWeekends;
+
+  /// Yorgunluk puanı; bkz. [FatigueScore].
+  double get fatigue => FatigueScore.of(this);
 
   /// Gün aşırı zincirlerdeki toplam nöbet günü.
   int get everyOtherDayDays =>
@@ -86,6 +98,8 @@ class PersonTotals {
     religiousHolidayShifts: religiousHolidayShifts + o.religiousHolidayShifts,
     everyOtherDayPairs: everyOtherDayPairs + o.everyOtherDayPairs,
     everyOtherDayChains: [...everyOtherDayChains, ...o.everyOtherDayChains],
+    consecutivePairs: consecutivePairs + o.consecutivePairs,
+    consecutiveWeekends: consecutiveWeekends + o.consecutiveWeekends,
     longGaps: longGaps + o.longGaps,
     dayShifts: dayShifts + o.dayShifts,
     attendedDays: attendedDays + o.attendedDays,

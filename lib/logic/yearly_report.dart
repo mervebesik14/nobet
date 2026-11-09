@@ -21,6 +21,7 @@ class YearlyReport {
     YearlyMetric('Resmi tatil nöbeti', (t) => t.nationalHolidayShifts),
     YearlyMetric('4–5 gün ara', (t) => t.longGaps),
     YearlyMetric('Gün aşırı gün', (t) => t.everyOtherDayDays),
+    YearlyMetric('Yorgunluk', (t) => t.fatigue),
     YearlyMetric('7A gün', (t) => t.dayShifts),
     YearlyMetric('Geldiği gün', (t) => t.attendedDays),
   ];

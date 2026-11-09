@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../logic/every_other_day_chains.dart';
+import '../../logic/fatigue_score.dart';
 import '../../logic/request_fulfillment.dart';
 import '../../logic/file_names.dart';
 import '../../logic/totals_columns.dart';
@@ -287,6 +288,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
                     DataColumn(label: Text('Gün aşırı\nçift'), numeric: true),
                     DataColumn(label: Text('Gün aşırı\ngün'), numeric: true),
                     DataColumn(label: Text('En uzun\nzincir'), numeric: true),
+                    DataColumn(label: Text('Yorgun-\nluk'), numeric: true),
                     DataColumn(label: Text('7A\ngün'), numeric: true),
                     DataColumn(label: Text('Geldiği\ngün'), numeric: true),
                     DataColumn(label: Text('Çalışılan\nsaat'), numeric: true),
@@ -306,6 +308,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
                           DataCell(Text(fmt(r.totals.everyOtherDayPairs))),
                           DataCell(Text(fmt(r.totals.everyOtherDayDays))),
                           DataCell(Text(fmt(r.totals.longestChain))),
+                          DataCell(Text(fmt(r.totals.fatigue))),
                           DataCell(Text(fmt(r.totals.dayShifts))),
                           DataCell(Text(fmt(r.totals.attendedDays))),
                           DataCell(Text(fmt(r.totals.workedHours))),
@@ -339,6 +342,33 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
               ],
             ),
           ],
+          if (summary.rows.isNotEmpty) ...[
+            const PillHeader('Yorgunluk puanı', end: 'Dokun: döküm'),
+            GroupCard(
+              children: [
+                for (final r in [
+                  ...summary.rows,
+                ]..sort((a, b) => b.totals.fatigue.compareTo(a.totals.fatigue)))
+                  ListTile(
+                    key: ValueKey('fatigue-${r.personId}'),
+                    title: Text(r.name),
+                    subtitle: Text(
+                      r.isChargeNurse
+                          ? 'Sorumlu hemşire'
+                          : 'Rol ortalaması '
+                                '${fmt(summary.roleMean(r.role, (t) => t.fatigue))}',
+                    ),
+                    trailing: Text(
+                      fmt(r.totals.fatigue),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    onTap: () => _showFatigue(context, _year, summary, r),
+                  ),
+              ],
+            ),
+          ],
           if (requests.isNotEmpty) ...[
             const PillHeader('İstek karşılanma', end: 'Dokun: ayrıntı'),
             GroupCard(
@@ -365,6 +395,60 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
       ),
     );
   }
+}
+
+/// Yorgunluk puanının dökümü ve aylara göre değeri.
+void _showFatigue(
+  BuildContext context,
+  int year,
+  YearlySummary summary,
+  YearlyRow row,
+) {
+  final theme = Theme.of(context);
+  String fmt(num v) => SummaryTable.fmt(v);
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    isScrollControlled: true,
+    builder: (context) => SafeArea(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+        ),
+        child: ListView(
+          shrinkWrap: true,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          children: [
+            Text(
+              '${row.name} · $year yorgunluk: ${fmt(row.totals.fatigue)}',
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            for (final p in FatigueScore.parts(row.totals))
+              ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: Text(p.label),
+                subtitle: Text('${fmt(p.count)} kez'),
+                trailing: Text('+${fmt(p.points)}'),
+              ),
+            const Divider(),
+            Text('Aylara göre', style: theme.textTheme.titleSmall),
+            Wrap(
+              spacing: 12,
+              children: [
+                for (final m in summary.months)
+                  if (row.byMonth[m] case final t?)
+                    Text('${turkishMonthNames[m - 1]} ${fmt(t.fatigue)}'),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(FatigueScore.weights, style: theme.textTheme.bodySmall),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 /// Kişinin yıl içindeki istekleri: karşılanmayanlar ay ay, sonra döküm.
