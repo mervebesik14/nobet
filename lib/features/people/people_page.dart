@@ -9,6 +9,7 @@ import '../../shared/providers.dart';
 import '../../shared/widgets/brand_widgets.dart';
 import '../../shared/widgets/placeholder_view.dart';
 import '../../shared/widgets/section_header.dart';
+import 'leave_balance_provider.dart';
 import 'people_controller.dart';
 import 'person_delete_dialog.dart';
 import 'person_form_page.dart';
@@ -164,19 +165,30 @@ class _PersonTile extends ConsumerWidget {
         ),
       ),
       title: Text(person.name),
-      subtitle: period != null
-          ? Text(period)
-          : person.startDate != null && person.startDate!.isAfter(today)
-          ? Text(
-              '${person.role.label} · '
-              '${DateFormat('d MMMM y', 'tr_TR').format(person.startDate!)} '
-              'tarihinde başlıyor',
-            )
-          : !activeNow
-          ? Text('${person.role.label} · pasif')
-          : person.isChargeNurse
-          ? const Text('Sorumlu hemşire · 7A')
-          : null,
+      subtitle:
+          switch (ref.watch(leaveBalancesProvider(today.year))[person.id]) {
+            final b? when period == null && activeNow => Text(
+              '${person.isChargeNurse ? 'Sorumlu hemşire' : person.role.label} · '
+              'izin ${b.used}/${b.allowance}',
+              style: b.remaining < 0
+                  ? TextStyle(color: theme.colorScheme.error)
+                  : null,
+            ),
+            _ => null,
+          } ??
+          (period != null
+              ? Text(period)
+              : person.startDate != null && person.startDate!.isAfter(today)
+              ? Text(
+                  '${person.role.label} · '
+                  '${DateFormat('d MMMM y', 'tr_TR').format(person.startDate!)} '
+                  'tarihinde başlıyor',
+                )
+              : !activeNow
+              ? Text('${person.role.label} · pasif')
+              : person.isChargeNurse
+              ? const Text('Sorumlu hemşire · 7A')
+              : null),
       trailing: hasOpenInactivity(person, today)
           ? IconButton(
               tooltip: 'Pasif dönemi sonlandır',

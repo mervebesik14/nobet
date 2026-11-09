@@ -64,13 +64,14 @@ class PersonAdapter extends TypeAdapter<Person> {
       inactiveUntil: fields[7] as DateTime?,
       startDate: fields[8] as DateTime?,
       phone: fields[9] as String?,
+      annualLeaveDays: (fields[10] as num?)?.toInt(),
     );
   }
 
   @override
   void write(BinaryWriter writer, Person obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(11)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -90,7 +91,9 @@ class PersonAdapter extends TypeAdapter<Person> {
       ..writeByte(8)
       ..write(obj.startDate)
       ..writeByte(9)
-      ..write(obj.phone);
+      ..write(obj.phone)
+      ..writeByte(10)
+      ..write(obj.annualLeaveDays);
   }
 
   @override

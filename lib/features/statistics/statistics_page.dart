@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../logic/every_other_day_chains.dart';
 import '../../logic/fatigue_score.dart';
+import '../../logic/leave_balance.dart';
 import '../../logic/request_fulfillment.dart';
 import '../../logic/file_names.dart';
 import '../../logic/totals_columns.dart';
@@ -18,6 +19,7 @@ import '../../shared/widgets/column_picker_dialog.dart';
 import '../../shared/widgets/pdf_preview_page.dart';
 import '../../shared/widgets/brand_widgets.dart';
 import '../holidays/holidays_controller.dart';
+import '../people/leave_balance_provider.dart';
 import '../people/people_controller.dart';
 import 'monthly_comparison.dart';
 import 'person_report_pdf.dart';
@@ -387,6 +389,39 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
                     ),
                     onTap: () => _showRequests(context, _year, r),
                   ),
+              ],
+            ),
+          ],
+          if (ref.watch(leaveBalancesProvider(_year)) case final balances
+              when balances.isNotEmpty) ...[
+            const PillHeader('Yıllık izin bakiyesi', end: 'İş günü'),
+            GroupCard(
+              children: [
+                for (final p in ref.watch(peopleProvider))
+                  if (balances[p.id] case final b?)
+                    ListTile(
+                      key: ValueKey('leave-${p.id}'),
+                      title: Text(p.name),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(LeaveBalances.label(b)),
+                          const SizedBox(height: 4),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(99),
+                            child: LinearProgressIndicator(
+                              value: b.allowance == 0
+                                  ? 1
+                                  : (b.used / b.allowance).clamp(0.0, 1.0),
+                              minHeight: 6,
+                              color: b.remaining < 0
+                                  ? theme.colorScheme.error
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
               ],
             ),
           ],

@@ -4,7 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../models/models.dart';
+import '../../logic/leave_balance.dart';
 import '../holidays/holidays_controller.dart';
+import '../people/leave_balance_provider.dart';
 import '../../shared/widgets/month_selector.dart';
 import 'month_plan_controller.dart';
 import '../../shared/app_colors.dart';
@@ -402,6 +404,7 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
                     'İzin sonraki aya taşıyorsa başlangıcı seçip yukarıdan '
                     'sonraki aya geçin ve bitişi orada seçin. '
                     'İzin günlerinde nöbet verilmez ve gereken saatten düşülür. '
+                    '${type == LeaveType.annual && ref.watch(leaveBalancesProvider(plan.year))[person.id] != null ? '${plan.year} yıllık izni: ${LeaveBalances.label(ref.watch(leaveBalancesProvider(plan.year))[person.id]!)} (iş günü). ' : ''}'
                     '${switch (type) {
                       LeaveType.annual => 'İzinden önceki son nöbet, izinden önceki son iş '
                           'gününden bir önceki gündür (izin Pazartesi '

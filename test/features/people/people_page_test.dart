@@ -154,6 +154,34 @@ void main() {
     expect(saved.phone, '0505 123 45 67');
   });
 
+  testWidgets('yıllık izin hakkı: formdan girilir, listede bakiye görünür', (
+    tester,
+  ) async {
+    await seed(const [Person(id: '1', name: 'Ayşe', role: Role.nurse)]);
+    // Ekim 2026: 26–28 yıllık izin (3 iş günü).
+    await boxes.monthPlans.put(
+      '2026-10',
+      const MonthPlan(
+        year: 2026,
+        month: 10,
+        annualLeave: {
+          '1': [26, 27, 28],
+        },
+      ),
+    );
+    await pumpPage(tester);
+    await tester.tap(find.text('Ayşe'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('leave-days-field')),
+      '20',
+    );
+    await tester.tap(find.text('Kaydet'));
+    await tester.pumpAndSettle();
+    expect(boxes.people.get('1')!.annualLeaveDays, 20);
+    expect(find.text('Hemşire · izin 3/20'), findsOneWidget);
+  });
+
   testWidgets('sorumlu hemşire işaretlenir; tek kişi olur', (tester) async {
     await seed(const [
       Person(id: '1', name: 'Ayşe', role: Role.nurse, isChargeNurse: true),

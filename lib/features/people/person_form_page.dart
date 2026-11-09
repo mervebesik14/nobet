@@ -23,6 +23,7 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _name;
   late final TextEditingController _phone;
+  late final TextEditingController _leaveDays;
   late Role _role;
   late bool _isActive;
   late bool _isChargeNurse;
@@ -52,6 +53,9 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
     final person = widget.person;
     _name = TextEditingController(text: person?.name ?? '');
     _phone = TextEditingController(text: person?.phone ?? '');
+    _leaveDays = TextEditingController(
+      text: person?.annualLeaveDays?.toString() ?? '',
+    );
     _role = person?.role ?? Role.nurse;
     final today = ref.read(todayProvider);
     // Pasif dönemi bitmiş kişi aktif görünür; dönemi sürüyor ya da
@@ -75,6 +79,7 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
   void dispose() {
     _name.dispose();
     _phone.dispose();
+    _leaveDays.dispose();
     super.dispose();
   }
 
@@ -133,6 +138,7 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
         isChargeNurse: chargeNurse,
         startDate: _startDate,
         phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
+        annualLeaveDays: int.tryParse(_leaveDays.text.trim()),
       );
     } else {
       final messenger = ScaffoldMessenger.of(context);
@@ -145,6 +151,8 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
           clearStartDate: _startDate == null,
           phone: _phone.text.trim(),
           clearPhone: _phone.text.trim().isEmpty,
+          annualLeaveDays: int.tryParse(_leaveDays.text.trim()),
+          clearAnnualLeaveDays: int.tryParse(_leaveDays.text.trim()) == null,
         ),
       );
       final from = _inactiveFrom;
@@ -237,6 +245,26 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
                 ),
               ),
               validator: _validatePhone,
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              key: const ValueKey('leave-days-field'),
+              controller: _leaveDays,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Yıllık izin hakkı (iş günü, isteğe bağlı)',
+                hintText: 'ör. 20',
+                helperText: 'Girilirse kullanılan ve kalan izin izlenir.',
+                border: OutlineInputBorder(),
+              ),
+              validator: (v) {
+                final t = v?.trim() ?? '';
+                if (t.isEmpty) return null;
+                final n = int.tryParse(t);
+                return n == null || n < 0 || n > 365
+                    ? 'Gün sayısı yazın (ör. 20).'
+                    : null;
+              },
             ),
             const SizedBox(height: 24),
             Text('Görev', style: Theme.of(context).textTheme.titleSmall),

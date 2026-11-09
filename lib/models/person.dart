@@ -13,6 +13,7 @@ class Person {
     this.inactiveUntil,
     this.startDate,
     this.phone,
+    this.annualLeaveDays,
   });
 
   final String id;
@@ -45,6 +46,9 @@ class Person {
   /// Telefon numarası (WhatsApp ile kişiye özel liste göndermek için),
   /// yazıldığı gibi; gönderirken [PhoneNumber] ile düzeltilir.
   final String? phone;
+
+  /// Yıllık izin hakkı (iş günü, isteğe bağlı); boşsa bakiye izlenmez.
+  final int? annualLeaveDays;
 
   static DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
 
@@ -109,6 +113,8 @@ class Person {
     bool clearStartDate = false,
     String? phone,
     bool clearPhone = false,
+    int? annualLeaveDays,
+    bool clearAnnualLeaveDays = false,
   }) {
     return Person(
       id: id,
@@ -125,6 +131,9 @@ class Person {
           : (inactiveUntil ?? this.inactiveUntil),
       startDate: clearStartDate ? null : (startDate ?? this.startDate),
       phone: clearPhone ? null : (phone ?? this.phone),
+      annualLeaveDays: clearAnnualLeaveDays
+          ? null
+          : (annualLeaveDays ?? this.annualLeaveDays),
     );
   }
 
@@ -139,6 +148,7 @@ class Person {
     'inactiveUntil': inactiveUntil?.toIso8601String(),
     'startDate': startDate?.toIso8601String(),
     if (phone != null) 'phone': phone,
+    if (annualLeaveDays != null) 'annualLeaveDays': annualLeaveDays,
   };
 
   factory Person.fromJson(Map<String, dynamic> json) => Person(
@@ -158,6 +168,7 @@ class Person {
         ? null
         : DateTime.parse(json['startDate'] as String),
     phone: json['phone'] as String?,
+    annualLeaveDays: json['annualLeaveDays'] as int?,
   );
 
   @override
@@ -172,7 +183,8 @@ class Person {
       other.inactiveFrom == inactiveFrom &&
       other.inactiveUntil == inactiveUntil &&
       other.startDate == startDate &&
-      other.phone == phone;
+      other.phone == phone &&
+      other.annualLeaveDays == annualLeaveDays;
 
   @override
   int get hashCode => Object.hash(
@@ -186,6 +198,7 @@ class Person {
     inactiveUntil,
     startDate,
     phone,
+    annualLeaveDays,
   );
 
   @override
