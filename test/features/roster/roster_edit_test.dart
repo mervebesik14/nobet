@@ -976,6 +976,35 @@ void main() {
     expect(saved().assignments[7]!.shiftCode('n0'), '16A');
   });
 
+  testWidgets('takas önerileri: kurala uyan takas listelenir ve uygulanır', (
+    tester,
+  ) async {
+    await pumpRoster(tester);
+    await tester.longPress(cell('n0', 3));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('swap-suggest')));
+    await tester.pumpAndSettle();
+    final sheet = find.byKey(const ValueKey('swap-sheet'));
+    expect(sheet, findsOneWidget);
+    final first = find
+        .descendant(
+          of: sheet,
+          matching: find.widgetWithText(FilledButton, 'Takas'),
+        )
+        .first;
+    final tile = tester.widget<ListTile>(
+      find.ancestor(of: first, matching: find.byType(ListTile)).first,
+    );
+    final parts = (tile.key! as ValueKey<String>).value.split('-');
+    final other = parts[1];
+    final otherDay = int.parse(parts[2]);
+    await tester.tap(first);
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.nurseIds, contains(other));
+    expect(saved().assignments[otherDay]!.nurseIds, contains('n0'));
+    expect(find.textContaining('Takas: Ayşe 3 Ekim'), findsOneWidget);
+  });
+
   testWidgets('basılı tut → Sil: nöbet doğrudan silinir', (tester) async {
     await pumpRoster(tester);
     await tester.longPress(cell('n0', 3));

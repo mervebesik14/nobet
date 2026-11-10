@@ -20,6 +20,7 @@ import '../../logic/roster_summary.dart';
 import '../../logic/roster_validator.dart';
 import '../../logic/shift_explainer.dart';
 import '../../logic/shift_pay.dart';
+import '../../logic/swap_finder.dart';
 import '../../logic/shift_gaps.dart';
 import '../../logic/text_edits.dart';
 import '../../logic/summary_columns.dart';
@@ -479,6 +480,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             icon: Icons.sick_outlined,
             result: plan.assignments,
             onSelected: () => _useBackup(cell, role),
+          ),
+          EditOption(
+            title: 'Takas önerileri',
+            subtitle: 'Kural bozmadan değişebileceği nöbetler.',
+            icon: Icons.swap_horiz,
+            result: plan.assignments,
+            onSelected: () => _showSwapSuggestions(cell),
           ),
           EditOption(
             title: 'Neden bu nöbet?',
@@ -1112,6 +1120,126 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     if (!opened) await services.shareText(text);
   }
 
+  /// Takas önerileri: kural bozmadan değişebileceği nöbetler; "Takas"
+  /// uygular, mesaj simgesi öteki kişiye teklif gönderir.
+  Future<void> _showSwapSuggestions(RosterCell cell) async {
+    if (!_ensureUnlocked()) return;
+    final plan = _plan;
+    final settings = ref.read(effectiveSettingsProvider);
+    final people = ref.read(peopleProvider);
+    final options = SwapFinder.find(
+      plan: plan,
+      people: people,
+      personId: cell.personId,
+      day: cell.day,
+      nursesPerDay: settings.nursesPerDay,
+      validate: _validate,
+      weekendDays: RosterGenerator.weekendDays(
+        plan.year,
+        plan.month,
+        ref.read(holidaysProvider),
+        settings,
+      ),
+    );
+    final byId = {for (final p in people) p.id: p};
+    final name = _name(cell.personId);
+    String d(int x) => formatDayMonthWeekday(plan.year, plan.month, x);
+    final picked = await showModalBottomSheet<SwapOption>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.8,
+            ),
+            child: ListView(
+              key: const ValueKey('swap-sheet'),
+              shrinkWrap: true,
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              children: [
+                Text(
+                  '$name · ${d(cell.day)} · takas önerileri',
+                  style: theme.textTheme.titleMedium,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  options.isEmpty
+                      ? 'Kural bozmadan yapılabilecek takas bulunamadı. '
+                            '"Başka bir nöbetle takas et" ile elle '
+                            'seçebilirsiniz.'
+                      : 'Hiçbiri yeni kural ihlali doğurmaz; yakın tarihler '
+                            'önce.',
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: 8),
+                for (final o in options)
+                  ListTile(
+                    key: ValueKey('swap-${o.otherId}-${o.otherDay}'),
+                    contentPadding: EdgeInsets.zero,
+                    leading: byId[o.otherId] == null
+                        ? null
+                        : PersonAvatar.of(byId[o.otherId]!, radius: 18),
+                    title: Text('${o.otherName} · ${d(o.otherDay)}'),
+                    subtitle: Text(
+                      '$name → ${formatDayMonth(o.otherDay, plan.month)} · '
+                      '${o.otherName} → ${formatDayMonth(cell.day, plan.month)}',
+                    ),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          tooltip: 'Teklif gönder',
+                          icon: const Icon(Icons.send_outlined),
+                          onPressed: () => _sendSwapOffer(cell, o),
+                        ),
+                        FilledButton(
+                          onPressed: () => Navigator.of(context).pop(o),
+                          child: const Text('Takas'),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (picked == null || !mounted) return;
+    await _apply(
+      picked.after,
+      message:
+          'Takas: $name ${formatDayMonth(cell.day, plan.month)} ↔ '
+          '${picked.otherName} ${formatDayMonth(picked.otherDay, plan.month)}.',
+    );
+  }
+
+  /// Takas teklifini öteki kişiye gönderir (numarası varsa WhatsApp).
+  Future<void> _sendSwapOffer(RosterCell cell, SwapOption o) async {
+    final plan = _plan;
+    final other = ref
+        .read(peopleProvider)
+        .where((p) => p.id == o.otherId)
+        .firstOrNull;
+    final text = SwapFinder.offer(
+      plan: plan,
+      personName: _name(cell.personId),
+      day: cell.day,
+      otherName: o.otherName,
+      otherDay: o.otherDay,
+    );
+    final services = ref.read(platformServicesProvider);
+    final number = PhoneNumber.normalize(other?.phone);
+    final opened =
+        number != null &&
+        (await services.openUrl(PhoneNumber.whatsApp(number, text)) ||
+            await services.openUrl(PhoneNumber.whatsAppWeb(number, text)));
+    if (!opened) await services.shareText(text);
+  }
+
   /// "Neden bu nöbet?": kişinin bu ayki durumu ve aynı roldeki diğerlerinin
   /// o gün neden nöbette olmadığı.
   Future<void> _showWhy(RosterCell cell) async {
@@ -1611,6 +1739,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                       Navigator.of(context).pop(secondary ? '24' : '16b'),
                 ),
               ListTile(
+                key: const ValueKey('swap-suggest'),
+                leading: const Icon(Icons.auto_awesome),
+                title: const Text('Takas önerileri'),
+                subtitle: const Text('Kural bozmadan değişebileceği nöbetler.'),
+                onTap: () => Navigator.of(context).pop('suggest'),
+              ),
+              ListTile(
                 key: const ValueKey('why-shift'),
                 leading: const Icon(Icons.help_outline),
                 title: const Text('Neden bu nöbet?'),
@@ -1716,6 +1851,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         await _write16a(cell, role);
       case 'why':
         await _showWhy(cell);
+      case 'suggest':
+        await _showSwapSuggestions(cell);
       case 'swap':
         setState(() => _swapFrom = cell);
     }
