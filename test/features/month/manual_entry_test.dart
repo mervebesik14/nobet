@@ -11,6 +11,7 @@ import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/data/holiday_repository.dart';
 import 'package:nobet_listesi/data/roster_history_repository.dart';
 import 'package:nobet_listesi/features/month/month_page.dart';
+import 'package:nobet_listesi/logic/ocr_table.dart';
 import 'package:nobet_listesi/logic/roster_excel.dart';
 import 'package:nobet_listesi/logic/roster_summary.dart';
 import 'package:nobet_listesi/models/models.dart';
@@ -172,6 +173,40 @@ void main() {
     );
     // Liste ekranı açıldı.
     expect(find.text('Ekim 2026 Nöbet Listesi'), findsOneWidget);
+  });
+
+  testWidgets("fotoğraftan al: metin okunur, tablo kurulur, kaydedilir", (
+    tester,
+  ) async {
+    double x(int d) => 0.2 + d * 0.025;
+    OcrBox box(String t, double cx, double y, {double w = 0.02}) =>
+        (text: t, x: cx - w / 2, y: y, w: w, h: 0.02);
+    services.pickedScan = (bytes: Uint8List.fromList([1, 2, 3]), isPdf: false);
+    services.scanPages = [
+      [
+        for (var d = 1; d <= 31; d++) box('$d', x(d), 0.1),
+        box('Ayse', 0.08, 0.2, w: 0.06),
+        box('24', x(1), 0.2),
+        box('24', x(4), 0.2),
+        box('Banu', 0.08, 0.3, w: 0.06),
+        box('24', x(1), 0.3),
+        box('Ali', 0.08, 0.4, w: 0.05),
+        box('24', x(1), 0.4),
+      ],
+    ];
+    await pump(tester);
+    await open(tester, "Fotoğraftan / PDF'ten al");
+    await tester.tap(find.byKey(const ValueKey('scan-photos')));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(services.calls, contains('pickScanFile:photos'));
+    expect(find.text('Ekim listesi fotoğraftan alınsın mı?'), findsOneWidget);
+    expect(find.textContaining('4 nöbet, 3 kişi okundu.'), findsOneWidget);
+    await tester.tap(find.text('Kaydet'));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[1]!.nurseIds.toSet(), {'n1', 'n2'});
+    expect(saved().assignments[1]!.techId, 't1');
+    expect(saved().assignments[4]!.nurseIds, ['n1']);
   });
 
   testWidgets('mevcut listenin üstüne yazmadan önce sorar; uyarılar görünür', (

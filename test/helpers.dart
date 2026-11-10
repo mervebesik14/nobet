@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_riverpod/misc.dart';
 import 'package:hive_ce/hive_ce.dart';
+import 'package:nobet_listesi/logic/ocr_table.dart';
 import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/data/providers.dart';
 import 'package:nobet_listesi/data/weekly_file_backup.dart';
@@ -44,6 +45,27 @@ class FakePlatformServices extends PlatformServices {
 
   /// pickExcelFile'ın döndüreceği dosya (boşsa kullanıcı vazgeçmiş sayılır).
   Uint8List? pickedExcel;
+
+  /// pickScanFile'ın döndüreceği dosya ve recognizeText'in bulacağı kutular
+  /// (sayfa başına).
+  ({Uint8List bytes, bool isPdf})? pickedScan;
+  List<List<OcrBox>> scanPages = const [];
+
+  @override
+  Future<({Uint8List bytes, bool isPdf})?> pickScanFile({
+    required bool photos,
+  }) async {
+    calls.add('pickScanFile:${photos ? 'photos' : 'files'}');
+    return pickedScan;
+  }
+
+  var _ocrPage = 0;
+
+  @override
+  Future<List<OcrBox>> recognizeText(Uint8List image) async {
+    calls.add('recognizeText');
+    return _ocrPage < scanPages.length ? scanPages[_ocrPage++] : const [];
+  }
 
   final calls = <String>[];
   final sharedFiles = <({String name, String mime, Uint8List bytes})>[];

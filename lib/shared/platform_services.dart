@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_contact_picker/flutter_native_contact_picker.dart';
@@ -6,6 +8,8 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import '../logic/ocr_table.dart';
 
 /// Telefonun paylaş / yazdır / dosya seç işlemleri. Ekranlar bunları bu
 /// servis üzerinden çağırır; testlerde sahte bir sürümle değiştirilir.
@@ -81,6 +85,49 @@ class PlatformServices {
       allowedExtensions: const ['xlsx'],
     );
     return file?.xFile.readAsBytes();
+  }
+
+  /// Liste fotoğrafı ya da PDF'i seçtirir: [photos] true ise Fotoğraflar,
+  /// değilse Dosyalar. Vazgeçerse boş döner.
+  Future<({Uint8List bytes, bool isPdf})?> pickScanFile({
+    required bool photos,
+  }) async {
+    final file = await FilePicker.pickFile(
+      type: photos ? FileType.image : FileType.custom,
+      allowedExtensions: photos
+          ? null
+          : const ['pdf', 'jpg', 'jpeg', 'png', 'heic'],
+    );
+    if (file == null) return null;
+    return (
+      bytes: await file.xFile.readAsBytes(),
+      isPdf: file.name.toLowerCase().endsWith('.pdf'),
+    );
+  }
+
+  static const _ocr = MethodChannel('nobetci/ocr');
+
+  /// Görseldeki metni cihaz üstünde okur (iPhone: Apple Vision,
+  /// internetsiz). Kutular sayfaya göre 0–1 arası, y üstten.
+  Future<List<OcrBox>> recognizeText(Uint8List image) async {
+    if (!Platform.isIOS) {
+      throw UnsupportedError('Fotoğraftan okuma şimdilik yalnız iPhone\'da.');
+    }
+    final list =
+        await _ocr.invokeListMethod<Map<Object?, Object?>>('recognize', {
+          'image': image,
+        }) ??
+        const [];
+    return [
+      for (final m in list)
+        (
+          text: m['text'] as String? ?? '',
+          x: (m['x'] as num).toDouble(),
+          y: (m['y'] as num).toDouble(),
+          w: (m['w'] as num).toDouble(),
+          h: (m['h'] as num).toDouble(),
+        ),
+    ];
   }
 
   /// Telefon rehberinden bir numara seçtirir (izin istemez); vazgeçerse

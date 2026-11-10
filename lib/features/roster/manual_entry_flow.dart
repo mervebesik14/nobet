@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
+import '../../logic/ocr_table.dart';
 import '../../logic/roster_excel.dart';
 import '../../logic/roster_generator.dart';
 import '../../logic/roster_import.dart';
@@ -16,7 +17,7 @@ import '../month/month_plan_controller.dart';
 import '../people/people_controller.dart';
 import 'roster_flow.dart';
 
-enum _ManualEntry { empty, excel, template }
+enum _ManualEntry { empty, excel, scan, template }
 
 void _notify(BuildContext context, String message) =>
     ScaffoldMessenger.of(context)
@@ -66,6 +67,16 @@ Future<bool> manualEntryFlow(BuildContext context, WidgetRef ref) async {
             onTap: () => Navigator.of(context).pop(_ManualEntry.excel),
           ),
           ListTile(
+            key: const ValueKey('entry-scan'),
+            leading: const Icon(Icons.document_scanner_outlined),
+            title: const Text("Fotoğraftan / PDF'ten al"),
+            subtitle: const Text(
+              'Kâğıt listenin fotoğrafı ya da PDF\'i telefonda okunur '
+              '(internet gerekmez).',
+            ),
+            onTap: () => Navigator.of(context).pop(_ManualEntry.scan),
+          ),
+          ListTile(
             leading: const Icon(Icons.download_outlined),
             title: const Text('Excel şablonunu paylaş'),
             subtitle: const Text(
@@ -82,6 +93,7 @@ Future<bool> manualEntryFlow(BuildContext context, WidgetRef ref) async {
   return switch (choice) {
     _ManualEntry.empty => _startEmpty(context, ref),
     _ManualEntry.excel => _importExcel(context, ref),
+    _ManualEntry.scan => _importScan(context, ref),
     _ManualEntry.template => _shareTemplate(context, ref).then((_) => false),
   };
 }
@@ -141,12 +153,121 @@ Future<bool> _startEmpty(BuildContext context, WidgetRef ref) async {
 Future<bool> _importExcel(BuildContext context, WidgetRef ref) async {
   final bytes = await ref.read(platformServicesProvider).pickExcelFile();
   if (bytes == null || !context.mounted) return false;
+  final List<List<Object?>> rows;
+  try {
+    rows = XlsxReader.readSheet(bytes, preferredSheet: 'Nöbet Listesi');
+  } on XlsxFormatException catch (e) {
+    _notify(context, e.message);
+    return false;
+  }
+  return _importRows(context, ref, rows, source: "Excel'den");
+}
+
+/// Fotoğraf ya da PDF: metin cihazda okunur, tablo kurulur ve Excel'deki
+/// gibi içe aktarılır.
+Future<bool> _importScan(BuildContext context, WidgetRef ref) async {
+  final photos = await showModalBottomSheet<bool>(
+    context: context,
+    showDragHandle: true,
+    builder: (context) => SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            key: const ValueKey('scan-photos'),
+            leading: const Icon(Icons.photo_library_outlined),
+            title: const Text('Fotoğraflardan seç'),
+            subtitle: const Text(
+              'Listenin düz, net ve tamamı görünen fotoğrafı ya da ekran '
+              'görüntüsü.',
+            ),
+            onTap: () => Navigator.of(context).pop(true),
+          ),
+          ListTile(
+            key: const ValueKey('scan-files'),
+            leading: const Icon(Icons.picture_as_pdf_outlined),
+            title: const Text('Dosyalardan seç (PDF ya da resim)'),
+            onTap: () => Navigator.of(context).pop(false),
+          ),
+        ],
+      ),
+    ),
+  );
+  if (photos == null || !context.mounted) return false;
+  final services = ref.read(platformServicesProvider);
+  final file = await services.pickScanFile(photos: photos);
+  if (file == null || !context.mounted) return false;
+  final navigator = Navigator.of(context);
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const PopScope(
+      canPop: false,
+      child: AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Expanded(child: Text('Liste okunuyor…')),
+          ],
+        ),
+      ),
+    ),
+  );
+  final plan = ref.read(monthPlanProvider);
+  List<List<Object?>> rows;
+  try {
+    final boxes = <OcrBox>[];
+    if (file.isPdf) {
+      final pages = await services.pdfPages(file.bytes, dpi: 220);
+      for (final (i, page) in pages.indexed) {
+        for (final b in await services.recognizeText(page.png)) {
+          boxes.add((text: b.text, x: b.x, y: b.y + i, w: b.w, h: b.h));
+        }
+      }
+    } else {
+      boxes.addAll(await services.recognizeText(file.bytes));
+    }
+    rows = OcrTable.toRows(
+      boxes,
+      people: ref.read(peopleProvider),
+      daysInMonth: plan.daysInMonth,
+    );
+  } on Object catch (e) {
+    navigator.pop();
+    if (context.mounted) {
+      _notify(
+        context,
+        e is UnsupportedError ? '${e.message}' : 'Okunamadı: $e',
+      );
+    }
+    return false;
+  }
+  navigator.pop();
+  if (!context.mounted) return false;
+  if (rows.isEmpty) {
+    _notify(
+      context,
+      'Tabloda gün başlığı (1, 2, 3…) bulunamadı. Listeyi düz, net ve '
+      'tamamı görünecek şekilde çekip yeniden deneyin.',
+    );
+    return false;
+  }
+  return _importRows(context, ref, rows, source: 'fotoğraftan');
+}
+
+Future<bool> _importRows(
+  BuildContext context,
+  WidgetRef ref,
+  List<List<Object?>> rows, {
+  required String source,
+}) async {
   final plan = ref.read(monthPlanProvider);
   final settings = ref.read(rosterSettingsProvider);
   final RosterImportResult result;
   try {
     result = RosterImport.fromRows(
-      rows: XlsxReader.readSheet(bytes, preferredSheet: 'Nöbet Listesi'),
+      rows: rows,
       year: plan.year,
       month: plan.month,
       people: ref.read(peopleProvider),
@@ -154,15 +275,12 @@ Future<bool> _importExcel(BuildContext context, WidgetRef ref) async {
       shiftHours: settings.shiftHours,
       customShifts: settings.customShifts,
     );
-  } on XlsxFormatException catch (e) {
-    _notify(context, e.message);
-    return false;
   } on RosterImportException catch (e) {
     _notify(context, e.message);
     return false;
   }
   if (result.shiftCount == 0 && result.leaveDayCount == 0) {
-    _notify(context, 'Dosyada nöbet bulunamadı.');
+    _notify(context, 'Listede nöbet bulunamadı.');
     return false;
   }
 
@@ -171,7 +289,7 @@ Future<bool> _importExcel(BuildContext context, WidgetRef ref) async {
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      title: Text("$monthName listesi Excel'den alınsın mı?"),
+      title: Text('$monthName listesi $source alınsın mı?'),
       content: SingleChildScrollView(
         child: Text(
           [
@@ -186,6 +304,9 @@ Future<bool> _importExcel(BuildContext context, WidgetRef ref) async {
               '\nDikkat:\n${result.warnings.map((w) => '• $w').join('\n')}',
             '\nListe olduğu gibi kaydedilir; kural ihlalleri uyarı olarak '
                 'görünür.',
+            if (source == 'fotoğraftan')
+              'Fotoğraftan okuma hata yapabilir: kaydettikten sonra listeyi '
+                  'kontrol edin, yanlışları dokunarak düzeltin.',
             if (plan.hasRoster)
               'Bu ayın mevcut listesi değiştirilecek (geçmişten geri '
                   'alınabilir).',
@@ -209,7 +330,7 @@ Future<bool> _importExcel(BuildContext context, WidgetRef ref) async {
       .read(monthPlanProvider.notifier)
       .importRoster(result, nurseOnly: nurseOnly);
   if (ok && context.mounted) {
-    _notify(context, "Liste Excel'den alındı.");
+    _notify(context, 'Liste $source alındı.');
   }
   return ok;
 }
