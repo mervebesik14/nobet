@@ -194,6 +194,45 @@ class SettingsPage extends ConsumerWidget {
               ),
             ],
           ),
+          const PillHeader('Nöbet ücreti (tahmini)'),
+          GroupCard(
+            children: [
+              ListTile(
+                key: const ValueKey('pay-rate'),
+                leading: const Icon(Icons.payments_outlined),
+                title: const Text('Nöbet saat ücreti'),
+                subtitle: const Text(
+                  'Brüt, normal nöbet saati için (Temmuz–Aralık 2026 '
+                  'lisans/önlisans: yaklaşık 156 ₺). Girilince listenin '
+                  'özetinde ve karnede tahmini ücret görünür.',
+                ),
+                trailing: Text(
+                  s.shiftHourlyRate > 0
+                      ? '${NumberFormat('#,##0.00', 'tr_TR').format(s.shiftHourlyRate)} ₺'
+                      : 'Girilmedi',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                onTap: () => _editPayRate(context, ref),
+              ),
+              SwitchListTile(
+                title: const Text('Riskli birim'),
+                subtitle: const Text(
+                  'Yoğun bakım, acil gibi birimlerde ücret ×1,5.',
+                ),
+                value: s.riskyUnit,
+                onChanged: (v) => update(s.copyWith(riskyUnit: v)),
+              ),
+              const ListTile(
+                dense: true,
+                title: Text(
+                  'Hesap: gereken saati aşan saatler ödenir (ayda en fazla '
+                  '130 saat); resmi tatil ve bayram nöbet saatleri ×1,25; '
+                  'yalnız damga vergisi (binde 7,59) düşülür. Kurumun '
+                  'bordrosu farklı olabilir; bu bir tahmindir.',
+                ),
+              ),
+            ],
+          ),
           const PillHeader('Özel mesailer'),
           GroupCard(
             children: [
@@ -662,6 +701,51 @@ class SettingsPage extends ConsumerWidget {
 }
 
 /// − değer + biçiminde sayı ayarı.
+/// Nöbet saat ücretini sorar (boş ya da 0 → kapalı).
+Future<void> _editPayRate(BuildContext context, WidgetRef ref) async {
+  final s = ref.read(rosterSettingsProvider);
+  final text = TextEditingController(
+    text: s.shiftHourlyRate > 0
+        ? s.shiftHourlyRate.toString().replaceAll('.', ',')
+        : '',
+  );
+  final result = await showDialog<double>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Nöbet saat ücreti'),
+      content: TextField(
+        key: const ValueKey('pay-rate-field'),
+        controller: text,
+        autofocus: true,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        decoration: const InputDecoration(
+          suffixText: '₺ / saat',
+          hintText: 'ör. 156,35',
+          helperText: 'Boş bırakılırsa ücret tahmini kapanır.',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Vazgeç'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(
+            context,
+          ).pop(double.tryParse(text.text.trim().replaceAll(',', '.')) ?? 0),
+          child: const Text('Kaydet'),
+        ),
+      ],
+    ),
+  );
+  // Pencere kapanış animasyonu bitmeden denetleyici atılmasın.
+  WidgetsBinding.instance.addPostFrameCallback((_) => text.dispose());
+  if (result == null) return;
+  await ref
+      .read(rosterSettingsProvider.notifier)
+      .update(s.copyWith(shiftHourlyRate: result < 0 ? 0 : result));
+}
+
 /// Özel mesai ekler, düzenler ya da siler.
 Future<void> _editCustomShift(
   BuildContext context,

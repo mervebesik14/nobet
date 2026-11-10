@@ -159,6 +159,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
       settings: ref.watch(rosterSettingsProvider),
     );
     String fmt(num v) => SummaryTable.fmt(v);
+    final hasPay = summary.rows.any((r) => r.totals.estimatedPay > 0);
     final requests = RequestFulfillment.forYear(
       year: _year,
       plans: ref.watch(monthPlanRepositoryProvider).getAll(),
@@ -281,7 +282,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
                 child: DataTable(
                   columnSpacing: 20,
                   headingRowHeight: 56,
-                  columns: const [
+                  columns: [
                     DataColumn(label: Text('Ad')),
                     DataColumn(label: Text('Görev')),
                     DataColumn(label: Text('Ay'), numeric: true),
@@ -303,6 +304,11 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
                     DataColumn(label: Text('Geldiği\ngün'), numeric: true),
                     DataColumn(label: Text('Çalışılan\nsaat'), numeric: true),
                     DataColumn(label: Text('Fazla\nmesai'), numeric: true),
+                    if (hasPay)
+                      DataColumn(
+                        label: Text('Tahmini\nücret (₺)'),
+                        numeric: true,
+                      ),
                   ],
                   rows: [
                     for (final r in summary.rows)
@@ -323,6 +329,10 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
                           DataCell(Text(fmt(r.totals.attendedDays))),
                           DataCell(Text(fmt(r.totals.workedHours))),
                           DataCell(Text(fmt(r.totals.overtimeHours))),
+                          if (hasPay)
+                            DataCell(
+                              Text(fmt(r.totals.estimatedPay.roundToDouble())),
+                            ),
                         ],
                       ),
                   ],

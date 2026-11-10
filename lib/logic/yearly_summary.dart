@@ -168,6 +168,7 @@ class YearlySummary {
           everyOtherDayChains: r.everyOtherDayChains,
           consecutivePairs: r.consecutivePairs,
           consecutiveWeekends: r.consecutiveWeekends,
+          estimatedPay: r.estimatedPay,
           longGaps: r.longGaps,
           dayShifts: r.dayShifts,
           attendedDays: r.attendedDays,

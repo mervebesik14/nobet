@@ -17,6 +17,9 @@ class RosterSettings {
     this.halfDayHolidayIsHalfWorkday = true,
     this.halfDayRequiredHours = 5,
     this.customShifts = const [],
+    this.shiftHourlyRate = 0,
+    this.riskyUnit = false,
+    this.payHourCap = 130,
   });
 
   /// Her gün nöbet tutacak hemşire sayısı.
@@ -57,6 +60,15 @@ class RosterSettings {
   /// Kullanıcının tanımladığı özel mesailer (ör. 19A).
   final List<CustomShift> customShifts;
 
+  /// Normal nöbet saat ücreti (TL, brüt); 0 ise ücret tahmini kapalı.
+  final double shiftHourlyRate;
+
+  /// Riskli birim (yoğun bakım, acil…): ücret ×1,5.
+  final bool riskyUnit;
+
+  /// Ayda ücreti ödenen en fazla nöbet saati (mevzuatta 130).
+  final int payHourCap;
+
   /// [code] adlı özel mesai; yoksa null.
   CustomShift? customShift(String code) =>
       customShifts.firstWhereOrNull((s) => s.code == code);
@@ -75,6 +87,9 @@ class RosterSettings {
     bool? halfDayHolidayIsHalfWorkday,
     double? halfDayRequiredHours,
     List<CustomShift>? customShifts,
+    double? shiftHourlyRate,
+    bool? riskyUnit,
+    int? payHourCap,
   }) {
     return RosterSettings(
       nursesPerDay: nursesPerDay ?? this.nursesPerDay,
@@ -96,6 +111,9 @@ class RosterSettings {
           halfDayHolidayIsHalfWorkday ?? this.halfDayHolidayIsHalfWorkday,
       halfDayRequiredHours: halfDayRequiredHours ?? this.halfDayRequiredHours,
       customShifts: customShifts ?? this.customShifts,
+      shiftHourlyRate: shiftHourlyRate ?? this.shiftHourlyRate,
+      riskyUnit: riskyUnit ?? this.riskyUnit,
+      payHourCap: payHourCap ?? this.payHourCap,
     );
   }
 
@@ -113,6 +131,9 @@ class RosterSettings {
     'halfDayRequiredHours': halfDayRequiredHours,
     if (customShifts.isNotEmpty)
       'customShifts': [for (final s in customShifts) s.toJson()],
+    'shiftHourlyRate': shiftHourlyRate,
+    'riskyUnit': riskyUnit,
+    'payHourCap': payHourCap,
   };
 
   /// Eksik alanlar varsayılan değerini alır (eski yedeklerle uyum için).
@@ -140,6 +161,10 @@ class RosterSettings {
       halfDayRequiredHours:
           (json['halfDayRequiredHours'] as num?)?.toDouble() ??
           d.halfDayRequiredHours,
+      shiftHourlyRate:
+          (json['shiftHourlyRate'] as num?)?.toDouble() ?? d.shiftHourlyRate,
+      riskyUnit: json['riskyUnit'] as bool? ?? d.riskyUnit,
+      payHourCap: json['payHourCap'] as int? ?? d.payHourCap,
       customShifts: [
         for (final s in json['customShifts'] as List? ?? const [])
           CustomShift.fromJson((s as Map).cast<String, dynamic>()),
@@ -161,6 +186,9 @@ class RosterSettings {
       other.holidayCountsAsWeekend == holidayCountsAsWeekend &&
       other.halfDayHolidayIsHalfWorkday == halfDayHolidayIsHalfWorkday &&
       other.halfDayRequiredHours == halfDayRequiredHours &&
+      other.shiftHourlyRate == shiftHourlyRate &&
+      other.riskyUnit == riskyUnit &&
+      other.payHourCap == payHourCap &&
       const ListEquality<CustomShift>().equals(
         other.customShifts,
         customShifts,
@@ -180,5 +208,8 @@ class RosterSettings {
     halfDayHolidayIsHalfWorkday,
     halfDayRequiredHours,
     const ListEquality<CustomShift>().hash(customShifts),
+    shiftHourlyRate,
+    riskyUnit,
+    payHourCap,
   );
 }

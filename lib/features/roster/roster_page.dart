@@ -19,6 +19,7 @@ import '../../logic/roster_generator.dart';
 import '../../logic/roster_summary.dart';
 import '../../logic/roster_validator.dart';
 import '../../logic/shift_explainer.dart';
+import '../../logic/shift_pay.dart';
 import '../../logic/shift_gaps.dart';
 import '../../logic/text_edits.dart';
 import '../../logic/summary_columns.dart';
@@ -2041,16 +2042,24 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   Future<Set<SummaryColumn>?> _askDetails(_ShareAction action) async {
     final meta = ref.read(hiveBoxesProvider).meta;
     final saved = meta.get(_columnsKey);
+    // Ücret sütunu yalnız ayarda saat ücreti girilmişse seçilebilir.
+    final options = [
+      for (final c in SummaryColumn.values)
+        if (c != SummaryColumn.estimatedPay ||
+            ShiftPay.enabled(ref.read(effectiveSettingsProvider)))
+          c,
+    ];
     final initial = saved is List
         ? SummaryColumn.fromNames(saved.cast<String>())
-        : {...SummaryColumn.values};
+        : {...options};
     final picked = await showDialog<Set<SummaryColumn>>(
       context: context,
       builder: (_) => _ShareDetailsDialog(
         title: action == _ShareAction.print
             ? 'Ne yazdırılsın?'
             : 'Ne paylaşılsın?',
-        initial: initial,
+        initial: initial.intersection(options.toSet()),
+        options: options,
       ),
     );
     if (picked != null && picked.isNotEmpty) {
@@ -2825,10 +2834,17 @@ class _HighlightSummary extends StatelessWidget {
 /// Paylaşma seçimi: "Yalnız liste" ya da özet sütunlarını işaretleyip
 /// "Liste ve seçilenler".
 class _ShareDetailsDialog extends StatefulWidget {
-  const _ShareDetailsDialog({required this.title, required this.initial});
+  const _ShareDetailsDialog({
+    required this.title,
+    required this.initial,
+    required this.options,
+  });
 
   final String title;
   final Set<SummaryColumn> initial;
+
+  /// Seçilebilir sütunlar.
+  final List<SummaryColumn> options;
 
   @override
   State<_ShareDetailsDialog> createState() => _ShareDetailsDialogState();
@@ -2856,7 +2872,7 @@ class _ShareDetailsDialogState extends State<_ShareDetailsDialog> {
                 style: theme.textTheme.bodySmall,
               ),
             ),
-            for (final c in SummaryColumn.values)
+            for (final c in widget.options)
               CheckboxListTile(
                 key: ValueKey('col-${c.name}'),
                 dense: true,

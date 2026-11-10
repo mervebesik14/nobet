@@ -12,7 +12,8 @@ enum SummaryColumn {
   dayShifts('7A gün'),
   worked('Çalışılan saat'),
   required('Gereken saat'),
-  overtime('Fazla mesai');
+  overtime('Fazla mesai'),
+  estimatedPay('Tahmini ücret (₺)');
 
   const SummaryColumn(this.label);
 
@@ -30,6 +31,7 @@ enum SummaryColumn {
     worked => p.workedHours,
     required => p.requiredHours,
     overtime => p.overtimeHours,
+    estimatedPay => p.estimatedPay.roundToDouble(),
   };
 
   /// Rol ortalaması satırındaki değer; ortalaması olmayan sütunda null.
@@ -43,6 +45,7 @@ enum SummaryColumn {
     worked => a.workedHours,
     required => summary.requiredHours,
     overtime => a.overtimeHours,
+    estimatedPay => null,
   };
 
   /// [selected] içinden, bu özette gösterilecekler (sıra sabit). Resmi
@@ -56,7 +59,8 @@ enum SummaryColumn {
         if (switch (c) {
           nationalHoliday ||
           religiousHoliday ||
-          dayShifts => summary.people.any((p) => c.valueOf(p) > 0),
+          dayShifts ||
+          estimatedPay => summary.people.any((p) => c.valueOf(p) > 0),
           _ => true,
         })
           c,

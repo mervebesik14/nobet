@@ -367,13 +367,16 @@ class RosterSettingsAdapter extends TypeAdapter<RosterSettings> {
       customShifts: fields[11] == null
           ? const []
           : (fields[11] as List).cast<CustomShift>(),
+      shiftHourlyRate: fields[12] == null ? 0 : (fields[12] as num).toDouble(),
+      riskyUnit: fields[13] == null ? false : fields[13] as bool,
+      payHourCap: fields[14] == null ? 130 : (fields[14] as num).toInt(),
     );
   }
 
   @override
   void write(BinaryWriter writer, RosterSettings obj) {
     writer
-      ..writeByte(12)
+      ..writeByte(15)
       ..writeByte(0)
       ..write(obj.nursesPerDay)
       ..writeByte(1)
@@ -397,7 +400,13 @@ class RosterSettingsAdapter extends TypeAdapter<RosterSettings> {
       ..writeByte(10)
       ..write(obj.secondaryTechShiftHours)
       ..writeByte(11)
-      ..write(obj.customShifts);
+      ..write(obj.customShifts)
+      ..writeByte(12)
+      ..write(obj.shiftHourlyRate)
+      ..writeByte(13)
+      ..write(obj.riskyUnit)
+      ..writeByte(14)
+      ..write(obj.payHourCap);
   }
 
   @override

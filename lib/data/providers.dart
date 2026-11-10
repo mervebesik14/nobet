@@ -51,12 +51,16 @@ class RosterSettingsController extends Notifier<RosterSettings> {
 
   /// Kurallar ve saatler varsayılana döner; özel mesai tanımları kalır.
   Future<void> reset() async {
-    final custom = state.customShifts;
+    // Özel mesailer ve ücret bilgileri kural değil; korunur.
+    final kept = const RosterSettings().copyWith(
+      customShifts: state.customShifts,
+      shiftHourlyRate: state.shiftHourlyRate,
+      riskyUnit: state.riskyUnit,
+      payHourCap: state.payHourCap,
+    );
     await ref.read(settingsRepositoryProvider).reset();
     state = const RosterSettings();
-    if (custom.isNotEmpty) {
-      await update(const RosterSettings().copyWith(customShifts: custom));
-    }
+    if (kept != const RosterSettings()) await update(kept);
   }
 }
 

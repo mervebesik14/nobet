@@ -109,7 +109,7 @@ types:
         index: 16
   RosterSettings:
     typeId: 5
-    nextIndex: 12
+    nextIndex: 15
     fields:
       nursesPerDay:
         index: 0
@@ -135,6 +135,12 @@ types:
         index: 10
       customShifts:
         index: 11
+      shiftHourlyRate:
+        index: 12
+      riskyUnit:
+        index: 13
+      payHourCap:
+        index: 14
   CustomShift:
     typeId: 6
     nextIndex: 4

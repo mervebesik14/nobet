@@ -35,7 +35,7 @@ void main() {
   tearDown(() => Hive.close());
 
   Future<void> pump(WidgetTester tester, {Widget? home}) async {
-    tester.view.physicalSize = const Size(1200, 5000);
+    tester.view.physicalSize = const Size(1200, 6400);
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
@@ -159,6 +159,41 @@ void main() {
     await tester.tap(find.text('Sil'));
     await tester.pumpAndSettle();
     expect(saved().customShifts, isEmpty);
+  });
+
+  testWidgets('nöbet saat ücreti girilir, riskli birim; sıfırlamada kalır', (
+    tester,
+  ) async {
+    await pump(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('pay-rate')));
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('pay-rate')),
+        matching: find.text('Girilmedi'),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('pay-rate')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('pay-rate-field')),
+      '156,35',
+    );
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Kaydet'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(saved().shiftHourlyRate, 156.35);
+    expect(find.text('156,35 ₺'), findsOneWidget);
+    await tester.tap(find.text('Riskli birim'));
+    await tester.pumpAndSettle();
+    expect(saved().riskyUnit, isTrue);
+    await tester.tap(find.text('Varsayılanlara dön'));
+    await tester.pumpAndSettle();
+    expect(saved().shiftHourlyRate, 156.35);
   });
 
   testWidgets('sınırlar: tekniker 0-1, zincir en az 1', (tester) async {

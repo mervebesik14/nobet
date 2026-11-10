@@ -1,5 +1,6 @@
 import 'every_other_day_chains.dart';
 import 'fatigue_score.dart';
+import 'shift_pay.dart';
 import '../models/day_assignment.dart';
 import 'day_shift_planner.dart';
 import '../models/holiday.dart';
@@ -32,6 +33,7 @@ class PersonSummary {
     this.everyOtherDayChains = const [],
     this.consecutivePairs = 0,
     this.consecutiveWeekends = 0,
+    this.estimatedPay = 0,
   });
 
   final String personId;
@@ -52,6 +54,10 @@ class PersonSummary {
 
   /// Art arda (d, d+1) nöbet çifti sayısı.
   final int consecutivePairs;
+
+  /// Tahmini net nöbet ücreti (TL); ayarda saat ücreti yoksa 0
+  /// (bkz. [ShiftPay]).
+  final double estimatedPay;
 
   /// Art arda iki hafta sonunda da nöbet tutma sayısı.
   final int consecutiveWeekends;
@@ -258,6 +264,25 @@ class RosterSummary {
           ? required
           : (required - calc.leaveDeduction(year, month, holidays, leave))
                 .clamp(0.0, required);
+      final workedHours =
+          calc.workedHours(full) +
+          light.length * settings.secondaryTechShiftHours +
+          nights.length * DayAssignment.shift16aHours +
+          (customHours[id] ?? 0) +
+          (extraHours[id] ?? 0) +
+          (dayHours[id] ?? 0);
+      final pay = ShiftPay.enabled(settings)
+          ? ShiftPay.estimate(
+              overtimeHours: workedHours > personRequired
+                  ? workedHours - personRequired
+                  : 0,
+              holidayShiftHours:
+                  (days.where(nationalDays.contains).length +
+                      days.where(religiousDays.contains).length) *
+                  settings.shiftHours.toDouble(),
+              settings: settings,
+            ).net
+          : 0.0;
       rows.add(
         PersonSummary(
           personId: id,
@@ -278,13 +303,8 @@ class RosterSummary {
           // 24 vardiyaları tam saat, 16B vardiyaları kısa saat, 16A'lar
           // 16 saat sayılır. 7A günleri o günün mesai saati kadar
           // eklenir.
-          workedHours:
-              calc.workedHours(full) +
-              light.length * settings.secondaryTechShiftHours +
-              nights.length * DayAssignment.shift16aHours +
-              (customHours[id] ?? 0) +
-              (extraHours[id] ?? 0) +
-              (dayHours[id] ?? 0),
+          workedHours: workedHours.toDouble(),
+          estimatedPay: pay,
           requiredHours: personRequired,
           dayShifts: dayCount[id] ?? 0,
           isChargeNurse: person?.isChargeNurse ?? false,

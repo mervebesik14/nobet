@@ -12,6 +12,7 @@ class PersonTotals {
     this.everyOtherDayChains = const [],
     this.consecutivePairs = 0,
     this.consecutiveWeekends = 0,
+    this.estimatedPay = 0,
     this.longGaps = 0,
     this.dayShifts = 0,
     this.attendedDays = 0,
@@ -40,6 +41,9 @@ class PersonTotals {
 
   /// Art arda iki hafta sonunda da nöbet tutma sayısı.
   final int consecutiveWeekends;
+
+  /// Tahmini net nöbet ücreti toplamı (TL); bkz. [ShiftPay].
+  final double estimatedPay;
 
   /// Yorgunluk puanı; bkz. [FatigueScore].
   double get fatigue => FatigueScore.of(this);
@@ -100,6 +104,7 @@ class PersonTotals {
     everyOtherDayChains: [...everyOtherDayChains, ...o.everyOtherDayChains],
     consecutivePairs: consecutivePairs + o.consecutivePairs,
     consecutiveWeekends: consecutiveWeekends + o.consecutiveWeekends,
+    estimatedPay: estimatedPay + o.estimatedPay,
     longGaps: longGaps + o.longGaps,
     dayShifts: dayShifts + o.dayShifts,
     attendedDays: attendedDays + o.attendedDays,

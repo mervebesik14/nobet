@@ -26,6 +26,7 @@ class SummaryTable extends StatelessWidget {
         DataCell(Text(fmt(value), style: style));
 
     final has7A = summary.people.any((r) => r.dayShifts > 0);
+    final hasPay = summary.people.any((r) => r.estimatedPay > 0);
     final hasNational = summary.people.any((r) => r.nationalHolidayShifts > 0);
     final hasReligious = summary.people.any(
       (r) => r.religiousHolidayShifts > 0,
@@ -51,6 +52,8 @@ class SummaryTable extends StatelessWidget {
           const DataColumn(label: Text('Çalışılan\nsaat'), numeric: true),
           const DataColumn(label: Text('Gereken\nsaat'), numeric: true),
           const DataColumn(label: Text('Fazla\nmesai'), numeric: true),
+          if (hasPay)
+            const DataColumn(label: Text('Tahmini\nücret (₺)'), numeric: true),
         ],
         rows: [
           for (final r in summary.people)
@@ -70,6 +73,7 @@ class SummaryTable extends StatelessWidget {
                 number(r.workedHours),
                 number(r.requiredHours),
                 number(r.overtimeHours),
+                if (hasPay) number(r.estimatedPay.roundToDouble()),
               ],
             ),
           for (final a in summary.averages.values)
@@ -90,6 +94,7 @@ class SummaryTable extends StatelessWidget {
                 number(a.workedHours, style: averageStyle),
                 number(summary.requiredHours, style: averageStyle),
                 number(a.overtimeHours, style: averageStyle),
+                if (hasPay) const DataCell(Text('')),
               ],
             ),
         ],
