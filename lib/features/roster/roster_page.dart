@@ -1033,6 +1033,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       return;
     }
     var sick = true;
+    var leaveEmpty = false;
     final picked = await showDialog<Person>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -1075,10 +1076,39 @@ class _RosterPageState extends ConsumerState<RosterPage> {
               onPressed: () => Navigator.of(context).pop(),
               child: const Text('Vazgeç'),
             ),
+            TextButton(
+              key: const ValueKey('backup-vacate'),
+              onPressed: () {
+                leaveEmpty = true;
+                Navigator.of(context).pop();
+              },
+              child: const Text('Boş bırak'),
+            ),
           ],
         ),
       ),
     );
+    if (leaveEmpty && mounted) {
+      final controller = ref.read(monthPlanProvider.notifier);
+      if (sick &&
+          !plan.leaveOf(cell.personId, LeaveType.sick).contains(cell.day)) {
+        await controller.toggleLeave(cell.personId, LeaveType.sick, cell.day);
+      }
+      await controller.vacateShifts(
+        cell.personId,
+        [cell.day],
+        title:
+            '${formatDayMonth(cell.day, plan.month)}: ${_name(cell.personId)} '
+            'gelemiyor, koltuk boş',
+      );
+      if (mounted) {
+        _notify(
+          '${formatDayMonth(cell.day, plan.month)}: ${_name(cell.personId)} '
+          'çıkarıldı, koltuk boş. Boş koltuğa dokunup yerleştirebilirsin.',
+        );
+      }
+      return;
+    }
     if (picked == null || !mounted) return;
     final after = RosterEditor.replace(
       plan.assignments,

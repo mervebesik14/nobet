@@ -8,6 +8,8 @@ import '../../data/providers.dart';
 import '../../logic/leave_balance.dart';
 import '../../logic/leave_impact.dart';
 import '../people/people_controller.dart';
+import '../roster/what_if_page.dart';
+import 'sick_shift_action.dart';
 import '../holidays/holidays_controller.dart';
 import '../people/leave_balance_provider.dart';
 import '../../shared/widgets/month_selector.dart';
@@ -348,6 +350,119 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
     );
   }
 
+  /// Seçilen aralığın bu aya düşen günlerinden kişinin listede nöbeti
+  /// olanlar.
+  List<int> _shiftDaysIn(MonthPlan plan, DateTime s, DateTime e) {
+    if (!plan.hasRoster) return const [];
+    return [
+      for (var d = 1; d <= plan.daysInMonth; d++)
+        if (!DateTime(plan.year, plan.month, d).isBefore(s) &&
+            !DateTime(plan.year, plan.month, d).isAfter(e) &&
+            (plan.assignments[d]?.includes(person.id) ?? false))
+          d,
+    ];
+  }
+
+  /// Raporlu günlerdeki nöbetler: ayardaki tercihe göre boş bırakılır,
+  /// "Ya şöyle olursa" ile dağıtılır ya da ("Sor") seçtirilir.
+  Future<void> _handleSickShifts(List<int> days) async {
+    final plan = ref.read(monthPlanProvider);
+    final dates = days.map((d) => '$d').join(', ');
+    final when =
+        '$dates ${DateFormat.MMMM('tr_TR').format(DateTime(plan.year, plan.month))}';
+    var action = ref.read(sickShiftActionProvider);
+    if (action == SickShiftAction.ask) {
+      final picked = await showDialog<SickShiftAction>(
+        context: context,
+        builder: (context) => SimpleDialog(
+          key: const ValueKey('sick-shifts'),
+          title: Text(
+            'Raporlu günlerde ${person.name} için ${days.length} nöbet '
+            'var ($when). Ne yapalım?',
+          ),
+          children: [
+            SimpleDialogOption(
+              key: const ValueKey('sick-vacate'),
+              onPressed: () =>
+                  Navigator.of(context).pop(SickShiftAction.vacate),
+              child: const ListTile(
+                leading: Icon(Icons.event_busy_outlined),
+                title: Text('Boş bırak, ben yerleştiririm'),
+                subtitle: Text(
+                  'Koltuklar boş kalır; listede boş koltuğa dokunup '
+                  'yerleştirirsin.',
+                ),
+              ),
+            ),
+            SimpleDialogOption(
+              key: const ValueKey('sick-redistribute'),
+              onPressed: () =>
+                  Navigator.of(context).pop(SickShiftAction.redistribute),
+              child: const ListTile(
+                leading: Icon(Icons.auto_fix_high_outlined),
+                title: Text('Otomatik dağıt'),
+                subtitle: Text(
+                  'En az değişiklikle başkalarına yazılır; önce '
+                  'gösterilir.',
+                ),
+              ),
+            ),
+            SimpleDialogOption(
+              key: const ValueKey('sick-keep'),
+              onPressed: () => Navigator.of(context).pop(),
+              child: const ListTile(
+                leading: Icon(Icons.do_not_disturb_on_outlined),
+                title: Text('Listeye dokunma'),
+                subtitle: Text('Nöbetler kalır, kural uyarısı çıkar.'),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (picked == null || !mounted) return;
+      action = picked;
+    }
+    switch (action) {
+      case SickShiftAction.vacate:
+        final n = await ref
+            .read(monthPlanProvider.notifier)
+            .vacateShifts(
+              person.id,
+              days,
+              title: 'Rapor: ${person.name} nöbetleri boş bırakıldı',
+            );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                '$n nöbet boş bırakıldı ($when). Listede boş koltuklara '
+                'dokunup yerleştirebilirsin.',
+              ),
+            ),
+          );
+      case SickShiftAction.redistribute:
+        final message = await Navigator.of(context).push<String>(
+          MaterialPageRoute(
+            builder: (_) => WhatIfPage(
+              personId: person.id,
+              sick: true,
+              start: days.first,
+              end: days.last,
+            ),
+          ),
+        );
+        if (message != null && mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(SnackBar(content: Text(message)));
+        }
+      case SickShiftAction.ask:
+        break;
+    }
+  }
+
   /// Etkisi gösterilir; "Yine de ekle" denirse true.
   Future<bool> _confirmImpact(LeaveImpactReport impact) async {
     final problem = impact.verdict == LeaveVerdict.problem;
@@ -445,7 +560,11 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
     Future<void> add() async {
       final s = start!;
       final e = _rangeEnd ?? s;
-      final impact = _impact(plan, s, e);
+      // Rapor onaya bağlı değil: etki sorulmaz; nöbetleri ayrıca sorulur.
+      final impact = type == LeaveType.sick ? null : _impact(plan, s, e);
+      final sickShifts = type == LeaveType.sick
+          ? _shiftDaysIn(plan, s, e)
+          : const <int>[];
       if (impact != null &&
           impact.verdict != LeaveVerdict.ok &&
           !await _confirmImpact(impact)) {
@@ -473,6 +592,10 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
           ..showSnackBar(SnackBar(content: Text(message)));
+      }
+      if (sickShifts.isNotEmpty &&
+          !skipped.any((m) => m.year == plan.year && m.month == plan.month)) {
+        await _handleSickShifts(sickShifts);
       }
     }
 

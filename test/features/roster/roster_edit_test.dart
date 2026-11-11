@@ -906,6 +906,45 @@ void main() {
     expect(saved().leaveOf('n0', LeaveType.sick), [3]);
   });
 
+  testWidgets('gelemiyor: boş bırak, kimseye yazılmaz', (tester) async {
+    await pumpRoster(tester);
+    await tester.tap(cell('n0', 3));
+    await tester.pumpAndSettle();
+    await tester.tap(inSheet('Gelemiyor: yedeği yaz'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('backup-vacate')));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.nurseIds, ['n6']);
+    expect(saved().leaveOf('n0', LeaveType.sick), [3]);
+    expect(find.textContaining('koltuk boş'), findsWidgets);
+  });
+
+  testWidgets('ya şöyle olursa: raporda nöbetleri boş bırak', (tester) async {
+    await pumpRoster(tester);
+    await tester.tap(find.byKey(const ValueKey('what-if')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('what-if-person')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ayşe').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Rapor'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('what-if-start')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('3').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('what-if-vacate')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('what-if-try')));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('boş kalır; kimseye yazılmaz'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('what-if-apply')));
+    await tester.pumpAndSettle();
+    expect(saved().assignments[3]!.nurseIds, ['n6']);
+    expect(saved().leaveOf('n0', LeaveType.sick), [3]);
+  });
+
   testWidgets('ya şöyle olursa: kaydetmeden dener, uygulayınca kaydeder', (
     tester,
   ) async {

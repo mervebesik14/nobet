@@ -97,6 +97,40 @@ void main() {
     });
   });
 
+  test('vacate: kişi koltuklarından çıkar, koltuk boş kalır', () {
+    final withTech = {
+      ...base,
+      4: const DayAssignment(
+        day: 4,
+        nurseIds: ['b'],
+        techId: 'z',
+        tech16bId: 'm',
+      ),
+      5: const DayAssignment(day: 5, nurseIds: ['a', 'c'], shift16aIds: ['a']),
+    };
+    final r = RosterEditor.vacate(
+      withTech,
+      personId: 'a',
+      days: [1, 2, 3, 5, 9],
+      nursesPerDay: 2,
+    );
+    expect(r[1]!.nurseIds, ['b']);
+    expect(r[2]!.nurseIds, ['c', 'd']); // o gün nöbeti yok
+    expect(r[3]!.nurseIds, isEmpty);
+    expect(r[5]!.nurseIds, ['c']);
+    expect(r[5]!.shift16aIds, isEmpty);
+    expect(r.containsKey(9), isFalse);
+    final m = RosterEditor.vacate(
+      withTech,
+      personId: 'm',
+      days: [1, 4],
+      nursesPerDay: 2,
+    );
+    expect(m[1]!.techId, isNull);
+    expect(m[4]!.tech16bId, isNull);
+    expect(m[4]!.techId, 'z');
+  });
+
   group('swap', () {
     test('iki nöbet takas edilir', () {
       final r = RosterEditor.swap(

@@ -17,6 +17,7 @@ import '../../logic/day_shift_planner.dart';
 import '../../logic/feasibility_checker.dart';
 import '../../logic/leave_rules.dart';
 import '../../logic/roster_diff.dart';
+import '../../logic/roster_editor.dart';
 import '../../logic/roster_generator.dart';
 import '../../logic/roster_import.dart';
 import '../../logic/roster_validator.dart';
@@ -548,6 +549,32 @@ class MonthPlanController extends Notifier<MonthPlan> {
     await ref.read(monthPlanRepositoryProvider).save(state);
     await _record(title, before);
     return true;
+  }
+
+  /// [personId] kişisinin [days] günlerindeki nöbetlerini boşaltır:
+  /// koltuklar boş kalır, kimseye yazılmaz (rapor girilince "boş bırak").
+  /// Boşaltılan gün sayısı; kilitli ayda ya da nöbet yoksa 0.
+  Future<int> vacateShifts(
+    String personId,
+    Iterable<int> days, {
+    String title = 'Nöbetler boş bırakıldı',
+  }) async {
+    if (state.isLocked) return 0;
+    final hit = [
+      for (final d in days)
+        if (state.assignments[d]?.includes(personId) ?? false) d,
+    ];
+    if (hit.isEmpty) return 0;
+    await setAssignments(
+      RosterEditor.vacate(
+        state.assignments,
+        personId: personId,
+        days: hit,
+        nursesPerDay: ref.read(rosterSettingsProvider).nursesPerDay,
+      ),
+      title: title,
+    );
+    return hit.length;
   }
 
   RosterGenerator _generator(

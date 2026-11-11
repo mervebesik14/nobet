@@ -9,6 +9,7 @@ import '../../data/providers.dart';
 import '../../data/weekly_file_backup.dart';
 import '../../logic/next_month_reminder.dart';
 import '../../models/models.dart';
+import '../month/sick_shift_action.dart';
 import '../../shared/notification_service.dart';
 import '../../shared/platform_services.dart';
 import '../../shared/widgets/brand_widgets.dart';
@@ -140,6 +141,27 @@ class SettingsPage extends ConsumerWidget {
                 ),
                 value: s.holidayCountsAsWeekend,
                 onChanged: (v) => update(s.copyWith(holidayCountsAsWeekend: v)),
+              ),
+              ListTile(
+                key: const ValueKey('sick-action'),
+                title: const Text('Rapor girilince nöbetleri'),
+                subtitle: const Text(
+                  'Raporlu günlerdeki nöbetler boş mu kalsın (elle '
+                  'yerleştirirsin), başkalarına mı dağıtılsın, yoksa her '
+                  'seferinde sorulsun mu?',
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: SegmentedButton<SickShiftAction>(
+                  segments: [
+                    for (final a in SickShiftAction.values)
+                      ButtonSegment(value: a, label: Text(a.label)),
+                  ],
+                  selected: {ref.watch(sickShiftActionProvider)},
+                  onSelectionChanged: (v) =>
+                      ref.read(sickShiftActionProvider.notifier).set(v.single),
+                ),
               ),
             ],
           ),

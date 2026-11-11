@@ -6,6 +6,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/data/holiday_repository.dart';
 import 'package:nobet_listesi/features/month/month_page.dart';
+import 'package:nobet_listesi/features/month/month_plan_controller.dart';
 import 'package:nobet_listesi/models/models.dart';
 import 'package:nobet_listesi/shared/platform_services.dart';
 import 'package:nobet_listesi/shared/providers.dart';
@@ -59,6 +60,7 @@ void main() {
           ...boxOverrides(boxes),
           todayProvider.overrideWithValue(today ?? DateTime(2026, 10, 11)),
           platformServicesProvider.overrideWithValue(services),
+          rosterRunnerProvider.overrideWithValue((g) async => g.generate()),
         ],
         child: const MaterialApp(home: MonthPage()),
       ),
@@ -348,6 +350,85 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.text('2 gün rapor'), findsOneWidget);
+  });
+
+  group('rapor girilince nöbetler', () {
+    const plan = MonthPlan(
+      year: 2026,
+      month: 10,
+      assignments: {
+        10: DayAssignment(day: 10, nurseIds: ['n1', 'n2'], techId: 't1'),
+        12: DayAssignment(day: 12, nurseIds: ['n3', 'n4'], techId: 't1'),
+        20: DayAssignment(day: 20, nurseIds: ['n3', 'n4'], techId: 't1'),
+      },
+    );
+
+    Future<void> addSick(WidgetTester tester) async {
+      await pumpPage(tester);
+      await tester.tap(find.text('Ali').last);
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(TabBar), const Offset(-400, 0));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Rapor'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('10'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('13'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('İzin ekle'));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('sorulur; boş bırakılınca kimseye yazılmaz', (tester) async {
+      await seed(_team, plan);
+      await addSick(tester);
+      expect(find.byKey(const ValueKey('sick-shifts')), findsOneWidget);
+      expect(find.textContaining('2 nöbet var (10, 12 Ekim)'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('sick-vacate')));
+      await tester.pumpAndSettle();
+      final saved = boxes.monthPlans.get('2026-10')!;
+      expect(saved.sickLeaveOf('t1'), [10, 11, 12, 13]);
+      expect(saved.assignments[10]!.techId, isNull);
+      expect(saved.assignments[12]!.techId, isNull);
+      expect(saved.assignments[20]!.techId, 't1');
+      expect(find.textContaining('2 nöbet boş bırakıldı'), findsOneWidget);
+    });
+
+    testWidgets('"Listeye dokunma": nöbetler kalır', (tester) async {
+      await seed(_team, plan);
+      await addSick(tester);
+      await tester.tap(find.byKey(const ValueKey('sick-keep')));
+      await tester.pumpAndSettle();
+      final saved = boxes.monthPlans.get('2026-10')!;
+      expect(saved.sickLeaveOf('t1'), [10, 11, 12, 13]);
+      expect(saved.assignments[10]!.techId, 't1');
+    });
+
+    testWidgets('ayarda "Boş bırak" seçiliyse sormadan boşaltır', (
+      tester,
+    ) async {
+      await seed(_team, plan);
+      await boxes.meta.put('sickShiftAction', 'vacate');
+      await addSick(tester);
+      expect(find.byKey(const ValueKey('sick-shifts')), findsNothing);
+      expect(boxes.monthPlans.get('2026-10')!.assignments[10]!.techId, isNull);
+    });
+
+    testWidgets('otomatik dağıt: ya şöyle olursa açılır, uygulanınca yazılır', (
+      tester,
+    ) async {
+      await seed(_team, plan);
+      await addSick(tester);
+      await tester.tap(find.byKey(const ValueKey('sick-redistribute')));
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+      expect(find.text('Ya şöyle olursa'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('what-if-apply')));
+      await tester.pumpAndSettle();
+      final saved = boxes.monthPlans.get('2026-10')!;
+      expect(saved.assignments[10]!.techId, isNot('t1'));
+      expect(saved.assignments[12]!.techId, isNot('t1'));
+    });
   });
 
   testWidgets('kişi takviminde ay değiştirilir; izin iki aya taşabilir', (

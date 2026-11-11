@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../logic/roster_diff.dart';
+import '../../logic/roster_editor.dart';
 import '../../logic/roster_generator.dart';
 import '../../logic/turkish_collation.dart';
 import '../../logic/turkish_dates.dart';
@@ -15,7 +16,20 @@ import '../people/people_controller.dart';
 /// en az değişiklikle nasıl olurdu; kaydetmeden gösterilir, istenirse
 /// uygulanır.
 class WhatIfPage extends ConsumerStatefulWidget {
-  const WhatIfPage({super.key});
+  const WhatIfPage({
+    super.key,
+    this.personId,
+    this.sick = false,
+    this.start,
+    this.end,
+  });
+
+  /// Verilirse kişi, (sick ise) Rapor ve gün aralığı seçili açılır ve hemen
+  /// denenir (rapor girilince "otomatik dağıt").
+  final String? personId;
+  final bool sick;
+  final int? start;
+  final int? end;
 
   @override
   ConsumerState<WhatIfPage> createState() => _WhatIfPageState();
@@ -41,6 +55,23 @@ class _WhatIfPageState extends ConsumerState<WhatIfPage> {
   bool _busy = false;
   ({MonthPlan plan, RosterResult result})? _preview;
 
+  /// Raporda nöbetler başkalarına dağıtılmaz, koltuklar boş kalır.
+  bool _vacate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.personId != null) {
+      _personId = widget.personId;
+      if (widget.sick) _kind = _Kind.sick;
+      _start = widget.start ?? 1;
+      _end = widget.end ?? _start;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _try();
+      });
+    }
+  }
+
   String get _title {
     final plan = ref.read(monthPlanProvider);
     final name = ref
@@ -61,11 +92,36 @@ class _WhatIfPageState extends ConsumerState<WhatIfPage> {
     });
     final lo = _start < _end ? _start : _end,
         hi = _start < _end ? _end : _start;
-    final r = await ref.read(monthPlanProvider.notifier).previewAbsence(
-      _personId!,
-      _kind.type,
-      [for (var d = lo; d <= hi; d++) d],
-    );
+    final days = [for (var d = lo; d <= hi; d++) d];
+    final ({MonthPlan plan, RosterResult result})? r;
+    if (_kind == _Kind.sick && _vacate) {
+      // Kimseye yazılmaz: rapor işlenir, kişinin o günlerdeki koltukları
+      // boş kalır.
+      final plan = ref.read(monthPlanProvider);
+      final hypo = plan.withLeave(_personId!, LeaveType.sick, {
+        ...plan.leaveOf(_personId!, LeaveType.sick),
+        ...days,
+      });
+      final assignments = RosterEditor.vacate(
+        plan.assignments,
+        personId: _personId!,
+        days: days,
+        nursesPerDay: ref.read(effectiveSettingsProvider).nursesPerDay,
+      );
+      r = (
+        plan: hypo.copyWith(assignments: assignments),
+        result: RosterResult(
+          assignments: assignments,
+          score: 0,
+          issues: const [],
+          seed: plan.seed ?? 0,
+        ),
+      );
+    } else {
+      r = await ref
+          .read(monthPlanProvider.notifier)
+          .previewAbsence(_personId!, _kind.type, days);
+    }
     if (!mounted) return;
     setState(() {
       _busy = false;
@@ -200,6 +256,21 @@ class _WhatIfPageState extends ConsumerState<WhatIfPage> {
               ),
             ],
           ),
+          if (_kind == _Kind.sick)
+            SwitchListTile(
+              key: const ValueKey('what-if-vacate'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Nöbetleri boş bırak'),
+              subtitle: const Text(
+                'Başkalarına dağıtılmaz; koltuklar boş kalır, elle '
+                'yerleştirirsin.',
+              ),
+              value: _vacate,
+              onChanged: (v) => setState(() {
+                _vacate = v;
+                _preview = null;
+              }),
+            ),
           const SizedBox(height: 12),
           FilledButton.icon(
             key: const ValueKey('what-if-try'),
@@ -215,7 +286,9 @@ class _WhatIfPageState extends ConsumerState<WhatIfPage> {
           if (preview != null && report != null) ...[
             const Divider(height: 32),
             Text(
-              report.changedSeats == 0
+              _kind == _Kind.sick && _vacate
+                  ? '${lines.length} nöbet boş kalır; kimseye yazılmaz.'
+                  : report.changedSeats == 0
                   ? 'Liste değişmeden olur.'
                   : '${report.changedSeats} nöbet değişir.',
               style: theme.textTheme.titleMedium,

@@ -104,6 +104,32 @@ class RosterEditor {
     return {...assignments, day: updated};
   }
 
+  /// [personId] kişisini [days] günlerindeki koltuklarından (hemşire, 24
+  /// ya da 16B) çıkarır; koltuklar boş kalır, kimseye yazılmaz (rapor
+  /// girilince "boş bırak"). O gün nöbeti olmayan günler atlanır.
+  static Map<int, DayAssignment> vacate(
+    Map<int, DayAssignment> assignments, {
+    required String personId,
+    required Iterable<int> days,
+    required int nursesPerDay,
+  }) {
+    var out = assignments;
+    for (final d in days) {
+      final a = out[d];
+      if (a == null || !a.includes(personId)) continue;
+      final nurse = a.nurseIds.contains(personId);
+      out = replace(
+        out,
+        day: d,
+        role: nurse ? Role.nurse : Role.radiologyTech,
+        oldId: personId,
+        nursesPerDay: nursesPerDay,
+        secondary: !nurse && a.tech16bId == personId,
+      );
+    }
+    return out;
+  }
+
   /// [a] kişisinin [dayA] nöbeti ile [b] kişisinin [dayB] nöbetini takas
   /// eder: a → dayB, b → dayA. İkisi aynı rolde olmalı.
   static Map<int, DayAssignment> swap(
