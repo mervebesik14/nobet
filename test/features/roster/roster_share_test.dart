@@ -576,6 +576,19 @@ void main() {
     expect(services.calls, ['shareText']);
   });
 
+  testWidgets('adalet belgesi önizlenir ve PDF paylaşılır', (tester) async {
+    await pump(tester);
+    await choose(tester, 'Adalet belgesi (PDF)');
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(find.text('Adalet belgesi'), findsOneWidget);
+    expect(isPdf(services.lastPdf), isTrue);
+    await tester.tap(find.byTooltip('Paylaş').last);
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(services.calls, contains('sharePdf:nobet-dagilimi-2026-10.pdf'));
+  });
+
   testWidgets('isme dokununca kişi vurgulanır ve özeti çıkar', (tester) async {
     await pump(tester);
     await tester.pumpAndSettle();

@@ -40,6 +40,11 @@ import '../../shared/widgets/motion.dart';
 import 'change_notice_page.dart';
 import 'month_close_page.dart';
 import 'favor_ledger_page.dart';
+import 'fairness_report_pdf.dart';
+import '../../logic/fairness_report.dart';
+import '../../logic/request_fulfillment.dart';
+import '../../logic/yearly_summary.dart';
+import '../../shared/widgets/pdf_preview_page.dart';
 import '../../logic/month_close.dart';
 import 'edit_sheet.dart';
 import '../settings/report_info.dart';
@@ -2097,6 +2102,57 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     }
   }
 
+  /// Adalet belgesi: kurallar, denge özeti, kişi başı bu ay ve yıl içi
+  /// sayılar; önce önizlenir.
+  Future<void> _shareFairness(MonthPlan plan, RosterSummary summary) async {
+    final services = ref.read(platformServicesProvider);
+    try {
+      final people = ref.read(peopleProvider);
+      final yearly = YearlySummary.build(
+        year: plan.year,
+        plans: [
+          for (final p in ref.read(monthPlanRepositoryProvider).getAll())
+            if (p.year != plan.year || p.month != plan.month) p,
+          plan,
+        ],
+        people: people,
+        holidays: ref.read(holidaysProvider),
+        settings: ref.read(rosterSettingsProvider),
+        beforeMonth: plan.month + 1,
+      );
+      final report = FairnessReport.build(
+        summary: summary,
+        ytd: {for (final r in yearly.rows) r.personId: r.totals},
+        requests: RequestFulfillment.forMonth(plan, people),
+        settings: ref.read(effectiveSettingsProvider),
+      );
+      final fonts = await services.loadPdfFonts();
+      final pdf = await buildFairnessReportPdf(
+        year: plan.year,
+        month: plan.month,
+        report: report,
+        info: ref.read(reportInfoProvider),
+        font: fonts.regular,
+        boldFont: fonts.bold,
+        createdAt: ref.read(todayProvider),
+      );
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => PdfPreviewPage(
+            title: 'Adalet belgesi',
+            pdf: pdf,
+            fileName:
+                'nobet-dagilimi-${plan.year}-'
+                '${plan.month.toString().padLeft(2, '0')}.pdf',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) _notify('Hazırlanamadı: $e');
+    }
+  }
+
   /// Herkesin kişiye özel PDF'ini ayrı dosyalar olarak tek seferde paylaşır.
   /// [calendar] ise PDF yerine herkesin takvim dosyası (.ics); ay içinde
   /// nöbeti ve 7A'sı olmayanlar atlanır.
@@ -2283,6 +2339,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             _ShareAction.whatsAppEach ||
             _ShareAction.swapLog ||
             _ShareAction.favorLedger ||
+            _ShareAction.fairness ||
             _ShareAction.notifyChanges ||
             _ShareAction.closeMonth ||
             _ShareAction.allPersonalPdf ||
@@ -2403,6 +2460,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
               _ShareAction.swapLog => Navigator.of(context).push(
                 MaterialPageRoute<void>(builder: (_) => const SwapLogPage()),
               ),
+              _ShareAction.fairness => _shareFairness(plan, summary),
               _ShareAction.favorLedger => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => const FavorLedgerPage(),
@@ -2563,6 +2621,14 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 child: ListTile(
                   leading: Icon(Icons.swap_horiz),
                   title: Text('Takas defteri'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.fairness,
+                child: ListTile(
+                  leading: Icon(Icons.balance),
+                  title: Text('Adalet belgesi (PDF)'),
+                  subtitle: Text('Nöbetler nasıl dağıtıldı'),
                 ),
               ),
               PopupMenuItem(
@@ -2996,6 +3062,7 @@ enum _ShareAction {
   whatsAppEach,
   swapLog,
   favorLedger,
+  fairness,
   notifyChanges,
   closeMonth,
 }
