@@ -493,6 +493,59 @@ void main() {
     }
   });
 
+  testWidgets('ay kapanışı: adımlar sırayla yapılır ve hatırlanır', (
+    tester,
+  ) async {
+    await pump(tester);
+    await tester.tap(find.byTooltip('Paylaş'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ayı kapat'));
+    await tester.pumpAndSettle();
+
+    // Kontrol: boş koltuklar var, sorulur.
+    expect(find.textContaining('koltuk boş'), findsWidgets);
+    expect(find.text('0 / 6 adım tamam'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('close-next')));
+    await tester.pumpAndSettle();
+    expect(find.text('Listede bakılacak şeyler var'), findsOneWidget);
+    await tester.tap(find.text('Yine de devam'));
+    await tester.pumpAndSettle();
+    expect(find.text('1 / 6 adım tamam'), findsOneWidget);
+
+    // Kilit.
+    await tester.tap(find.byKey(const ValueKey('close-next')));
+    await tester.pumpAndSettle();
+    expect(boxes.monthPlans.get('2026-10')!.isLocked, isTrue);
+    expect(find.text('Liste kilitli.'), findsOneWidget);
+
+    // Fazla mesai raporu (sıra dışı, satırdan).
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('close-overtime')),
+        matching: find.text('Yap'),
+      ),
+    );
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(services.calls, ['sharePdf:fazla-mesai-2026-10.pdf']);
+
+    // Yedek.
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('close-backup')),
+        matching: find.text('Yap'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(services.calls.last, startsWith('shareFile:nobet-yedek-'));
+    expect(find.text('4 / 6 adım tamam'), findsOneWidget);
+    expect(find.text('Sıradaki: Herkese gönder'), findsOneWidget);
+    expect(
+      boxes.meta.get('monthClose/2026-10'),
+      unorderedEquals(['check', 'lock', 'overtime', 'backup']),
+    );
+  });
+
   testWidgets('isme dokununca kişi vurgulanır ve özeti çıkar', (tester) async {
     await pump(tester);
     await tester.pumpAndSettle();

@@ -38,6 +38,8 @@ import '../../shared/platform_services.dart';
 import '../../shared/providers.dart';
 import '../../shared/widgets/motion.dart';
 import 'change_notice_page.dart';
+import 'month_close_page.dart';
+import '../../logic/month_close.dart';
 import 'edit_sheet.dart';
 import '../settings/report_info.dart';
 import 'overtime_report_pdf.dart';
@@ -2268,6 +2270,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             _ShareAction.whatsAppEach ||
             _ShareAction.swapLog ||
             _ShareAction.notifyChanges ||
+            _ShareAction.closeMonth ||
             _ShareAction.allPersonalPdf ||
             _ShareAction.allPersonalCalendar ||
             _ShareAction.excel:
@@ -2391,6 +2394,51 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                   builder: (_) => const ChangeNoticePage(),
                 ),
               ),
+              _ShareAction.closeMonth => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => MonthClosePage(
+                    checkLines: MonthClose.checkLines(
+                      missingSeats: missingByDay.values.fold(
+                        0,
+                        (a, b) => a + b,
+                      ),
+                      violations: violations
+                          .where((v) => v.kind != ViolationKind.missing)
+                          .length,
+                      overCapNames: [
+                        for (final r in summary.people)
+                          if (r.overtimeHours > settings.payHourCap) r.name,
+                      ],
+                      payHourCap: settings.payHourCap,
+                    ),
+                    onPublish: () async {
+                      await markPublished(ref, plan);
+                      if (!context.mounted) return;
+                      await Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => WhatsAppSendPage(
+                            personIds: [for (final r in rows) r.id],
+                            dayShifts: dayShifts,
+                            weekendDays: weekendDays,
+                            holidayDays: holidayDays,
+                          ),
+                        ),
+                      );
+                    },
+                    onOvertimeReport: () => _shareOvertimeReport(
+                      plan,
+                      summary,
+                      settings.shiftHours,
+                    ),
+                    onPersonalPdfs: () => _shareAllPersonal(
+                      rows,
+                      dayShifts,
+                      weekendDays: weekendDays,
+                      holidayDays: holidayDays,
+                    ),
+                  ),
+                ),
+              ),
               _ShareAction.whatsAppEach => () async {
                 await markPublished(ref, plan);
                 if (!context.mounted) return;
@@ -2431,6 +2479,15 @@ class _RosterPageState extends ConsumerState<RosterPage> {
               ),
             },
             itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: _ShareAction.closeMonth,
+                child: ListTile(
+                  leading: Icon(Icons.task_alt),
+                  title: Text('Ayı kapat'),
+                  subtitle: Text('Kontrol, kilit, gönder, rapor, yedek'),
+                ),
+              ),
+              PopupMenuDivider(),
               PopupMenuItem(
                 value: _ShareAction.pdf,
                 child: ListTile(
@@ -2911,6 +2968,7 @@ enum _ShareAction {
   whatsAppEach,
   swapLog,
   notifyChanges,
+  closeMonth,
 }
 
 /// Vurgulanan kişinin özeti: tablonun üstünde, kapatılabilir.
