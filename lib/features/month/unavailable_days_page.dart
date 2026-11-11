@@ -4,7 +4,10 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../models/models.dart';
+import '../../data/providers.dart';
 import '../../logic/leave_balance.dart';
+import '../../logic/leave_impact.dart';
+import '../people/people_controller.dart';
 import '../holidays/holidays_controller.dart';
 import '../people/leave_balance_provider.dart';
 import '../../shared/widgets/month_selector.dart';
@@ -313,6 +316,81 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
   Person get person => widget.person;
   LeaveType get type => widget.type;
 
+  /// Seçilen aralığın bu aya düşen kısmı için izin etkisi; bu aya düşen gün
+  /// yoksa null.
+  LeaveImpactReport? _impact(MonthPlan plan, DateTime s, DateTime e) {
+    final first = DateTime(plan.year, plan.month);
+    final last = DateTime(plan.year, plan.month, plan.daysInMonth);
+    final from = s.isBefore(first) ? first : s;
+    final to = e.isAfter(last) ? last : e;
+    if (to.isBefore(from)) return null;
+    final people = ref.read(peopleProvider);
+    final holidays = ref.read(holidaysProvider);
+    final after = plan.withLeave(person.id, type, {
+      ...plan.leaveOf(person.id, type),
+      for (var d = from.day; d <= to.day; d++) d,
+    });
+    return LeaveImpact.assess(
+      year: plan.year,
+      month: plan.month,
+      people: people,
+      personId: person.id,
+      blockedBefore: ref.read(effectiveBlockedDaysProvider),
+      blockedAfter: computeEffectiveBlockedDays(
+        after,
+        holidays,
+        repository: ref.read(monthPlanRepositoryProvider),
+        people: people,
+      ),
+      settings: ref.read(effectiveSettingsProvider),
+      requestedShifts: plan.requestedShifts,
+      assignments: plan.assignments,
+    );
+  }
+
+  /// Etkisi gösterilir; "Yine de ekle" denirse true.
+  Future<bool> _confirmImpact(LeaveImpactReport impact) async {
+    final problem = impact.verdict == LeaveVerdict.problem;
+    final scheme = Theme.of(context).colorScheme;
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        key: const ValueKey('leave-impact'),
+        icon: Icon(
+          problem ? Icons.error_outline : Icons.info_outline,
+          color: problem ? scheme.error : scheme.primary,
+        ),
+        title: Text(problem ? 'Bu izin listeyi zorlar' : 'İzinden önce bakın'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('${person.name} · ${type.label}'),
+              const SizedBox(height: 8),
+              for (final l in impact.lines)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text('• $l'),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Yine de ekle'),
+          ),
+        ],
+      ),
+    );
+    return go ?? false;
+  }
+
   /// Sıralı gün listesini bitişik aralıklara ayırır: [1,2,3,7] → [(1,3),(7,7)].
   List<(int, int)> _ranges(List<int> days) {
     if (days.isEmpty) return const [];
@@ -367,6 +445,12 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
     Future<void> add() async {
       final s = start!;
       final e = _rangeEnd ?? s;
+      final impact = _impact(plan, s, e);
+      if (impact != null &&
+          impact.verdict != LeaveVerdict.ok &&
+          !await _confirmImpact(impact)) {
+        return;
+      }
       final skipped = await controller.addLeaveDates(person.id, type, s, e);
       if (!context.mounted) return;
       setState(() {
@@ -381,6 +465,9 @@ class _LeaveEditorState extends ConsumerState<_LeaveEditor> {
           : multi
           ? '${type.label} eklendi: ${selectionText(s, e)}. Diğer ayın günleri '
                 'o ayın planına yazıldı.'
+          : impact != null && impact.verdict == LeaveVerdict.ok
+          ? '${type.label} eklendi. Sorun yok'
+                '${impact.extraShifts >= 0.1 ? '; diğerlerine kişi başı ~${impact.extraPerPerson.toStringAsFixed(1).replaceAll('.', ',')} nöbet daha düşer.' : '.'}'
           : null;
       if (message != null) {
         ScaffoldMessenger.of(context)

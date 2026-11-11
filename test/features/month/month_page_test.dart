@@ -238,6 +238,54 @@ void main() {
     expect(plan.unavailableDaysOf('t1'), isEmpty);
   });
 
+  testWidgets('izin onay asistanı: sıkışık günlerde önce etkisi gösterilir', (
+    tester,
+  ) async {
+    await seed(
+      _team,
+      const MonthPlan(
+        year: 2026,
+        month: 10,
+        unavailableDays: {
+          't2': [7, 8],
+          't3': [8],
+        },
+      ),
+    );
+    await pumpPage(tester);
+    await tester.tap(find.text('Ali'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Yıllık izin'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Yıllık izin'));
+    await tester.pumpAndSettle();
+
+    Future<void> pick() async {
+      await tester.tap(find.text('6'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('9'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('İzin ekle'));
+      await tester.pumpAndSettle();
+    }
+
+    await pick();
+    expect(find.byKey(const ValueKey('leave-impact')), findsOneWidget);
+    expect(find.textContaining('Sıkışık günler: 7, 8 Ekim'), findsOneWidget);
+    expect(
+      find.textContaining('Aynı günlerde müsait olmayanlar: Burak (2 gün)'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Vazgeç'));
+    await tester.pumpAndSettle();
+    expect(boxes.monthPlans.get('2026-10')!.annualLeaveOf('t1'), isEmpty);
+
+    await pick();
+    await tester.tap(find.text('Yine de ekle'));
+    await tester.pumpAndSettle();
+    expect(boxes.monthPlans.get('2026-10')!.annualLeaveOf('t1'), [6, 7, 8, 9]);
+  });
+
   testWidgets('Şua izni ayrı sekmede tutulur, yıllık izinden bağımsız', (
     tester,
   ) async {
