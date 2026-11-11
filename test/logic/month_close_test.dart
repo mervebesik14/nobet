@@ -36,7 +36,7 @@ void main() {
       [
         '2 koltuk boş.',
         '1 kural uyarısı var.',
-        '130 saat ücret sınırını aşanlar: Ayşe.',
+        'Ücretli 130 saat sınırını aşanlar: Ayşe.',
       ],
     );
   });

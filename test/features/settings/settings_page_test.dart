@@ -191,6 +191,19 @@ void main() {
     await tester.tap(find.text('Riskli birim'));
     await tester.pumpAndSettle();
     expect(saved().riskyUnit, isTrue);
+    expect(find.text('Sınır yok'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('pay-cap')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('pay-cap-field')), '100');
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Kaydet'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(saved().payHourCap, 100);
+    expect(find.text('100 saat'), findsOneWidget);
     await tester.tap(find.text('Varsayılanlara dön'));
     await tester.pumpAndSettle();
     expect(saved().shiftHourlyRate, 156.35);

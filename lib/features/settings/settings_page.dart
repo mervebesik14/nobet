@@ -222,11 +222,22 @@ class SettingsPage extends ConsumerWidget {
                 value: s.riskyUnit,
                 onChanged: (v) => update(s.copyWith(riskyUnit: v)),
               ),
+              ListTile(
+                key: const ValueKey('pay-cap'),
+                leading: const Icon(Icons.timer_outlined),
+                title: const Text('Aylık saat sınırı'),
+                subtitle: const Text('Ayda en fazla ödenen fazla nöbet saati.'),
+                trailing: Text(
+                  s.payHourCap > 0 ? '${s.payHourCap} saat' : 'Sınır yok',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                onTap: () => _editPayCap(context, ref),
+              ),
               const ListTile(
                 dense: true,
                 title: Text(
                   'Hesap: gereken saati aşan saatler ödenir (ayda en fazla '
-                  '130 saat); resmi tatil ve bayram nöbet saatleri ×1,25; '
+                  'saat sınırı kadar); resmi tatil ve bayram nöbet saatleri ×1,25; '
                   'yalnız damga vergisi (binde 7,59) düşülür. Kurumun '
                   'bordrosu farklı olabilir; bu bir tahmindir.',
                 ),
@@ -744,6 +755,46 @@ Future<void> _editPayRate(BuildContext context, WidgetRef ref) async {
   await ref
       .read(rosterSettingsProvider.notifier)
       .update(s.copyWith(shiftHourlyRate: result < 0 ? 0 : result));
+}
+
+/// Aylık ücretli saat sınırını sorar (boş ya da 0 → sınır yok).
+Future<void> _editPayCap(BuildContext context, WidgetRef ref) async {
+  final s = ref.read(rosterSettingsProvider);
+  final text = TextEditingController(
+    text: s.payHourCap > 0 ? '${s.payHourCap}' : '',
+  );
+  final result = await showDialog<int>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Aylık saat sınırı'),
+      content: TextField(
+        key: const ValueKey('pay-cap-field'),
+        controller: text,
+        autofocus: true,
+        keyboardType: TextInputType.number,
+        decoration: const InputDecoration(
+          suffixText: 'saat',
+          helperText: 'Boş bırakılırsa sınır yok.',
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Vazgeç'),
+        ),
+        FilledButton(
+          onPressed: () =>
+              Navigator.of(context).pop(int.tryParse(text.text.trim()) ?? 0),
+          child: const Text('Kaydet'),
+        ),
+      ],
+    ),
+  );
+  WidgetsBinding.instance.addPostFrameCallback((_) => text.dispose());
+  if (result == null) return;
+  await ref
+      .read(rosterSettingsProvider.notifier)
+      .update(s.copyWith(payHourCap: result < 0 ? 0 : result));
 }
 
 /// Özel mesai ekler, düzenler ya da siler.

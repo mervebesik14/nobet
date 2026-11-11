@@ -13,7 +13,7 @@ typedef PayEstimate = ({
 
 /// Nöbet (fazla mesai) ücreti tahmini (saf Dart). Ödenen saat, gereken
 /// saati aşan çalışılan saattir; ayda en fazla [RosterSettings.payHourCap]
-/// saat ödenir. Resmi tatil / bayram nöbetlerinin saatleri ×1,25, riskli
+/// saat ödenir (0 = sınır yok). Resmi tatil / bayram nöbetlerinin saatleri ×1,25, riskli
 /// birimde tüm saatler ×1,5 (bayram ×1,875). Yalnız damga vergisi kesilir.
 /// Gerçek bordro kurumun hesabına göre değişebilir; bu bir tahmindir.
 class ShiftPay {
@@ -37,7 +37,7 @@ class ShiftPay {
     final cap = settings.payHourCap.toDouble();
     final paid = overtimeHours < 0
         ? 0.0
-        : (overtimeHours > cap ? cap : overtimeHours);
+        : (cap > 0 && overtimeHours > cap ? cap : overtimeHours);
     final holiday = holidayShiftHours > paid ? paid : holidayShiftHours;
     final normal = paid - holiday;
     final rate =
@@ -51,7 +51,7 @@ class ShiftPay {
       gross: gross,
       stamp: stamp,
       net: gross - stamp,
-      capped: overtimeHours > cap,
+      capped: cap > 0 && overtimeHours > cap,
     );
   }
 }

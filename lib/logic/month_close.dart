@@ -50,7 +50,7 @@ class MonthClose {
       if (missingSeats > 0) '$missingSeats koltuk boş.',
       if (violations > 0) '$violations kural uyarısı var.',
       if (overCapNames.isNotEmpty)
-        '$payHourCap saat ücret sınırını aşanlar: ${overCapNames.join(', ')}.',
+        'Ücretli $payHourCap saat sınırını aşanlar: ${overCapNames.join(', ')}.',
     ];
     return lines.isEmpty ? const ['Her şey yolunda.'] : lines;
   }

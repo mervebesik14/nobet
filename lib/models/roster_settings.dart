@@ -19,7 +19,7 @@ class RosterSettings {
     this.customShifts = const [],
     this.shiftHourlyRate = 0,
     this.riskyUnit = false,
-    this.payHourCap = 130,
+    this.payHourCap = 0,
   });
 
   /// Her gün nöbet tutacak hemşire sayısı.
@@ -66,7 +66,7 @@ class RosterSettings {
   /// Riskli birim (yoğun bakım, acil…): ücret ×1,5.
   final bool riskyUnit;
 
-  /// Ayda ücreti ödenen en fazla nöbet saati (mevzuatta 130).
+  /// Ayda ücreti ödenen en fazla nöbet saati; 0 = sınır yok.
   final int payHourCap;
 
   /// [code] adlı özel mesai; yoksa null.

@@ -2407,7 +2407,9 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                           .length,
                       overCapNames: [
                         for (final r in summary.people)
-                          if (r.overtimeHours > settings.payHourCap) r.name,
+                          if (settings.payHourCap > 0 &&
+                              r.overtimeHours > settings.payHourCap)
+                            r.name,
                       ],
                       payHourCap: settings.payHourCap,
                     ),

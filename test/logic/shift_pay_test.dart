@@ -29,8 +29,22 @@ void main() {
     expect(e.capped, isFalse);
   });
 
-  test('riskli birim ve 130 saat sınırı', () {
-    const s = RosterSettings(shiftHourlyRate: 100, riskyUnit: true);
+  test('sınır yoksa bütün fazla saat ödenir', () {
+    final e = ShiftPay.estimate(
+      overtimeHours: 150,
+      holidayShiftHours: 0,
+      settings: const RosterSettings(shiftHourlyRate: 100),
+    );
+    expect(e.paidHours, 150);
+    expect(e.capped, isFalse);
+  });
+
+  test('riskli birim ve saat sınırı', () {
+    const s = RosterSettings(
+      shiftHourlyRate: 100,
+      riskyUnit: true,
+      payHourCap: 130,
+    );
     final e = ShiftPay.estimate(
       overtimeHours: 150,
       holidayShiftHours: 0,
