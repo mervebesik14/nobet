@@ -45,6 +45,7 @@ class SwapFinder {
     required int nursesPerDay,
     required List<RuleViolation> Function(Map<int, DayAssignment>) validate,
     Set<int> weekendDays = const {},
+    Map<String, int> debts = const {},
     int limit = 12,
   }) {
     final current = plan.assignments[day];
@@ -98,7 +99,8 @@ class SwapFinder {
             weekendDays.contains(day) != weekendDays.contains(e) ? 1 : 0;
         out.add((
           (otherId: q.id, otherName: q.name, otherDay: e, after: after),
-          weekendShift * 100 + (e - day).abs(),
+          // Kişiye iyilik borcu olan önce (bkz. FavorLedger).
+          -(debts[q.id] ?? 0) * 1000 + weekendShift * 100 + (e - day).abs(),
         ));
       }
     }

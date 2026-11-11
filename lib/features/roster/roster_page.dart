@@ -39,6 +39,7 @@ import '../../shared/providers.dart';
 import '../../shared/widgets/motion.dart';
 import 'change_notice_page.dart';
 import 'month_close_page.dart';
+import 'favor_ledger_page.dart';
 import '../../logic/month_close.dart';
 import 'edit_sheet.dart';
 import '../settings/report_info.dart';
@@ -1018,8 +1019,10 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         ref.read(holidaysProvider),
         settings,
       ),
+      debts: ref.read(favorLedgerProvider).debtorsOf(cell.personId),
       count: 3,
     );
+    final debts = ref.read(favorLedgerProvider).debtorsOf(cell.personId);
     if (backups.isEmpty) {
       _notify('Bu gün için kurala uyan yedek yok; listeden elle seçin.');
       return;
@@ -1040,7 +1043,14 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                   key: ValueKey('backup-${p.id}'),
                   leading: Icon(i == 0 ? Icons.star : Icons.person_outline),
                   title: Text(p.name),
-                  subtitle: i == 0 ? const Text('Önerilen yedek') : null,
+                  subtitle: debts[p.id] != null
+                      ? Text(
+                          'İyilik borcu: ${_name(cell.personId)} daha önce '
+                          '${debts[p.id]} kez onun yerine geçti',
+                        )
+                      : i == 0
+                      ? const Text('Önerilen yedek')
+                      : null,
                   onTap: () => Navigator.of(context).pop(p),
                 ),
               SwitchListTile(
@@ -1142,7 +1152,9 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         ref.read(holidaysProvider),
         settings,
       ),
+      debts: ref.read(favorLedgerProvider).debtorsOf(cell.personId),
     );
+    final debts = ref.read(favorLedgerProvider).debtorsOf(cell.personId);
     final byId = {for (final p in people) p.id: p};
     final name = _name(cell.personId);
     String d(int x) => formatDayMonthWeekday(plan.year, plan.month, x);
@@ -1187,7 +1199,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                     title: Text('${o.otherName} · ${d(o.otherDay)}'),
                     subtitle: Text(
                       '$name → ${formatDayMonth(o.otherDay, plan.month)} · '
-                      '${o.otherName} → ${formatDayMonth(cell.day, plan.month)}',
+                      '${o.otherName} → ${formatDayMonth(cell.day, plan.month)}'
+                      '${debts[o.otherId] == null ? '' : '\nİyilik borcu: $name daha önce ${debts[o.otherId]} kez onun yerine geçti'}',
                     ),
                     trailing: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -2269,6 +2282,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             _ShareAction.overtimeReport ||
             _ShareAction.whatsAppEach ||
             _ShareAction.swapLog ||
+            _ShareAction.favorLedger ||
             _ShareAction.notifyChanges ||
             _ShareAction.closeMonth ||
             _ShareAction.allPersonalPdf ||
@@ -2388,6 +2402,11 @@ class _RosterPageState extends ConsumerState<RosterPage> {
               ),
               _ShareAction.swapLog => Navigator.of(context).push(
                 MaterialPageRoute<void>(builder: (_) => const SwapLogPage()),
+              ),
+              _ShareAction.favorLedger => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const FavorLedgerPage(),
+                ),
               ),
               _ShareAction.notifyChanges => Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -2544,6 +2563,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 child: ListTile(
                   leading: Icon(Icons.swap_horiz),
                   title: Text('Takas defteri'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.favorLedger,
+                child: ListTile(
+                  leading: Icon(Icons.volunteer_activism_outlined),
+                  title: Text('İyilik defteri'),
                 ),
               ),
               PopupMenuItem(
@@ -2969,6 +2995,7 @@ enum _ShareAction {
   overtimeReport,
   whatsAppEach,
   swapLog,
+  favorLedger,
   notifyChanges,
   closeMonth,
 }

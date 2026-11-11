@@ -54,6 +54,17 @@ void main() {
       settings: const RosterSettings(),
     );
     expect([for (final p in c20) p.id], ['e', 'a']);
+
+    // Gelemeyene iyilik borcu olan önce.
+    final owed = BackupPicker.candidates(
+      plan: plan,
+      people: people,
+      day: 20,
+      role: Role.nurse,
+      settings: const RosterSettings(),
+      debts: const {'b': 1},
+    );
+    expect([for (final p in owed) p.id], ['b', 'e']);
   });
 
   test('mesaj', () {

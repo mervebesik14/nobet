@@ -5,6 +5,8 @@ import '../../data/month_plan_repository.dart';
 import '../../data/providers.dart';
 import '../../data/turkish_holidays.dart';
 import '../../logic/backup_picker.dart';
+import '../../logic/favor_ledger.dart';
+import '../../logic/swap_log.dart';
 import '../../logic/request_fulfillment.dart';
 import '../../logic/holiday_history.dart';
 import '../../logic/request_parser.dart';
@@ -1137,6 +1139,21 @@ final rosterHistoryProvider = Provider<List<RosterEdit>>((ref) {
   ref.watch(rosterHistoryVersionProvider);
   final plan = ref.watch(monthPlanProvider);
   return ref.watch(rosterHistoryRepositoryProvider).load(plan.year, plan.month);
+});
+
+/// Seçili ayın yılının iyilik defteri (her ayın takas defterinden).
+final favorLedgerProvider = Provider<FavorLedger>((ref) {
+  ref.watch(rosterHistoryVersionProvider);
+  final plan = ref.watch(monthPlanProvider);
+  final people = ref.watch(peopleProvider);
+  final plans = ref.watch(monthPlanRepositoryProvider);
+  final history = ref.watch(rosterHistoryRepositoryProvider);
+  final roles = {for (final p in people) p.id: p.role};
+  return FavorLedger.build({
+    for (var m = 1; m <= 12; m++)
+      if (m == plan.month ? plan : plans.get(plan.year, m) case final p?)
+        m: SwapLog.build(history.load(plan.year, m), p.assignments),
+  }, roleOf: (id) => roles[id]);
 });
 
 /// Seçili ayın kapalı günleri ve nedenleri.

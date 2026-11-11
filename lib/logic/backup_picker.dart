@@ -7,7 +7,8 @@ import 'turkish_dates.dart';
 /// Günün yedek nöbetçileri (saf Dart): o gün nöbette olmayan, aynı roldeki
 /// kişilerden biri gelemezse yerine kural bozmadan yazılabilecekler. Kesin
 /// kurallar: izin / istemediği gün / pasif (bkz. [BlockReason]), art arda
-/// gün, gün aşırı zincir sınırı; sorumlu hemşire yedek olmaz. Sıra: bu ay
+/// gün, gün aşırı zincir sınırı; sorumlu hemşire yedek olmaz. Sıra: gelemeyen
+/// kişiye iyilik borcu olan ([debts], bkz. [FavorLedger]) önce, sonra bu ay
 /// en az nöbeti olan, eşitse (hafta sonuysa) en az hafta sonu tutan.
 class BackupPicker {
   const BackupPicker._();
@@ -20,6 +21,7 @@ class BackupPicker {
     required RosterSettings settings,
     Map<String, Map<int, BlockReason>> blockReasons = const {},
     Set<int> weekendDays = const {},
+    Map<String, int> debts = const {},
     int count = 2,
   }) {
     final current = plan.assignments[day];
@@ -50,6 +52,8 @@ class BackupPicker {
     }
     final weekend = weekendDays.contains(day);
     out.sort((a, b) {
+      final o = (debts[b.$1.id] ?? 0).compareTo(debts[a.$1.id] ?? 0);
+      if (o != 0) return o;
       final s = a.$2.compareTo(b.$2);
       if (s != 0) return s;
       if (weekend) {

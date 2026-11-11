@@ -50,6 +50,18 @@ void main() {
     final swapped = options.first.after;
     expect(swapped[10]!.nurseIds, ['b']);
     expect(swapped[11]!.nurseIds, ['a']);
+
+    // Ayşe'ye iyilik borcu olan önce gelir.
+    final owed = SwapFinder.find(
+      plan: plan,
+      people: people,
+      personId: 'a',
+      day: 10,
+      nursesPerDay: 1,
+      validate: validate,
+      debts: const {'c': 1},
+    );
+    expect([for (final o in owed) '${o.otherId}${o.otherDay}'], ['c5', 'b11']);
   });
 
   test('art arda doğuracak takas önerilmez', () {

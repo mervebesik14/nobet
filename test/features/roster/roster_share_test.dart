@@ -8,6 +8,7 @@ import 'package:hive_ce/hive_ce.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:nobet_listesi/data/hive_boxes.dart';
 import 'package:nobet_listesi/data/holiday_repository.dart';
+import 'package:nobet_listesi/data/roster_history_repository.dart';
 import 'package:nobet_listesi/features/roster/roster_page.dart';
 import 'package:nobet_listesi/logic/xlsx_writer.dart';
 import 'package:nobet_listesi/models/models.dart';
@@ -545,6 +546,34 @@ void main() {
       boxes.meta.get('monthClose/2026-10'),
       unorderedEquals(['check', 'lock', 'overtime', 'backup']),
     );
+  });
+
+  testWidgets('iyilik defteri: yerine geçen alacaklı', (tester) async {
+    await boxes.people.put(
+      'c',
+      const Person(id: 'c', name: 'Cemile', role: Role.nurse),
+    );
+    await RosterHistoryRepository(boxes.history).add(
+      2026,
+      10,
+      RosterEdit(
+        at: DateTime(2026, 10, 2),
+        title: 'Elle değişiklik',
+        before: const {
+          1: DayAssignment(day: 1, nurseIds: ['a', 'c'], techId: 't'),
+        },
+      ),
+    );
+    await pump(tester);
+    await choose(tester, 'İyilik defteri');
+    expect(find.text('Cemile → Banu'), findsOneWidget);
+    expect(find.text('1 nöbet'), findsOneWidget);
+    await tester.tap(find.text('Cemile → Banu'));
+    await tester.pumpAndSettle();
+    expect(find.text('1 Ekim: Banu, Cemile yerine'), findsOneWidget);
+    await tester.tap(find.byTooltip('Paylaş').last);
+    await tester.pumpAndSettle();
+    expect(services.calls, ['shareText']);
   });
 
   testWidgets('isme dokununca kişi vurgulanır ve özeti çıkar', (tester) async {
