@@ -252,6 +252,28 @@ class RosterGenerator {
     };
   }
 
+  /// Hafta sonunu yiyen nöbet günleri ("Cuma nöbeti"): kendisi hafta sonu
+  /// sayılmayan, ertesi günü hafta sonu ya da tatil olan günler. Nöbetten
+  /// sonraki gün uykuyla geçtiği için hafta sonunun yarısı kaybolur. Ayın son
+  /// günü, ertesi ay Cumartesi ile başlıyorsa sayılır.
+  static Set<int> preWeekendDays(
+    int year,
+    int month,
+    Iterable<Holiday> holidays,
+    RosterSettings settings,
+  ) {
+    final days = DateTime(year, month + 1, 0).day;
+    final weekend = weekendDays(year, month, holidays, settings);
+    return {
+      for (var d = 1; d <= days; d++)
+        if (!weekend.contains(d) &&
+            (d < days
+                ? weekend.contains(d + 1)
+                : DateTime(year, month, d + 1).weekday == DateTime.saturday))
+          d,
+    };
+  }
+
   /// Kişinin yıl içi toplamının, çalışabildiği güne göre payından farkı
   /// (± [clamp] ile sınırlı). Pay = grubun toplamı × kişinin çalışabildiği
   /// gün / grubun çalışabildiği gün: işe sonradan başlayan ya da uzun izne
@@ -313,6 +335,7 @@ class RosterGenerator {
     };
     final national = holidayDays(year, month, holidays, religious: false);
     final religious = holidayDays(year, month, holidays, religious: true);
+    final preWeekend = preWeekendDays(year, month, holidays, settings);
 
     // Sorumlu hemşire yalnızca seçtiği günlerde nöbete yazılabilir.
     Map<String, Set<int>> availableOf(List<Person> members) => {
@@ -338,6 +361,7 @@ class RosterGenerator {
       preferred: preferredSets,
       national: national,
       religious: religious,
+      preWeekend: preWeekend,
       lastHoliday: previousHolidayWorkers,
       tail: _tailFor(nurseMembers),
       absent: _absentFor(nurseMembers),
@@ -372,6 +396,7 @@ class RosterGenerator {
         preferred: preferredSets,
         national: national,
         religious: religious,
+
         lastHoliday: previousHolidayWorkers,
         tail: techTail,
         absent: _absentFor(techMembers),
@@ -402,6 +427,7 @@ class RosterGenerator {
         preferred: preferredSets,
         national: national,
         religious: religious,
+        preWeekend: preWeekend,
         lastHoliday: previousHolidayWorkers,
         tail: techTail,
         absent: _absentFor(techMembers),
@@ -478,6 +504,7 @@ class _RoleSolver {
     this.preferred = const {},
     this.national = const {},
     this.religious = const {},
+    this.preWeekend = const {},
     this.lastHoliday = const {},
     required this.tail,
     this.absent = const {},
@@ -510,6 +537,11 @@ class _RoleSolver {
          _fair(members, reserve),
          yearToDate,
          (t) => t.religiousHolidayShifts,
+       ),
+       ytdPreWeekend = _relative(
+         _fair(members, reserve),
+         yearToDate,
+         (t) => t.preWeekendShifts,
        ),
        forbidConsecutive = settings.forbidConsecutiveDays,
        maxChain = max(1, settings.maxEveryOtherDayChain),
@@ -579,6 +611,10 @@ class _RoleSolver {
   /// Tam gün dini bayramlar; nöbetleri resmi tatillerden ayrı dengelenir.
   final Set<int> religious;
 
+  /// Hafta sonunu yiyen günler (Cuma ve tatil öncesi); nöbetleri ayrıca
+  /// dengelenir (bkz. [RosterGenerator.preWeekendDays]).
+  final Set<int> preWeekend;
+
   /// Tatil günü → aynı tatilin önceki seferinde nöbet tutanlar.
   final Map<int, Set<String>> lastHoliday;
 
@@ -613,6 +649,11 @@ class _RoleSolver {
   final Map<String, double> ytdPairs;
   final Map<String, double> ytdNational;
   final Map<String, double> ytdReligious;
+  final Map<String, double> ytdPreWeekend;
+
+  /// Cuma nöbetinin yıllık teriminin çarpanı: yıllık terimlerin bir
+  /// hamledeki toplamı ay içi dengeyi bozmanın bedelinin altında kalsın.
+  static const _ytdPreWeekendScale = 0.25;
 
   /// Yıllık tatil terimlerinin ek çarpanı: dört yıllık terimin bir hamledeki
   /// toplam etkisi (4,8 + 0,8 = 5,6) ay içi dengeyi bozmanın bedelinden (6)
@@ -658,6 +699,7 @@ class _RoleSolver {
     _weekendN = {for (final id in ids) id: 0};
     _nationalN = {for (final id in ids) id: 0};
     _religiousN = {for (final id in ids) id: 0};
+    _preWeekendN = {for (final id in ids) id: 0};
     _pairsN = {for (final id in ids) id: 0};
   }
 
@@ -666,6 +708,7 @@ class _RoleSolver {
   late Map<String, int> _weekendN;
   late Map<String, int> _nationalN;
   late Map<String, int> _religiousN;
+  late Map<String, int> _preWeekendN;
   late Map<String, int> _pairsN;
 
   void _count(String id, int d, int delta) {
@@ -673,6 +716,7 @@ class _RoleSolver {
     if (weekend.contains(d)) _weekendN[id] = _weekendN[id]! + delta;
     if (national.contains(d)) _nationalN[id] = _nationalN[id]! + delta;
     if (religious.contains(d)) _religiousN[id] = _religiousN[id]! + delta;
+    if (preWeekend.contains(d)) _preWeekendN[id] = _preWeekendN[id]! + delta;
     final pairs = (w.contains(d - 2) ? 1 : 0) + (w.contains(d + 2) ? 1 : 0);
     _pairsN[id] = _pairsN[id]! + delta * pairs;
   }
@@ -743,6 +787,8 @@ class _RoleSolver {
 
   int _religiousCount(String id) => _religiousN[id]!;
 
+  int _preWeekendCount(String id) => _preWeekendN[id]!;
+
   int _pairs(String id) => _pairsN[id]!;
 
   /// Rol puanı: grup içi sapmaların kareleri + toplam çift cezası + boş
@@ -764,6 +810,7 @@ class _RoleSolver {
     final weekends = [for (final id in ids) _weekendCount(id)];
     final nationals = [for (final id in ids) _nationalCount(id)];
     final religiouses = [for (final id in ids) _religiousCount(id)];
+    final preWeekends = [for (final id in ids) _preWeekendCount(id)];
     final pairs = [for (final id in ids) _pairs(id)];
     final consecutiveWeekends = [
       for (final id in ids)
@@ -815,6 +862,7 @@ class _RoleSolver {
                 sq(weekends) +
                 sq(nationals) +
                 sq(religiouses) +
+                sq(preWeekends) +
                 sq(pairs) +
                 sq(longGaps)) +
         // Art arda hafta sonu: hafif denge; ay içi nöbet adaleti ve yıl
@@ -825,6 +873,7 @@ class _RoleSolver {
                 over(weekends) +
                 over(nationals) +
                 over(religiouses) +
+                over(preWeekends) +
                 over(pairs) +
                 over(longGaps)) +
         RosterGenerator.gapExcessPenalty * gapExcess +
@@ -833,6 +882,7 @@ class _RoleSolver {
         yearly(weekends, ytdWeekend) +
         yearly(nationals, ytdNational) * _ytdHolidayScale +
         yearly(religiouses, ytdReligious) * _ytdHolidayScale +
+        yearly(preWeekends, ytdPreWeekend) * _ytdPreWeekendScale +
         yearly(pairs, ytdPairs) +
         0.75 * totalPairs +
         RosterGenerator.consecutiveWeekendPenalty *
@@ -1007,6 +1057,10 @@ class _RoleSolver {
     if (religious.contains(d)) {
       cost += (_religiousCount(id) + 1 - religious.length * perDay / n) * 10;
       cost += ytdReligious[id]! * _ytdGreedyWeight;
+    }
+    if (preWeekend.contains(d)) {
+      cost += (_preWeekendCount(id) + 1 - preWeekend.length * perDay / n) * 10;
+      cost += ytdPreWeekend[id]! * _ytdGreedyWeight * _ytdPreWeekendScale;
     }
     if (lastHoliday[d]?.contains(id) ?? false) cost += _repeatHolidayGreedy;
     final newPairs =
@@ -1560,7 +1614,6 @@ class _TechSolver {
       _w16[id]!.where(religious.contains).length;
 
   int _pairs24(String id) => RosterGenerator.everyOtherDayPairs(_w24[id]!);
-
   int _emptySlots() {
     var empty = 0;
     for (var d = 1; d <= days; d++) {

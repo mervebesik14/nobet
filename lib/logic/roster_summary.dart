@@ -20,6 +20,7 @@ class PersonSummary {
     required this.role,
     required this.shifts,
     required this.weekendShifts,
+    this.preWeekendShifts = 0,
     this.nationalHolidayShifts = 0,
     this.religiousHolidayShifts = 0,
     required this.everyOtherDayPairs,
@@ -41,6 +42,10 @@ class PersonSummary {
   final Role role;
   final int shifts;
   final int weekendShifts;
+
+  /// Hafta sonunu yiyen (Cuma / tatil öncesi) 24'lük nöbetler; bkz.
+  /// [RosterGenerator.preWeekendDays]. 16B gece bittiği için sayılmaz.
+  final int preWeekendShifts;
 
   /// Tam gün resmi (ulusal) tatil nöbetleri.
   final int nationalHolidayShifts;
@@ -101,6 +106,7 @@ class RoleAverage {
     required this.people,
     required this.shifts,
     required this.weekendShifts,
+    this.preWeekendShifts = 0,
     this.nationalHolidayShifts = 0,
     this.religiousHolidayShifts = 0,
     required this.everyOtherDayPairs,
@@ -114,6 +120,7 @@ class RoleAverage {
   final int people;
   final double shifts;
   final double weekendShifts;
+  final double preWeekendShifts;
   final double nationalHolidayShifts;
   final double religiousHolidayShifts;
   final double everyOtherDayPairs;
@@ -170,6 +177,13 @@ class RosterSummary {
       religious: true,
     );
     final weekend = RosterGenerator.weekendDays(
+      year,
+      month,
+      holidays,
+      settings,
+    );
+
+    final preWeekend = RosterGenerator.preWeekendDays(
       year,
       month,
       holidays,
@@ -291,6 +305,9 @@ class RosterSummary {
           shifts: days.length,
           secondaryShifts: light.length,
           weekendShifts: days.where(weekend.contains).length,
+          preWeekendShifts: days
+              .where((d) => preWeekend.contains(d) && !light.contains(d))
+              .length,
           nationalHolidayShifts: days.where(nationalDays.contains).length,
           religiousHolidayShifts: days.where(religiousDays.contains).length,
           everyOtherDayPairs: RosterGenerator.everyOtherDayPairs(days),
@@ -336,6 +353,7 @@ class RosterSummary {
         people: group.length,
         shifts: mean(group.map((r) => r.shifts)),
         weekendShifts: mean(group.map((r) => r.weekendShifts)),
+        preWeekendShifts: mean(group.map((r) => r.preWeekendShifts)),
         nationalHolidayShifts: mean(group.map((r) => r.nationalHolidayShifts)),
         religiousHolidayShifts: mean(
           group.map((r) => r.religiousHolidayShifts),

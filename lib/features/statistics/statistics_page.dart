@@ -288,6 +288,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
                     DataColumn(label: Text('Ay'), numeric: true),
                     DataColumn(label: Text('Toplam\nnöbet'), numeric: true),
                     DataColumn(label: Text('Hafta sonu\nnöbet'), numeric: true),
+                    DataColumn(label: Text('Cuma\nnöbeti'), numeric: true),
                     DataColumn(
                       label: Text('Resmi tatil\nnöbeti'),
                       numeric: true,
@@ -319,6 +320,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
                           DataCell(Text(fmt(r.totals.months))),
                           DataCell(Text(fmt(r.totals.shifts))),
                           DataCell(Text(fmt(r.totals.weekendShifts))),
+                          DataCell(Text(fmt(r.totals.preWeekendShifts))),
                           DataCell(Text(fmt(r.totals.nationalHolidayShifts))),
                           DataCell(Text(fmt(r.totals.religiousHolidayShifts))),
                           DataCell(Text(fmt(r.totals.everyOtherDayPairs))),

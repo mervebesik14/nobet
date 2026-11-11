@@ -5,6 +5,7 @@ import 'person_totals.dart';
 enum TotalsColumn {
   shifts('Nöbet'),
   weekend('Hafta sonu'),
+  preWeekend('Cuma nöbeti'),
   nationalHoliday('Resmi tatil'),
   religiousHoliday('Dini bayram'),
   everyOtherDay('Gün aşırı çift'),
@@ -26,6 +27,7 @@ enum TotalsColumn {
   num valueOf(PersonTotals t) => switch (this) {
     shifts => t.shifts,
     weekend => t.weekendShifts,
+    preWeekend => t.preWeekendShifts,
     nationalHoliday => t.nationalHolidayShifts,
     religiousHoliday => t.religiousHolidayShifts,
     everyOtherDay => t.everyOtherDayPairs,

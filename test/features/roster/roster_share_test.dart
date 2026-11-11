@@ -195,6 +195,7 @@ void main() {
     // Yalnız toplam nöbet ve fazla mesai kalsın.
     for (final c in [
       'weekend',
+      'preWeekend',
       'nationalHoliday',
       'religiousHoliday',
       'everyOtherDay',

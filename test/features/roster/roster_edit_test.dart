@@ -636,7 +636,7 @@ void main() {
       (r) => (r.cells.first.child as Text).data == 'Hale',
     );
     expect((hale.cells[2].child as Text).data, '1'); // toplam nöbet
-    expect((hale.cells[7].child as Text).data, '24'); // çalışılan saat
+    expect((hale.cells[8].child as Text).data, '24'); // çalışılan saat
   });
 
   group('değişiklik geçmişi', () {

@@ -5,6 +5,7 @@ import 'roster_summary.dart';
 enum SummaryColumn {
   shifts('Toplam nöbet'),
   weekend('Hafta sonu nöbet'),
+  preWeekend('Cuma nöbeti'),
   nationalHoliday('Resmi tatil nöbeti'),
   religiousHoliday('Dini bayram nöbeti'),
   everyOtherDay('Gün aşırı çift'),
@@ -23,6 +24,7 @@ enum SummaryColumn {
   num valueOf(PersonSummary p) => switch (this) {
     shifts => p.shifts,
     weekend => p.weekendShifts,
+    preWeekend => p.preWeekendShifts,
     nationalHoliday => p.nationalHolidayShifts,
     religiousHoliday => p.religiousHolidayShifts,
     everyOtherDay => p.everyOtherDayPairs,
@@ -38,6 +40,7 @@ enum SummaryColumn {
   num? averageOf(RoleAverage a, RosterSummary summary) => switch (this) {
     shifts => a.shifts,
     weekend => a.weekendShifts,
+    preWeekend => a.preWeekendShifts,
     nationalHoliday => a.nationalHolidayShifts,
     religiousHoliday => a.religiousHolidayShifts,
     everyOtherDay => a.everyOtherDayPairs,

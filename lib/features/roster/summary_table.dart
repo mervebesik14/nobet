@@ -42,6 +42,7 @@ class SummaryTable extends StatelessWidget {
           const DataColumn(label: Text('Görev')),
           const DataColumn(label: Text('Toplam\nnöbet'), numeric: true),
           const DataColumn(label: Text('Hafta sonu\nnöbet'), numeric: true),
+          const DataColumn(label: Text('Cuma\nnöbeti'), numeric: true),
           if (hasNational)
             const DataColumn(label: Text('Resmi tatil\nnöbeti'), numeric: true),
           if (hasReligious)
@@ -65,6 +66,7 @@ class SummaryTable extends StatelessWidget {
                 ),
                 number(r.shifts),
                 number(r.weekendShifts),
+                number(r.preWeekendShifts),
                 if (hasNational) number(r.nationalHolidayShifts),
                 if (hasReligious) number(r.religiousHolidayShifts),
                 number(r.everyOtherDayPairs),
@@ -84,6 +86,7 @@ class SummaryTable extends StatelessWidget {
                 DataCell(Text(a.role.pluralLabel, style: averageStyle)),
                 number(a.shifts, style: averageStyle),
                 number(a.weekendShifts, style: averageStyle),
+                number(a.preWeekendShifts, style: averageStyle),
                 if (hasNational)
                   number(a.nationalHolidayShifts, style: averageStyle),
                 if (hasReligious)

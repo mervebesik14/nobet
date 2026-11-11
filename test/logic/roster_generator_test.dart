@@ -135,6 +135,38 @@ void main() {
     });
   });
 
+  test('preWeekendDays: Cuma, tatil arifesi ve ay sonu', () {
+    expect(RosterGenerator.preWeekendDays(2026, 10, holidays, settings), {
+      2,
+      9,
+      16,
+      23,
+      28,
+      30,
+    });
+    // 31 Temmuz 2026 Cuma; 1 Ağustos Cumartesi.
+    expect(
+      RosterGenerator.preWeekendDays(2026, 7, const [], settings),
+      contains(31),
+    );
+  });
+
+  test('Cuma nöbetleri rol içinde dengelenir (fark ≤ 1)', () {
+    final people = team(7, 4);
+    final pre = RosterGenerator.preWeekendDays(2026, 10, holidays, settings);
+    for (final seed in [1, 2, 3]) {
+      final r = generator(seed: seed).generate();
+      final worked = workedDays(r);
+      for (final role in Role.values) {
+        final counts = [
+          for (final p in people.where((p) => p.role == role))
+            (worked[p.id] ?? const <int>{}).where(pre.contains).length,
+        ];
+        expect(spread(counts), lessThanOrEqualTo(1), reason: '$role $seed');
+      }
+    }
+  });
+
   test('everyOtherDayPairs', () {
     expect(RosterGenerator.everyOtherDayPairs({3, 5, 10, 12, 20}), 2);
     expect(RosterGenerator.everyOtherDayPairs({1, 4, 7}), 0);

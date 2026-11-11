@@ -162,6 +162,7 @@ class YearlySummary {
         final month = PersonTotals(
           shifts: r.shifts,
           weekendShifts: r.weekendShifts,
+          preWeekendShifts: r.preWeekendShifts,
           nationalHolidayShifts: r.nationalHolidayShifts,
           religiousHolidayShifts: r.religiousHolidayShifts,
           everyOtherDayPairs: r.everyOtherDayPairs,

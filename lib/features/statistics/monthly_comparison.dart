@@ -12,6 +12,7 @@ enum ComparisonMetric {
   religious('Dini bayram', 'dini bayram nöbeti'),
   overtime('Fazla mesai', 'saat fazla mesai'),
   weekend('Hafta sonu', 'hafta sonu nöbeti'),
+  preWeekend('Cuma nöbeti', 'Cuma nöbeti'),
   national('Resmi tatil', 'resmi tatil nöbeti'),
   longGaps('4–5 gün ara', '4–5 günlük ara'),
   everyOtherDayDays('Gün aşırı gün', 'gün gün aşırı'),
@@ -29,6 +30,7 @@ enum ComparisonMetric {
   num pick(PersonTotals t) => switch (this) {
     shifts => t.shifts,
     weekend => t.weekendShifts,
+    preWeekend => t.preWeekendShifts,
     national => t.nationalHolidayShifts,
     religious => t.religiousHolidayShifts,
     longGaps => t.longGaps,
