@@ -589,6 +589,28 @@ void main() {
     expect(services.calls, contains('sharePdf:nobet-dagilimi-2026-10.pdf'));
   });
 
+  testWidgets('puantaj cetveli: Excel ve önizlemeli PDF', (tester) async {
+    await pump(tester);
+    await choose(tester, 'Puantaj cetveli');
+    await tester.tap(find.byKey(const ValueKey('attendance-excel')));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(services.calls, ['shareFile:puantaj-2026-10.xlsx']);
+    final sheet = ZipDecoder()
+        .decodeBytes(services.sharedFiles.single.bytes)
+        .firstWhere((f) => f.name == 'xl/worksheets/sheet1.xml');
+    final xml = utf8.decode(sheet.content);
+    expect(xml, contains('Ekim 2026 Puantaj Cetveli'));
+    expect(xml, contains('N.İ.'));
+
+    await choose(tester, 'Puantaj cetveli');
+    await tester.tap(find.byKey(const ValueKey('attendance-pdf')));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(find.text('Puantaj cetveli'), findsOneWidget);
+    expect(isPdf(services.lastPdf), isTrue);
+  });
+
   testWidgets('isme dokununca kişi vurgulanır ve özeti çıkar', (tester) async {
     await pump(tester);
     await tester.pumpAndSettle();

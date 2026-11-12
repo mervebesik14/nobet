@@ -41,6 +41,9 @@ import 'change_notice_page.dart';
 import 'month_close_page.dart';
 import 'favor_ledger_page.dart';
 import 'fairness_report_pdf.dart';
+import 'attendance_pdf.dart';
+import '../../logic/attendance_excel.dart';
+import '../../logic/attendance_sheet.dart';
 import '../../logic/fairness_report.dart';
 import '../../logic/request_fulfillment.dart';
 import '../../logic/yearly_summary.dart';
@@ -2132,6 +2135,107 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     }
   }
 
+  /// Puantaj cetveli: kişi × gün kodları (24, 7A, N.İ., izinler); Excel
+  /// ya da (önizlemeli) PDF.
+  Future<void> _shareAttendance(
+    MonthPlan plan,
+    RosterSummary summary,
+    List<RosterRow> rows,
+    Iterable<DayShift> dayShifts,
+    Set<int> holidayDays,
+  ) async {
+    final pdf = await showDialog<bool>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: const Text('Puantaj cetveli'),
+        children: [
+          SimpleDialogOption(
+            key: const ValueKey('attendance-excel'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const ListTile(
+              leading: Icon(Icons.table_view_outlined),
+              title: Text('Excel'),
+            ),
+          ),
+          SimpleDialogOption(
+            key: const ValueKey('attendance-pdf'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const ListTile(
+              leading: Icon(Icons.picture_as_pdf_outlined),
+              title: Text('PDF'),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (pdf == null || !mounted) return;
+    final services = ref.read(platformServicesProvider);
+    final closed = {
+      for (var d = 1; d <= plan.daysInMonth; d++)
+        if (DateTime(plan.year, plan.month, d).weekday >= DateTime.saturday) d,
+      ...holidayDays,
+    };
+    final sheet = AttendanceSheet.build(
+      plan: plan,
+      rows: rows,
+      people: ref.read(peopleProvider),
+      closedDays: closed,
+      dayShifts: dayShifts,
+    );
+    final codes = {
+      for (final a in plan.assignments.values) ...[
+        ...a.customShifts.values,
+        ...a.extraShifts.values,
+      ],
+    };
+    final info = ref.read(reportInfoProvider);
+    final base =
+        'puantaj-${plan.year}-${plan.month.toString().padLeft(2, '0')}';
+    try {
+      if (!pdf) {
+        final xlsx = AttendanceExcel.build(
+          year: plan.year,
+          month: plan.month,
+          rows: sheet,
+          closedDays: closed,
+          workedHours: {
+            for (final p in summary.people) p.personId: p.workedHours,
+          },
+          institution: info.institution,
+          unit: info.unit,
+          preparedBy: info.preparedBy,
+          approvedBy: info.approvedBy,
+          customCodes: codes,
+        );
+        await services.shareFile(xlsx, '$base.xlsx', XlsxWriter.mimeType);
+        return;
+      }
+      final fonts = await services.loadPdfFonts();
+      final bytes = await buildAttendancePdf(
+        year: plan.year,
+        month: plan.month,
+        rows: sheet,
+        closedDays: closed,
+        info: info,
+        font: fonts.regular,
+        boldFont: fonts.bold,
+        customCodes: codes,
+      );
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => PdfPreviewPage(
+            title: 'Puantaj cetveli',
+            pdf: bytes,
+            fileName: '$base.pdf',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted) _notify('Hazırlanamadı: $e');
+    }
+  }
+
   /// Adalet belgesi: kurallar, denge özeti, kişi başı bu ay ve yıl içi
   /// sayılar; önce önizlenir.
   Future<void> _shareFairness(MonthPlan plan, RosterSummary summary) async {
@@ -2370,6 +2474,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             _ShareAction.swapLog ||
             _ShareAction.favorLedger ||
             _ShareAction.fairness ||
+            _ShareAction.attendance ||
             _ShareAction.notifyChanges ||
             _ShareAction.closeMonth ||
             _ShareAction.allPersonalPdf ||
@@ -2491,6 +2596,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 MaterialPageRoute<void>(builder: (_) => const SwapLogPage()),
               ),
               _ShareAction.fairness => _shareFairness(plan, summary),
+              _ShareAction.attendance => _shareAttendance(
+                plan,
+                summary,
+                rows,
+                dayShifts,
+                holidayDays,
+              ),
               _ShareAction.favorLedger => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => const FavorLedgerPage(),
@@ -2651,6 +2763,14 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 child: ListTile(
                   leading: Icon(Icons.swap_horiz),
                   title: Text('Takas defteri'),
+                ),
+              ),
+              PopupMenuItem(
+                value: _ShareAction.attendance,
+                child: ListTile(
+                  leading: Icon(Icons.grid_on_outlined),
+                  title: Text('Puantaj cetveli'),
+                  subtitle: Text('Excel ya da PDF'),
                 ),
               ),
               PopupMenuItem(
@@ -3093,6 +3213,7 @@ enum _ShareAction {
   swapLog,
   favorLedger,
   fairness,
+  attendance,
   notifyChanges,
   closeMonth,
 }
