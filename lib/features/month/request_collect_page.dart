@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../logic/ocr_text.dart';
 import '../../logic/request_parser.dart';
+import '../../logic/turkish_collation.dart';
 import '../../logic/turkish_dates.dart';
 import '../../models/models.dart';
 import '../../shared/platform_services.dart';
@@ -53,6 +55,65 @@ class _RequestCollectPageState extends ConsumerState<RequestCollectPage> {
         ? text
         : '${_input.text.trimRight()}\n$text';
     _read(plan, people);
+  }
+
+  /// WhatsApp ekran görüntüsünü okur, metni kutuya ekler. Gönderen adı
+  /// görüntüde yoksa (ör. sohbet başlığı kırpılmış) kimden olduğu sorulur.
+  Future<void> _screenshot(MonthPlan plan, List<Person> people) async {
+    final services = ref.read(platformServicesProvider);
+    final List<String> lines;
+    try {
+      final file = await services.pickScanFile(photos: true);
+      if (file == null || !mounted) return;
+      final boxes = await services.recognizeText(file.bytes);
+      lines = OcrText.lines(
+        boxes,
+        ignore: RequestParser.message(year: plan.year, month: plan.month),
+      );
+    } on UnsupportedError catch (e) {
+      _notify(e.message ?? 'Bu cihazda okunamıyor.');
+      return;
+    } catch (e) {
+      _notify('Okunamadı: $e');
+      return;
+    }
+    if (!mounted) return;
+    if (lines.isEmpty) {
+      _notify('Görüntüde yazı bulunamadı.');
+      return;
+    }
+    var text = lines.join('\n');
+    final found = RequestParser.parse(
+      text: text,
+      people: people,
+      year: plan.year,
+      month: plan.month,
+    ).replied;
+    if (found.isEmpty) {
+      final sorted = [...people]
+        ..sort((a, b) => compareTurkish(a.name, b.name));
+      final who = await showDialog<Person>(
+        context: context,
+        builder: (context) => SimpleDialog(
+          key: const ValueKey('screenshot-who'),
+          title: const Text('Bu mesajlar kimden?'),
+          children: [
+            for (final p in sorted)
+              SimpleDialogOption(
+                onPressed: () => Navigator.of(context).pop(p),
+                child: Text(p.name),
+              ),
+          ],
+        ),
+      );
+      if (who == null || !mounted) return;
+      text = '${who.name}: $text';
+    }
+    _input.text = _input.text.trim().isEmpty
+        ? text
+        : '${_input.text.trimRight()}\n$text';
+    _read(plan, people);
+    _notify('Ekran görüntüsü okundu; kutudaki metni kontrol edebilirsin.');
   }
 
   Future<void> _apply() async {
@@ -130,7 +191,8 @@ class _RequestCollectPageState extends ConsumerState<RequestCollectPage> {
                 children: [
                   Text(
                     'WhatsApp\'ta mesajları seçip kopyalayın (ya da '
-                    '"Ad: 3, 5" diye yazın) ve buraya yapıştırın.',
+                    '"Ad: 3, 5" diye yazın) ve buraya yapıştırın. Ekran '
+                    'görüntüsü geldiyse "Ekran görüntüsünden oku".',
                     style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: 8),
@@ -150,6 +212,12 @@ class _RequestCollectPageState extends ConsumerState<RequestCollectPage> {
                     runSpacing: 8,
                     alignment: WrapAlignment.end,
                     children: [
+                      OutlinedButton.icon(
+                        key: const ValueKey('requests-screenshot'),
+                        onPressed: () => _screenshot(plan, people),
+                        icon: const Icon(Icons.photo_library_outlined),
+                        label: const Text('Ekran görüntüsünden oku'),
+                      ),
                       OutlinedButton.icon(
                         onPressed: () => _paste(plan, people),
                         icon: const Icon(Icons.content_paste),

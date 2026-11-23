@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -783,6 +785,33 @@ void main() {
     expect(plan.unavailableDaysOf('n1'), [1, 3, 5]);
     expect(plan.annualLeaveOf('n1'), [20, 21, 22]);
     expect(find.text('1 kişinin istekleri eklendi.'), findsOneWidget);
+  });
+
+  testWidgets('istek ekran görüntüsünden okunur; ad yoksa kimden sorulur', (
+    tester,
+  ) async {
+    await seed(_team);
+    services.pickedScan = (bytes: Uint8List(1), isPdf: false);
+    services.scanPages = [
+      [
+        (text: '3, 7 olmaz', x: 0.05, y: 0.3, w: 0.3, h: 0.02),
+        (text: '14:03', x: 0.6, y: 0.305, w: 0.1, h: 0.02),
+        (text: 'rapor 9', x: 0.05, y: 0.4, w: 0.3, h: 0.02),
+      ],
+    ];
+    await pumpPage(tester);
+    await tester.tap(find.byKey(const ValueKey('collect-requests')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('requests-screenshot')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('screenshot-who')), findsOneWidget);
+    await tester.tap(find.text('Banu').last);
+    await tester.pumpAndSettle();
+    expect(find.text('İstemiyor: 3, 7\nRapor: 9'), findsOneWidget);
+    expect(
+      services.calls,
+      containsAll(['pickScanFile:photos', 'recognizeText']),
+    );
   });
 
   group('ay başı hatırlatması', () {
