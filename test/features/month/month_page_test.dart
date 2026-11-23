@@ -814,6 +814,68 @@ void main() {
     );
   });
 
+  testWidgets('ay başı sihirbazı: kalıcı istek, cevaplar, kontrol, liste', (
+    tester,
+  ) async {
+    await seed(_team);
+    await boxes.meta.put('recurringRequests', [
+      {
+        'id': 'r1',
+        'personId': 'n1',
+        'weekdays': [3],
+      },
+    ]);
+    await pumpPage(tester);
+    await tester.tap(find.byKey(const ValueKey('month-open')));
+    await tester.pumpAndSettle();
+    expect(find.text('0 / 5 adım tamam'), findsOneWidget);
+    expect(
+      find.textContaining('Ayşe: 7, 14, 21, 28 (her Çarşamba)'),
+      findsOneWidget,
+    );
+
+    // 1: kalıcı istekler işlenir.
+    await tester.tap(find.byKey(const ValueKey('open-next')));
+    await tester.pumpAndSettle();
+    expect(boxes.monthPlans.get('2026-10')!.unavailableDaysOf('n1'), [
+      7,
+      14,
+      21,
+      28,
+    ]);
+    expect(find.text('1 / 5 adım tamam'), findsOneWidget);
+
+    // 3: cevap takibi (2'yi atlayarak satırdan).
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('open-replies')),
+        matching: find.text('Yap'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('0 / 11 kişi yazdı'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('replied-n2')));
+    await tester.pumpAndSettle();
+    expect(find.text('1 / 11 kişi yazdı'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('remind-n3')));
+    await tester.pumpAndSettle();
+    expect(services.sharedTexts.last, contains('Ekim 2026 nöbet listesi'));
+    await tester.tap(find.byKey(const ValueKey('replies-done')));
+    await tester.pumpAndSettle();
+    expect(boxes.meta.get('requestReplies/2026-10'), ['n2']);
+
+    // 4 ve 5: kontrol ve liste.
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(const ValueKey('open-check')),
+        matching: find.text('Yap'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('3 / 5 adım tamam'), findsOneWidget);
+    expect(find.text('Sıradaki: İstek mesajını gönder'), findsOneWidget);
+  });
+
   group('ay başı hatırlatması', () {
     final reminder = find.byKey(const ValueKey('next-month-reminder'));
 

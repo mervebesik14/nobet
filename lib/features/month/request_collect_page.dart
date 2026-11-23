@@ -10,6 +10,7 @@ import '../../models/models.dart';
 import '../../shared/platform_services.dart';
 import '../../shared/widgets/brand_widgets.dart';
 import '../people/people_controller.dart';
+import 'month_open_providers.dart';
 import 'month_plan_controller.dart';
 
 /// İstek toplama: kişilere hazır mesajı gönder, gelen cevapları yapıştır,
@@ -35,14 +36,19 @@ class _RequestCollectPageState extends ConsumerState<RequestCollectPage> {
     ..hideCurrentSnackBar()
     ..showSnackBar(SnackBar(content: Text(message)));
 
-  void _read(MonthPlan plan, List<Person> people) => setState(
-    () => _result = RequestParser.parse(
+  void _read(MonthPlan plan, List<Person> people) {
+    final result = RequestParser.parse(
       text: _input.text,
       people: people,
       year: plan.year,
       month: plan.month,
-    ),
-  );
+    );
+    setState(() => _result = result);
+    // Ay başı sihirbazındaki cevap takibi için: yazanlar işaretlenir.
+    if (result.replied.isNotEmpty) {
+      ref.read(requestRepliesProvider.notifier).mark(result.replied);
+    }
+  }
 
   Future<void> _paste(MonthPlan plan, List<Person> people) async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);

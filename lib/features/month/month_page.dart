@@ -17,6 +17,7 @@ import '../roster/roster_flow.dart';
 import '../roster/roster_page.dart';
 import 'month_plan_controller.dart';
 import 'month_reminder_notifications.dart';
+import 'month_open_page.dart';
 import 'request_collect_page.dart';
 import 'unavailable_days_page.dart';
 import '../../shared/app_colors.dart';
@@ -158,6 +159,20 @@ class MonthPage extends ConsumerWidget {
                     ),
                   ],
                 ],
+              ),
+            ),
+          if (active.isNotEmpty && !plan.isLocked && !plan.hasRoster)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+              child: _CardButton(
+                key: const ValueKey('month-open'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const MonthOpenPage(),
+                  ),
+                ),
+                icon: Icons.rocket_launch_outlined,
+                label: 'Ay başı sihirbazı',
               ),
             ),
           if (active.isNotEmpty && !plan.isLocked)

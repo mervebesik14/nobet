@@ -9,6 +9,7 @@ import '../../data/providers.dart';
 import '../../data/weekly_file_backup.dart';
 import '../../logic/next_month_reminder.dart';
 import '../../models/models.dart';
+import '../month/recurring_requests_page.dart';
 import '../month/sick_shift_action.dart';
 import 'pair_rules_page.dart';
 import '../../shared/notification_service.dart';
@@ -157,6 +158,20 @@ class SettingsPage extends ConsumerWidget {
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => const PairRulesPage(),
+                  ),
+                ),
+              ),
+              ListTile(
+                key: const ValueKey('recurring-requests'),
+                leading: const Icon(Icons.event_repeat),
+                title: const Text('Kalıcı istekler'),
+                subtitle: const Text(
+                  'Her ay tekrar eden istenmeyen günler (ör. her Çarşamba).',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const RecurringRequestsPage(),
                   ),
                 ),
               ),
