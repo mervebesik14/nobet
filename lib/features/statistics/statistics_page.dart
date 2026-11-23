@@ -26,6 +26,8 @@ import 'monthly_comparison.dart';
 import 'person_report_pdf.dart';
 import 'past_roster_page.dart';
 import 'statistics_pdf.dart';
+import 'year_close_page.dart';
+import '../../logic/year_projection.dart';
 import '../../shared/providers.dart';
 import '../month/month_plan_controller.dart';
 import '../roster/summary_table.dart';
@@ -40,7 +42,7 @@ class StatisticsPage extends ConsumerStatefulWidget {
   ConsumerState<StatisticsPage> createState() => _StatisticsPageState();
 }
 
-enum _ShareAction { pdf, excel, personReport }
+enum _ShareAction { yearClose, pdf, excel, personReport }
 
 class _StatisticsPageState extends ConsumerState<StatisticsPage> {
   late int _year = ref.read(todayProvider).year;
@@ -61,6 +63,12 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
     final base = 'nobet-istatistik-$_year';
     try {
       switch (action) {
+        case _ShareAction.yearClose:
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => YearClosePage(year: _year, summary: summary),
+            ),
+          );
         case _ShareAction.pdf:
           final fonts = await services.loadPdfFonts();
           final pdf = await buildStatisticsPdf(
@@ -166,6 +174,14 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
       people: ref.watch(peopleProvider),
     );
 
+    // Yıl bitmemişse: bu gidişle yıl sonu (sapması büyük olan önce).
+    final lastMonth = summary.months.isEmpty
+        ? 12
+        : summary.months.reduce((a, b) => a > b ? a : b);
+    final projection = lastMonth >= 12
+        ? const <ProjectionRow>[]
+        : (YearProjection.build(summary: summary, year: _year)
+            ..sort((a, b) => b.diffEnd.abs().compareTo(a.diffEnd.abs())));
     final brand = context.brand;
     final maxShifts = summary.rows.fold<num>(
       0,
@@ -190,6 +206,15 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
             ),
             onSelected: (action) => _share(action, summary),
             itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: _ShareAction.yearClose,
+                child: ListTile(
+                  leading: Icon(Icons.task_alt),
+                  title: Text('Yılı kapat'),
+                  subtitle: Text('Özet, karneler, izin, bayram planı, yedek'),
+                ),
+              ),
+              PopupMenuDivider(),
               PopupMenuItem(
                 value: _ShareAction.pdf,
                 child: ListTile(
@@ -341,6 +366,49 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
                 ),
               ),
             ),
+          if (projection.isNotEmpty) ...[
+            PillHeader(
+              'Yıl sonu tahmini',
+              end: 'Bu gidişle, ${summary.months.length}. aydan sonra',
+            ),
+            GroupCard(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Text(
+                    'Pay: kişinin çalışabildiği güne göre (izin, rapor, '
+                    'pasif günler düşülür). Herkes bu hızla devam ederse '
+                    'yıl sonunda payından ne kadar sapar ve eşitlenmek için '
+                    'kalan aylarda kaç nöbet tutmalı.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+                for (final r in projection)
+                  ListTile(
+                    key: ValueKey('projection-${r.personId}'),
+                    dense: true,
+                    title: Text('${r.name} · ${r.role.label}'),
+                    subtitle: Text(
+                      'Şimdi ${r.shifts} nöbet, payından '
+                      '${YearProjection.signed(r.diffNow)} · yıl sonunda '
+                      '${YearProjection.signed(r.diffEnd)}\n'
+                      'Eşitlenmek için kalan aylarda ~${r.needed.round()} nöbet',
+                    ),
+                    trailing: Text(
+                      YearProjection.signed(r.diffEnd),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: r.diffEnd.abs() >= YearProjection.notable
+                            ? (r.diffEnd > 0
+                                  ? theme.colorScheme.error
+                                  : theme.colorScheme.primary)
+                            : null,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
           if (summary.rows.any(
             (r) => r.totals.everyOtherDayChains.isNotEmpty,
           )) ...[

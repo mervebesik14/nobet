@@ -73,6 +73,66 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('yıl sonu tahmini bölümü görünür', (tester) async {
+    await pump(tester);
+    final tile = find.byKey(const ValueKey('projection-n1'));
+    await tester.scrollUntilVisible(
+      tile,
+      300,
+      scrollable: find
+          .byWidgetPredicate(
+            (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: tile,
+        matching: find.textContaining('Şimdi 15 nöbet, payından 0'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('yıl kapanışı: karneler, izin, bayram planı', (tester) async {
+    await pump(tester);
+    await choose(tester, 'Yılı kapat');
+    expect(find.text('2026 · Yıl kapanışı'), findsOneWidget);
+    expect(find.text('0 / 5 adım tamam'), findsOneWidget);
+
+    Future<void> doStep(String name) async {
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(ValueKey('year-$name')),
+          matching: find.text('Yap'),
+        ),
+      );
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+      await tester.pumpAndSettle();
+    }
+
+    await doStep('reports');
+    expect(services.calls, contains('shareFiles:4'));
+    expect(services.sharedFiles.first.name, 'karne-hemsire-1-2026.pdf');
+
+    await doStep('leave');
+    expect(find.text('İzin hakkı girilmiş kişi yok.'), findsWidgets);
+    await tester.tap(find.text('Tamam'));
+    await tester.pumpAndSettle();
+
+    await doStep('holidays');
+    expect(find.textContaining('2027 bayram ve tatil planı'), findsOneWidget);
+    await tester.tap(find.text('Paylaş').last);
+    await tester.pumpAndSettle();
+    expect(services.sharedTexts.last, contains('Kurban Bayramı'));
+    expect(find.text('3 / 5 adım tamam'), findsOneWidget);
+    expect(
+      boxes.meta.get('yearClose/2026'),
+      unorderedEquals(['reports', 'leave', 'holidays']),
+    );
+  });
+
   testWidgets('PDF önce önizlenir, sonra paylaşılır', (tester) async {
     await pump(tester);
     await choose(tester, 'PDF (önizle ve paylaş)');

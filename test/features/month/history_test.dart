@@ -198,6 +198,8 @@ void main() {
       find.descendant(of: tile, matching: find.text('6 gün')),
       findsOneWidget,
     );
+    await tester.ensureVisible(tile);
+    await tester.pumpAndSettle();
     await tester.tap(tile);
     await tester.pumpAndSettle();
     expect(find.text('Hemşire 1 · 2026 gün aşırı'), findsOneWidget);
@@ -306,6 +308,7 @@ void main() {
       findsOneWidget,
     );
     await tester.ensureVisible(find.widgetWithText(ChoiceChip, 'Hafta sonu'));
+    await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(ChoiceChip, 'Hafta sonu'));
     await tester.pumpAndSettle();
     final n1SepWeekend = _september().assignments.values
