@@ -29,6 +29,8 @@ class SwapFinder {
     ViolationKind.wrongRole,
     ViolationKind.chargeNurseUnrequested,
     ViolationKind.radiationReturn,
+    ViolationKind.pairApart,
+    ViolationKind.noSenior,
   };
 
   /// Sayısı artmaması gereken uyarılar (boşluklar).

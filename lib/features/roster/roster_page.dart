@@ -256,6 +256,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     ViolationKind.overCap,
     ViolationKind.wrongRole,
     ViolationKind.chargeNurseUnrequested,
+    ViolationKind.pairApart,
+    ViolationKind.noSenior,
   };
 
   /// [after] uygulanırsa yeni çıkacak kural ihlallerini gösterip onay

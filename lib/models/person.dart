@@ -1,4 +1,5 @@
 import 'role.dart';
+import 'seniority.dart';
 
 /// Nöbet listesindeki bir kişi.
 class Person {
@@ -14,6 +15,7 @@ class Person {
     this.startDate,
     this.phone,
     this.annualLeaveDays,
+    this.seniority = Seniority.normal,
   });
 
   final String id;
@@ -49,6 +51,10 @@ class Person {
 
   /// Yıllık izin hakkı (iş günü, isteğe bağlı); boşsa bakiye izlenmez.
   final int? annualLeaveDays;
+
+  /// Kıdem: "yeni başlayan" yanında aynı rolden kıdemli olmadan nöbete
+  /// yazılmaz (bkz. [Seniority]).
+  final Seniority seniority;
 
   static DateTime _day(DateTime d) => DateTime(d.year, d.month, d.day);
 
@@ -115,6 +121,7 @@ class Person {
     bool clearPhone = false,
     int? annualLeaveDays,
     bool clearAnnualLeaveDays = false,
+    Seniority? seniority,
   }) {
     return Person(
       id: id,
@@ -134,6 +141,7 @@ class Person {
       annualLeaveDays: clearAnnualLeaveDays
           ? null
           : (annualLeaveDays ?? this.annualLeaveDays),
+      seniority: seniority ?? this.seniority,
     );
   }
 
@@ -149,6 +157,7 @@ class Person {
     'startDate': startDate?.toIso8601String(),
     if (phone != null) 'phone': phone,
     if (annualLeaveDays != null) 'annualLeaveDays': annualLeaveDays,
+    if (seniority != Seniority.normal) 'seniority': seniority.name,
   };
 
   factory Person.fromJson(Map<String, dynamic> json) => Person(
@@ -169,6 +178,7 @@ class Person {
         : DateTime.parse(json['startDate'] as String),
     phone: json['phone'] as String?,
     annualLeaveDays: json['annualLeaveDays'] as int?,
+    seniority: Seniority.fromName(json['seniority'] as String?),
   );
 
   @override
@@ -184,7 +194,8 @@ class Person {
       other.inactiveUntil == inactiveUntil &&
       other.startDate == startDate &&
       other.phone == phone &&
-      other.annualLeaveDays == annualLeaveDays;
+      other.annualLeaveDays == annualLeaveDays &&
+      other.seniority == seniority;
 
   @override
   int get hashCode => Object.hash(
@@ -199,6 +210,7 @@ class Person {
     startDate,
     phone,
     annualLeaveDays,
+    seniority,
   );
 
   @override

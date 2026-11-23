@@ -1,6 +1,7 @@
 import 'package:collection/collection.dart';
 
 import 'custom_shift.dart';
+import 'pair_rule.dart';
 
 /// Nöbet dağıtım kuralları ve mesai hesabı ayarları.
 class RosterSettings {
@@ -20,6 +21,7 @@ class RosterSettings {
     this.shiftHourlyRate = 0,
     this.riskyUnit = false,
     this.payHourCap = 0,
+    this.pairRules = const [],
   });
 
   /// Her gün nöbet tutacak hemşire sayısı.
@@ -69,6 +71,9 @@ class RosterSettings {
   /// Ayda ücreti ödenen en fazla nöbet saati; 0 = sınır yok.
   final int payHourCap;
 
+  /// Birlikte / ayrı kuralları (bkz. [PairRule]).
+  final List<PairRule> pairRules;
+
   /// [code] adlı özel mesai; yoksa null.
   CustomShift? customShift(String code) =>
       customShifts.firstWhereOrNull((s) => s.code == code);
@@ -90,6 +95,7 @@ class RosterSettings {
     double? shiftHourlyRate,
     bool? riskyUnit,
     int? payHourCap,
+    List<PairRule>? pairRules,
   }) {
     return RosterSettings(
       nursesPerDay: nursesPerDay ?? this.nursesPerDay,
@@ -114,6 +120,7 @@ class RosterSettings {
       shiftHourlyRate: shiftHourlyRate ?? this.shiftHourlyRate,
       riskyUnit: riskyUnit ?? this.riskyUnit,
       payHourCap: payHourCap ?? this.payHourCap,
+      pairRules: pairRules ?? this.pairRules,
     );
   }
 
@@ -134,6 +141,8 @@ class RosterSettings {
     'shiftHourlyRate': shiftHourlyRate,
     'riskyUnit': riskyUnit,
     'payHourCap': payHourCap,
+    if (pairRules.isNotEmpty)
+      'pairRules': [for (final r in pairRules) r.toJson()],
   };
 
   /// Eksik alanlar varsayılan değerini alır (eski yedeklerle uyum için).
@@ -169,6 +178,10 @@ class RosterSettings {
         for (final s in json['customShifts'] as List? ?? const [])
           CustomShift.fromJson((s as Map).cast<String, dynamic>()),
       ],
+      pairRules: [
+        for (final r in json['pairRules'] as List? ?? const [])
+          PairRule.fromJson((r as Map).cast<String, dynamic>()),
+      ],
     );
   }
 
@@ -192,7 +205,8 @@ class RosterSettings {
       const ListEquality<CustomShift>().equals(
         other.customShifts,
         customShifts,
-      );
+      ) &&
+      const ListEquality<PairRule>().equals(other.pairRules, pairRules);
 
   @override
   int get hashCode => Object.hash(
@@ -211,5 +225,6 @@ class RosterSettings {
     shiftHourlyRate,
     riskyUnit,
     payHourCap,
+    const ListEquality<PairRule>().hash(pairRules),
   );
 }

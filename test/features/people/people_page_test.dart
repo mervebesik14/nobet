@@ -27,7 +27,7 @@ void main() {
 
   Future<void> pumpPage(WidgetTester tester) async {
     // Telefon boyu: uzun kişi formu tek ekrana sığsın.
-    tester.view.physicalSize = const Size(1080, 2400);
+    tester.view.physicalSize = const Size(1080, 2800);
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
@@ -180,6 +180,23 @@ void main() {
     await tester.pumpAndSettle();
     expect(boxes.people.get('1')!.annualLeaveDays, 20);
     expect(find.text('Hemşire · izin 3/20'), findsOneWidget);
+  });
+
+  testWidgets('kıdem formdan seçilir', (tester) async {
+    await seed(const [Person(id: '1', name: 'Ayşe', role: Role.nurse)]);
+    await pumpPage(tester);
+    await tester.tap(find.text('Ayşe'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Yeni başlayan'));
+    await tester.tap(find.text('Yeni başlayan'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('yanına aynı görevden bir kıdemli'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Kaydet'));
+    await tester.pumpAndSettle();
+    expect(boxes.people.get('1')!.seniority, Seniority.novice);
   });
 
   testWidgets('sorumlu hemşire işaretlenir; tek kişi olur', (tester) async {

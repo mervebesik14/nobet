@@ -8,6 +8,7 @@ import '../models/roster_settings.dart';
 import 'fatigue_score.dart';
 import 'person_totals.dart';
 import 'shift_gaps.dart';
+import 'team_rules.dart';
 import 'turkish_collation.dart';
 import 'turkish_dates.dart';
 
@@ -63,7 +64,7 @@ class RosterResult {
 }
 
 /// Bir kişinin bir güne atanamama nedeni.
-enum _Block { unavailable, sameDay, consecutive, chain, cap }
+enum _Block { unavailable, sameDay, pair, consecutive, chain, cap }
 
 /// Nöbet dağıtım algoritması (saf Dart).
 ///
@@ -227,6 +228,15 @@ class RosterGenerator {
   /// verilmez.
   static const unevenFivePenalty = 15.0;
 
+  /// Yeni başlayanın yanında kıdemli olmayan her gün için ceza: dengeden
+  /// pahalı, boş koltuktan ucuz ("neredeyse kesin").
+  static const unsupervisedPenalty = 100.0;
+  static const unsupervisedGreedy = 40.0;
+
+  /// "Mümkünse aynı gün" çiftinin birlikte olduğu her gün için küçük ödül.
+  static const togetherBonus = 1.0;
+  static const togetherGreedy = 3.0;
+
   /// Yerel iyileştirmeye alınan en iyi deneme sayısı.
   static const _polishCount = 3;
 
@@ -336,6 +346,7 @@ class RosterGenerator {
     final national = holidayDays(year, month, holidays, religious: false);
     final religious = holidayDays(year, month, holidays, religious: true);
     final preWeekend = preWeekendDays(year, month, holidays, settings);
+    final team = TeamRules(people, settings.pairRules);
 
     // Sorumlu hemşire yalnızca seçtiği günlerde nöbete yazılabilir.
     Map<String, Set<int>> availableOf(List<Person> members) => {
@@ -372,6 +383,7 @@ class RosterGenerator {
           if (p.isChargeNurse) p.id,
       },
       fixed: _fixedFor(nurseMembers),
+      team: team.isEmpty ? null : team,
       settings: settings,
     )._run(rng, attempts, existing, (a) => a.nurseIds);
 
@@ -403,6 +415,7 @@ class RosterGenerator {
         yearToDate: yearToDate,
         allowance: _allowanceFor(techMembers),
         fixed: _fixedFor(techMembers),
+        team: team.isEmpty ? null : team,
         settings: settings,
       )._run(techRng, attempts, existing);
       techScore = tech.score;
@@ -434,6 +447,7 @@ class RosterGenerator {
         yearToDate: yearToDate,
         allowance: _allowanceFor(techMembers),
         fixed: _fixedFor(techMembers),
+        team: team.isEmpty ? null : team,
         settings: settings,
       )._run(techRng, attempts, existing, (a) => [?a.techId]);
       techScore = techs.score;
@@ -512,6 +526,7 @@ class _RoleSolver {
     this.allowance = const {},
     this.reserve = const {},
     this.fixed = const {},
+    this.team,
     required RosterSettings settings,
   }) : ytdShifts = _relative(
          _fair(members, reserve),
@@ -578,6 +593,30 @@ class _RoleSolver {
   final Map<String, Set<int>> fixed;
 
   bool _isFixed(String id, int d) => fixed[id]?.contains(d) ?? false;
+
+  /// Birlikte / ayrı çiftleri ve kıdem; kural yoksa null.
+  final TeamRules? team;
+
+  /// Yanında kıdemli olmayan yeni başlayanlı gün sayısı (günde 2+ kişi).
+  int _unsupervised() {
+    final t = team;
+    if (t == null || perDay < 2) return 0;
+    var n = 0;
+    for (var d = 1; d <= days; d++) {
+      n += t.unsupervised(_slots[d]).length;
+    }
+    return n;
+  }
+
+  int _togetherHits() {
+    final t = team;
+    if (t == null) return 0;
+    var n = 0;
+    for (var d = 1; d <= days; d++) {
+      n += t.togetherHits(_slots[d]);
+    }
+    return n;
+  }
 
   void _prefill() {
     for (final MapEntry(key: id, value: days) in fixed.entries) {
@@ -755,6 +794,9 @@ class _RoleSolver {
   _Block? _block(String id, int d) {
     if (!available[id]!.contains(d)) return _Block.unavailable;
     if (_worked[id]!.contains(d)) return _Block.sameDay;
+    if (team case final t? when _slots[d].any((x) => t.isApart(id, x))) {
+      return _Block.pair;
+    }
     if (forbidConsecutive && (_works(id, d - 1) || _works(id, d + 1))) {
       return _Block.consecutive;
     }
@@ -891,6 +933,8 @@ class _RoleSolver {
         _emptySlots() * RosterGenerator.emptySlotPenalty +
         RosterGenerator.changePenalty * _changes() +
         _repeatHolidayWeight * _holidayRepeats() +
+        RosterGenerator.unsupervisedPenalty * _unsupervised() -
+        RosterGenerator.togetherBonus * _togetherHits() +
         reserveCost;
   }
 
@@ -1075,6 +1119,21 @@ class _RoleSolver {
     cost += _adjacentWeekendCost(weekendBlocks, d, (x) => _works(id, x));
     if (preferred[id]?.contains(d) ?? false) {
       cost -= RosterGenerator.preferredDayGreedy;
+    }
+    if (team case final t?) {
+      final slot = _slots[d];
+      if (slot.any((x) => t.isTogether(id, x))) {
+        cost -= RosterGenerator.togetherGreedy;
+      }
+      if (perDay >= 2) {
+        final after = [...slot, id];
+        final now = t.unsupervised(after).length;
+        if (after.length >= perDay && now > 0) {
+          cost += RosterGenerator.unsupervisedGreedy * now;
+        } else if (now < t.unsupervised(slot).length) {
+          cost -= RosterGenerator.unsupervisedGreedy / 2;
+        }
+      }
     }
     return cost;
   }
@@ -1308,6 +1367,10 @@ class _RoleSolver {
         return false;
       }
       if (_breaksChain(id, d)) return false;
+      if (team case final t?
+          when _slots[d].any((x) => x != id && t.isApart(id, x))) {
+        return false;
+      }
     }
     return true;
   }
@@ -1358,6 +1421,7 @@ class _RoleSolver {
               ? 'sorumlu hemşire, bu günü seçmedi'
               : 'istemiyor ya da izinli',
         _Block.sameDay || null => null,
+        _Block.pair => 'aynı gün olmaması gereken biriyle',
         _Block.consecutive =>
           '${date(_works(p.id, d - 1) ? d - 1 : d + 1)} nöbetçi (art arda gün)',
         _Block.chain => 'gün aşırı zincir sınırında',
@@ -1423,6 +1487,7 @@ class _TechSolver {
     required Map<String, PersonTotals> yearToDate,
     this.allowance = const {},
     this.fixed = const {},
+    this.team,
     required RosterSettings settings,
   }) : ids = [for (final p in members) p.id],
        maxChain = max(1, settings.maxEveryOtherDayChain),
@@ -1471,6 +1536,8 @@ class _TechSolver {
   final Map<String, Set<int>> fixed;
 
   bool _isFixed(String id, int d) => fixed[id]?.contains(d) ?? false;
+
+  final TeamRules? team;
 
   void _prefill() {
     for (final MapEntry(key: id, value: days) in fixed.entries) {
@@ -1583,10 +1650,15 @@ class _TechSolver {
   bool _overCap(String id) =>
       cap != null && _w24[id]!.length + _w16[id]!.length >= cap! + _allow(id);
 
+  /// Aynı gün olmaması gereken biri öteki koltukta mı?
+  bool _apartWith(String id, String? other) =>
+      other != null && (team?.isApart(id, other) ?? false);
+
   bool _canPlace24(String id, int d) =>
       available[id]!.contains(d) &&
       _slot24[d] == null &&
       _slot16[d] != id &&
+      !_apartWith(id, _slot16[d]) &&
       !_worksAny(id, d) &&
       !_has24(id, d - 1) &&
       !_worksAny(id, d + 1) &&
@@ -1597,6 +1669,7 @@ class _TechSolver {
       available[id]!.contains(d) &&
       _slot16[d] == null &&
       _slot24[d] != id &&
+      !_apartWith(id, _slot24[d]) &&
       !_worksAny(id, d) &&
       !_has24(id, d - 1) &&
       !_overCap(id);
@@ -2011,6 +2084,7 @@ class _TechSolver {
     }
     for (final d in _w16[id]!) {
       if (!available[id]!.contains(d) || _has24(id, d - 1)) return false;
+      if (_apartWith(id, _slot24[d])) return false;
     }
     return true;
   }

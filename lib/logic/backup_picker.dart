@@ -39,6 +39,15 @@ class BackupPicker {
         continue;
       }
       final days = daysOf(p.id);
+      // "Aynı gün olmasın" kuralı: o gün nöbette biriyle çakışmasın.
+      if (settings.pairRules.any(
+        (r) =>
+            !r.together &&
+            r.involves(p.id) &&
+            (current?.includes(r.partnerOf(p.id)!) ?? false),
+      )) {
+        continue;
+      }
       if (settings.forbidConsecutiveDays &&
           (days.contains(day - 1) || days.contains(day + 1))) {
         continue;

@@ -117,6 +117,15 @@ class ShiftExplainer {
         reason = r.label;
       } else if (p.isChargeNurse) {
         reason = 'sorumlu hemşire; yalnız seçtiği günlerde nöbet tutar';
+      } else if (settings.pairRules
+              .where((r) => !r.together && r.involves(p.id))
+              .map((r) => r.partnerOf(p.id)!)
+              .where((x) => current?.includes(x) ?? false)
+              .firstOrNull
+          case final partner?) {
+        reason =
+            '${byId[partner]?.name ?? 'biri'} ile aynı gün nöbet tutmuyor '
+            '(ayrı kuralı)';
       } else if (settings.forbidConsecutiveDays && days.contains(day - 1)) {
         reason =
             'bir gün önce (${formatDayMonth(day - 1, plan.month)}) '

@@ -65,13 +65,16 @@ class PersonAdapter extends TypeAdapter<Person> {
       startDate: fields[8] as DateTime?,
       phone: fields[9] as String?,
       annualLeaveDays: (fields[10] as num?)?.toInt(),
+      seniority: fields[11] == null
+          ? Seniority.normal
+          : fields[11] as Seniority,
     );
   }
 
   @override
   void write(BinaryWriter writer, Person obj) {
     writer
-      ..writeByte(11)
+      ..writeByte(12)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -93,7 +96,9 @@ class PersonAdapter extends TypeAdapter<Person> {
       ..writeByte(9)
       ..write(obj.phone)
       ..writeByte(10)
-      ..write(obj.annualLeaveDays);
+      ..write(obj.annualLeaveDays)
+      ..writeByte(11)
+      ..write(obj.seniority);
   }
 
   @override
@@ -369,14 +374,17 @@ class RosterSettingsAdapter extends TypeAdapter<RosterSettings> {
           : (fields[11] as List).cast<CustomShift>(),
       shiftHourlyRate: fields[12] == null ? 0 : (fields[12] as num).toDouble(),
       riskyUnit: fields[13] == null ? false : fields[13] as bool,
-      payHourCap: fields[14] == null ? 130 : (fields[14] as num).toInt(),
+      payHourCap: fields[14] == null ? 0 : (fields[14] as num).toInt(),
+      pairRules: fields[15] == null
+          ? const []
+          : (fields[15] as List).cast<PairRule>(),
     );
   }
 
   @override
   void write(BinaryWriter writer, RosterSettings obj) {
     writer
-      ..writeByte(15)
+      ..writeByte(16)
       ..writeByte(0)
       ..write(obj.nursesPerDay)
       ..writeByte(1)
@@ -406,7 +414,9 @@ class RosterSettingsAdapter extends TypeAdapter<RosterSettings> {
       ..writeByte(13)
       ..write(obj.riskyUnit)
       ..writeByte(14)
-      ..write(obj.payHourCap);
+      ..write(obj.payHourCap)
+      ..writeByte(15)
+      ..write(obj.pairRules);
   }
 
   @override
@@ -459,6 +469,87 @@ class CustomShiftAdapter extends TypeAdapter<CustomShift> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is CustomShiftAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
+class SeniorityAdapter extends TypeAdapter<Seniority> {
+  @override
+  final typeId = 7;
+
+  @override
+  Seniority read(BinaryReader reader) {
+    switch (reader.readByte()) {
+      case 0:
+        return Seniority.normal;
+      case 1:
+        return Seniority.senior;
+      case 2:
+        return Seniority.novice;
+      default:
+        return Seniority.normal;
+    }
+  }
+
+  @override
+  void write(BinaryWriter writer, Seniority obj) {
+    switch (obj) {
+      case Seniority.normal:
+        writer.writeByte(0);
+      case Seniority.senior:
+        writer.writeByte(1);
+      case Seniority.novice:
+        writer.writeByte(2);
+    }
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is SeniorityAdapter &&
+          runtimeType == other.runtimeType &&
+          typeId == other.typeId;
+}
+
+class PairRuleAdapter extends TypeAdapter<PairRule> {
+  @override
+  final typeId = 8;
+
+  @override
+  PairRule read(BinaryReader reader) {
+    final numOfFields = reader.readByte();
+    final fields = <int, dynamic>{
+      for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
+    };
+    return PairRule(
+      a: fields[0] as String,
+      b: fields[1] as String,
+      together: fields[2] == null ? false : fields[2] as bool,
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, PairRule obj) {
+    writer
+      ..writeByte(3)
+      ..writeByte(0)
+      ..write(obj.a)
+      ..writeByte(1)
+      ..write(obj.b)
+      ..writeByte(2)
+      ..write(obj.together);
+  }
+
+  @override
+  int get hashCode => typeId.hashCode;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is PairRuleAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

@@ -14,5 +14,7 @@ import '../models/models.dart';
   AdapterSpec<MonthPlan>(),
   AdapterSpec<RosterSettings>(),
   AdapterSpec<CustomShift>(),
+  AdapterSpec<Seniority>(),
+  AdapterSpec<PairRule>(),
 ])
 part 'hive_adapters.g.dart';

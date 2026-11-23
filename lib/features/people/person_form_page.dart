@@ -28,6 +28,7 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
   late Role _role;
   late bool _isActive;
   late bool _isChargeNurse;
+  late Seniority _seniority;
 
   /// Seçilen renk; null ise kimlikten otomatik.
   int? _colorValue;
@@ -70,6 +71,7 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
         ? person.isActive
         : person.hasEndedInactivity(today);
     _isChargeNurse = person?.isChargeNurse ?? false;
+    _seniority = person?.seniority ?? Seniority.normal;
     _colorValue = person?.colorValue;
     _startDate = person?.startDate;
     _inactiveFrom = _isActive ? null : person?.inactiveFrom;
@@ -145,6 +147,7 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
         phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
         annualLeaveDays: int.tryParse(_leaveDays.text.trim()),
         colorValue: _colorValue,
+        seniority: _seniority,
       );
     } else {
       final messenger = ScaffoldMessenger.of(context);
@@ -161,6 +164,7 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
           clearAnnualLeaveDays: int.tryParse(_leaveDays.text.trim()) == null,
           colorValue: _colorValue,
           clearColor: _colorValue == null,
+          seniority: _seniority,
         ),
       );
       final from = _inactiveFrom;
@@ -349,6 +353,31 @@ class _PersonFormPageState extends ConsumerState<PersonFormPage> {
                 value: _isChargeNurse,
                 onChanged: (value) => setState(() => _isChargeNurse = value),
               ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.military_tech_outlined),
+              title: const Text('Kıdem'),
+              subtitle: Text(switch (_seniority) {
+                Seniority.novice =>
+                  'Her nöbetinde yanına aynı görevden bir kıdemli yazılır.',
+                Seniority.senior =>
+                  'Yeni başlayanların yanına öncelikle yazılır.',
+                Seniority.normal => 'Kıdem kuralı yok.',
+              }),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: SegmentedButton<Seniority>(
+                key: const ValueKey('seniority'),
+                segments: [
+                  for (final s in Seniority.values)
+                    ButtonSegment(value: s, label: Text(s.label)),
+                ],
+                selected: {_seniority},
+                onSelectionChanged: (v) =>
+                    setState(() => _seniority = v.single),
+              ),
+            ),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.work_history_outlined),

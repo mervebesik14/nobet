@@ -11,9 +11,11 @@ extension HiveRegistrar on HiveInterface {
     registerAdapter(DayAssignmentAdapter());
     registerAdapter(HolidayAdapter());
     registerAdapter(MonthPlanAdapter());
+    registerAdapter(PairRuleAdapter());
     registerAdapter(PersonAdapter());
     registerAdapter(RoleAdapter());
     registerAdapter(RosterSettingsAdapter());
+    registerAdapter(SeniorityAdapter());
   }
 }
 
@@ -23,8 +25,10 @@ extension IsolatedHiveRegistrar on IsolatedHiveInterface {
     registerAdapter(DayAssignmentAdapter());
     registerAdapter(HolidayAdapter());
     registerAdapter(MonthPlanAdapter());
+    registerAdapter(PairRuleAdapter());
     registerAdapter(PersonAdapter());
     registerAdapter(RoleAdapter());
     registerAdapter(RosterSettingsAdapter());
+    registerAdapter(SeniorityAdapter());
   }
 }

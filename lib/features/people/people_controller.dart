@@ -72,6 +72,7 @@ class PeopleController extends Notifier<List<Person>> {
     String? phone,
     int? annualLeaveDays,
     int? colorValue,
+    Seniority seniority = Seniority.normal,
   }) async {
     final person = Person(
       id: _uuid.v4(),
@@ -85,6 +86,7 @@ class PeopleController extends Notifier<List<Person>> {
       phone: phone,
       annualLeaveDays: annualLeaveDays,
       colorValue: colorValue,
+      seniority: seniority,
     );
     await _save(person);
     return person;

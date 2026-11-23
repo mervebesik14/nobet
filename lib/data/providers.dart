@@ -57,6 +57,7 @@ class RosterSettingsController extends Notifier<RosterSettings> {
       shiftHourlyRate: state.shiftHourlyRate,
       riskyUnit: state.riskyUnit,
       payHourCap: state.payHourCap,
+      pairRules: state.pairRules,
     );
     await ref.read(settingsRepositoryProvider).reset();
     state = const RosterSettings();

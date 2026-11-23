@@ -3,6 +3,7 @@ import 'dart:math';
 import '../models/day_assignment.dart';
 import 'block_reason.dart';
 import 'shift_gaps.dart';
+import 'team_rules.dart';
 import '../models/person.dart';
 import '../models/role.dart';
 import '../models/roster_settings.dart';
@@ -44,6 +45,12 @@ enum ViolationKind {
 
   /// Şua izninden dönen kişi ilk iş gününde nöbette değil.
   radiationReturn,
+
+  /// "Aynı gün olmasın" kuralı olan iki kişi aynı gün nöbette.
+  pairApart,
+
+  /// Yeni başlayan, yanında aynı rolden kıdemli olmadan nöbette.
+  noSenior,
 }
 
 /// Bir kural ihlali.
@@ -124,9 +131,44 @@ class RosterValidator {
       }
     }
     final seatRole = <String, Role>{};
+    final team = TeamRules(people, settings.pairRules);
 
     for (var d = 1; d <= daysInMonth; d++) {
       final a = assignments[d] ?? DayAssignment(day: d);
+      if (!team.isEmpty) {
+        for (final (role, ids, seats) in [
+          (Role.nurse, a.nurseIds, settings.nursesPerDay),
+          (Role.radiologyTech, [?a.techId, ?a.tech16bId], settings.techsPerDay),
+        ]) {
+          for (final (x, y) in team.apartClashes(ids)) {
+            violations.add(
+              RuleViolation(
+                kind: ViolationKind.pairApart,
+                days: [d],
+                personId: x,
+                role: role,
+                message:
+                    '${name(x)} ile ${name(y)} aynı gün (${date(d)}) '
+                    'nöbette; aynı gün olmamalı.',
+              ),
+            );
+          }
+          if (seats < 2) continue;
+          for (final id in team.unsupervised(ids)) {
+            violations.add(
+              RuleViolation(
+                kind: ViolationKind.noSenior,
+                days: [d],
+                personId: id,
+                role: role,
+                message:
+                    'Yeni başlayan ${name(id)} ${date(d)} yanında kıdemli '
+                    'olmadan nöbette.',
+              ),
+            );
+          }
+        }
+      }
       final seats = [
         for (final id in a.nurseIds) (id, Role.nurse, false),
         if (a.techId != null) (a.techId!, Role.radiologyTech, false),

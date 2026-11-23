@@ -35,7 +35,7 @@ void main() {
   tearDown(() => Hive.close());
 
   Future<void> pump(WidgetTester tester, {Widget? home}) async {
-    tester.view.physicalSize = const Size(1200, 6400);
+    tester.view.physicalSize = const Size(1200, 7600);
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
     await tester.pumpWidget(
@@ -207,6 +207,45 @@ void main() {
     await tester.tap(find.text('Varsayılanlara dön'));
     await tester.pumpAndSettle();
     expect(saved().shiftHourlyRate, 156.35);
+  });
+
+  testWidgets('birlikte / ayrı kuralı eklenir ve silinir', (tester) async {
+    await boxes.people.putAll({
+      'a': const Person(
+        id: 'a',
+        name: 'Ayşe',
+        role: Role.nurse,
+        seniority: Seniority.senior,
+      ),
+      'b': const Person(id: 'b', name: 'Banu', role: Role.nurse),
+      't': const Person(id: 't', name: 'Ali', role: Role.radiologyTech),
+    });
+    await pump(tester);
+    await tester.tap(find.byKey(const ValueKey('pair-rules')));
+    await tester.pumpAndSettle();
+    expect(find.text('Henüz kural yok.'), findsOneWidget);
+    expect(find.textContaining('Kıdemli: Ayşe'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('pair-add')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('pair-a')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ayşe').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('pair-b-a')));
+    await tester.pumpAndSettle();
+    // Yalnız aynı görevdekiler.
+    expect(find.text('Ali'), findsNothing);
+    await tester.tap(find.text('Banu').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('pair-save')));
+    await tester.pumpAndSettle();
+    expect(saved().pairRules, [const PairRule(a: 'a', b: 'b')]);
+    expect(find.text('Aynı gün olmasın'), findsWidgets);
+
+    await tester.tap(find.byTooltip('Kuralı sil'));
+    await tester.pumpAndSettle();
+    expect(saved().pairRules, isEmpty);
   });
 
   testWidgets('sınırlar: tekniker 0-1, zincir en az 1', (tester) async {
