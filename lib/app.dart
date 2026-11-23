@@ -27,7 +27,7 @@ class NobetApp extends ConsumerWidget {
     ref.watch(shiftReminderWatcherProvider);
     return MaterialApp(
       themeMode: ref.watch(themeModeProvider),
-      title: 'Nöbetçi',
+      title: 'Baykuş',
       debugShowCheckedModeBanner: false,
       locale: const Locale('tr', 'TR'),
       supportedLocales: const [Locale('tr', 'TR')],

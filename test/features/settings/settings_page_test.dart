@@ -358,7 +358,7 @@ void main() {
 
     await tester.tap(find.text('Yedekten geri yükle'));
     await tester.pumpAndSettle();
-    expect(find.text('Bu dosya bir Nöbetçi yedeği değil.'), findsOneWidget);
+    expect(find.text('Bu dosya bir Baykuş yedeği değil.'), findsOneWidget);
     expect(boxes.people.keys, ['a']);
   });
 

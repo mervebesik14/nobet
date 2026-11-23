@@ -47,7 +47,7 @@ Future<Uint8List> buildPersonalRosterPdf({
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
             pw.Text(
-              'Nöbetçi · $created',
+              'Baykuş · $created',
               style: const pw.TextStyle(fontSize: 8, color: _muted),
             ),
             pw.Text(

@@ -132,7 +132,7 @@ ScheduledNotification monthReminderNotification(
 ) => (
   id: monthReminderFirstId + index,
   at: n.at,
-  title: 'Nöbetçi',
+  title: 'Baykuş',
   body:
       '${turkishMonthNames[n.month.month - 1]} listesi henüz oluşturulmadı. '
       'İstenmeyen günleri ve izinleri toplamaya başla.',

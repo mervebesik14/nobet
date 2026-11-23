@@ -528,7 +528,7 @@ class SettingsPage extends ConsumerWidget {
                     null => 'Henüz yazılmadı. ',
                   }}'
                   'Haftada bir kendiliğinden yazılır: Dosyalar › iPhone\'umda '
-                  '› Nöbetçi › Yedekler. Telefonun iCloud yedeğine de girer.',
+                  '› Baykuş › Yedekler. Telefonun iCloud yedeğine de girer.',
                 ),
                 isThreeLine: true,
                 trailing: TextButton(
@@ -725,7 +725,7 @@ class SettingsPage extends ConsumerWidget {
         if (context.mounted) {
           _notify(
             context,
-            'Bildirim izni yok. Telefonun Ayarlar > Bildirimler > Nöbetçi '
+            'Bildirim izni yok. Telefonun Ayarlar > Bildirimler > Baykuş '
             'bölümünden izin verin.',
           );
         }
@@ -733,7 +733,7 @@ class SettingsPage extends ConsumerWidget {
       }
       await service.show(
         id: monthReminderFirstId - 1,
-        title: 'Nöbetçi',
+        title: 'Baykuş',
         body: 'Deneme: ay başı hatırlatması böyle gelecek.',
       );
     } catch (e) {

@@ -171,7 +171,7 @@ class RosterCalendar {
     final lines = <String>[
       'BEGIN:VCALENDAR',
       'VERSION:2.0',
-      'PRODID:-//Nöbetçi//Nöbet Listesi//TR',
+      'PRODID:-//Baykuş//Nöbet Listesi//TR',
       'CALSCALE:GREGORIAN',
       'METHOD:PUBLISH',
       'X-WR-CALNAME:${_escape('${person.name} nöbetleri')}',

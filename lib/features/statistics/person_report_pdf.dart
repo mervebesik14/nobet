@@ -113,7 +113,7 @@ Future<Uint8List> buildPersonReportPdf({
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
           pw.Text(
-            'Nöbetçi · $created',
+            'Baykuş · $created',
             style: const pw.TextStyle(fontSize: 8, color: _muted),
           ),
           pw.Text(
