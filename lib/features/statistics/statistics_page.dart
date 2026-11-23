@@ -369,7 +369,7 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
           if (projection.isNotEmpty) ...[
             PillHeader(
               'Yıl sonu tahmini',
-              end: 'Bu gidişle, ${summary.months.length}. aydan sonra',
+              end: '${turkishMonthNames[lastMonth - 1]} sonu itibarıyla',
             ),
             GroupCard(
               children: [

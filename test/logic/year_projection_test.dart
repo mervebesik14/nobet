@@ -49,6 +49,20 @@ void main() {
     expect(YearProjection.signed(0.02), '0');
   });
 
+  test('yıl ortasında başlandıysa hız yalnız listeli aylardan', () {
+    // Yalnız Kasım (30 gün): grup 30 günde 60 nöbet tuttu, Aralık 31 gün.
+    final rows = YearProjection.build(
+      year: 2026,
+      summary: YearlySummary(
+        rows: [row('a', Role.nurse, 30, 30), row('b', Role.nurse, 30, 30)],
+        months: const [11],
+      ),
+    );
+    // Aralık'ta grup ~62 nöbet tutar; kişi başı ~31.
+    expect(rows.first.needed, closeTo(31, 0.1));
+    expect(rows.first.diffEnd, closeTo(0, 1e-9));
+  });
+
   test('gelecek yılın bayram planı', () {
     final turns = YearClose.holidayTurns(
       year: 2026,

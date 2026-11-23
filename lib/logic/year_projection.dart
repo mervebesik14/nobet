@@ -38,7 +38,12 @@ class YearProjection {
     final future = DateTime(
       year + 1,
     ).difference(DateTime(year, last + 1)).inDays;
-    final covered = DateTime(year, last + 1).difference(DateTime(year)).inDays;
+    // Hız yalnız listesi olan ayların günlerine göre: uygulama yıl ortasında
+    // kullanılmaya başlandıysa önceki aylar hızı düşürmesin.
+    final covered = summary.months.toSet().fold(
+      0,
+      (s, m) => s + DateTime(year, m + 1, 0).day,
+    );
     final out = <ProjectionRow>[];
     for (final role in Role.values) {
       final group = [
