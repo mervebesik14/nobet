@@ -19,6 +19,7 @@ import 'month_plan_controller.dart';
 import 'month_reminder_notifications.dart';
 import 'month_open_page.dart';
 import 'request_collect_page.dart';
+import 'search_page.dart';
 import 'unavailable_days_page.dart';
 import '../../shared/app_colors.dart';
 import '../../shared/providers.dart';
@@ -62,6 +63,23 @@ class MonthPage extends ConsumerWidget {
     return Scaffold(
       appBar: BrandHeader(
         title: 'Ay Planı',
+        actions: [
+          IconButton(
+            key: const ValueKey('search'),
+            tooltip: 'Ara',
+            icon: Icon(Icons.search, color: context.brand.onHeader),
+            style: IconButton.styleFrom(
+              backgroundColor: context.brand.onHeader.withValues(alpha: 0.14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              fixedSize: const Size(44, 44),
+            ),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute<void>(builder: (_) => const SearchPage())),
+          ),
+        ],
         bottom: HeaderMonthSelector(
           month: month,
           onChanged: ref.read(planMonthProvider.notifier).select,

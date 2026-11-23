@@ -40,6 +40,7 @@ import '../../shared/widgets/motion.dart';
 import 'change_notice_page.dart';
 import 'month_close_page.dart';
 import 'favor_ledger_page.dart';
+import '../month/search_page.dart';
 import 'fairness_report_pdf.dart';
 import 'attendance_pdf.dart';
 import '../../logic/attendance_excel.dart';
@@ -2833,6 +2834,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                 ),
               ),
             ],
+          ),
+          IconButton(
+            tooltip: 'Ara',
+            icon: const Icon(Icons.search),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute<void>(builder: (_) => const SearchPage())),
           ),
           IconButton(
             tooltip: 'Değişiklik geçmişi',

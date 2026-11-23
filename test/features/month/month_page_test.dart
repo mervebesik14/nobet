@@ -876,6 +876,33 @@ void main() {
     expect(find.text('Sıradaki: İstek mesajını gönder'), findsOneWidget);
   });
 
+  testWidgets('hızlı arama: kişi ve gün', (tester) async {
+    await seed(
+      _team,
+      const MonthPlan(
+        year: 2026,
+        month: 10,
+        assignments: {
+          12: DayAssignment(day: 12, nurseIds: ['n1', 'n2'], techId: 't1'),
+        },
+      ),
+    );
+    await pumpPage(tester);
+    await tester.tap(find.byKey(const ValueKey('search')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('search-field')), 'ayşe');
+    await tester.pumpAndSettle();
+    expect(find.text('Ayşe · Hemşire'), findsOneWidget);
+    expect(find.text('Nöbetler (1): 12'), findsOneWidget);
+    // Bugün 11 Ekim; yarın 12.
+    await tester.enterText(find.byKey(const ValueKey('search-field')), 'yarın');
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('Nöbetçi: Ayşe (24), Banu (24), Ali (24)'),
+      findsOneWidget,
+    );
+  });
+
   group('ay başı hatırlatması', () {
     final reminder = find.byKey(const ValueKey('next-month-reminder'));
 
