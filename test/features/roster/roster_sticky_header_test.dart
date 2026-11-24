@@ -89,6 +89,9 @@ void main() {
 
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -400));
     await tester.pumpAndSettle();
+    // Üstteki onay kutusu satırı da geçilsin.
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -100));
+    await tester.pumpAndSettle();
     // Başlık sayfanın en üstüne yapıştı; kişi satırları altından geçer.
     expect(header, findsOneWidget);
     expect(tester.getTopLeft(header).dy, moreOrLessEquals(top));

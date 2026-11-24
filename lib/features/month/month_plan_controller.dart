@@ -433,6 +433,42 @@ class MonthPlanController extends Notifier<MonthPlan> {
     title: 'Elle giriş için boş liste açıldı',
   );
 
+  /// Yalnız hemşire listesi olan aya radyoloji teknikerlerini ekler;
+  /// hemşire nöbetleri olduğu gibi kalır. [generate] ise tekniker nöbetleri
+  /// kurallara göre dağıtılır (tekniker çözümü hemşirelerden bağımsızdır),
+  /// değilse tekniker koltukları boş açılır (elle girilir). Geçmişe yazılır,
+  /// geri alınabilir. Kilitli ayda ya da ay zaten iki gruplu ise false.
+  Future<bool> addTechnicians({required bool generate}) async {
+    if (state.isLocked || !state.nurseOnly) return false;
+    final before = state;
+    var assignments = state.assignments;
+    if (generate) {
+      final full = state.copyWith(nurseOnly: false);
+      final result = await ref.read(rosterRunnerProvider)(
+        _generator(full, onlyNurses: false),
+      );
+      assignments = {
+        for (var d = 1; d <= state.daysInMonth; d++)
+          d: (state.assignments[d] ?? DayAssignment(day: d)).copyWith(
+            techId: result.assignments[d]?.techId,
+            clearTech: result.assignments[d]?.techId == null,
+            tech16bId: result.assignments[d]?.tech16bId,
+            clearTech16b: result.assignments[d]?.tech16bId == null,
+          ),
+      };
+    }
+    state = state.copyWith(assignments: assignments, nurseOnly: false);
+    await ref.read(monthPlanRepositoryProvider).save(state);
+    await _record(
+      generate
+          ? 'Radyoloji teknikerleri eklendi (liste oluşturuldu)'
+          : 'Radyoloji teknikerleri eklendi (boş)',
+      before,
+      details: false,
+    );
+    return true;
+  }
+
   /// Dışarıda hazırlanmış (Excel'den okunan) listeyi olduğu gibi kaydeder;
   /// kural ihlalleri her zamanki gibi uyarı olarak görünür. Dosyadaki
   /// izinler mevcut izinlere eklenir. Kilitli ayda false.

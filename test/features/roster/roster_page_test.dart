@@ -742,5 +742,61 @@ void main() {
     // Tekniker eksikliği ihlal/eksik olarak sayılmaz.
     expect(find.text('Kural ihlali yok'), findsOneWidget);
     expect(inTable('Eksik'), findsNothing);
+
+    // Teknikerler kutusu işaretlenince eklenmeleri önerilir.
+    final nursesBefore = {
+      for (final a in plan.assignments.values) a.day: a.nurseIds,
+    };
+    await tester.tap(find.byKey(const ValueKey('show-tech')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('add-techs')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('add-techs-generate')));
+    await tester.pumpAndSettle();
+    final after = saved();
+    expect(after.nurseOnly, isFalse);
+    for (final a in after.assignments.values) {
+      expect(a.techId, isNotNull);
+      expect(a.nurseIds, nursesBefore[a.day]); // hemşireler aynen kaldı
+    }
+    expect(inTable('Radyoloji Teknikerleri'), findsOneWidget);
+    expect(inTable('Ali'), findsOneWidget);
+  });
+
+  testWidgets('onay kutuları: grup gizlenir, en az biri seçili kalır', (
+    tester,
+  ) async {
+    await pumpMonthPage(tester);
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
+
+    final table = find.byType(RosterTable);
+    Finder inTable(String t) =>
+        find.descendant(of: table, matching: find.text(t));
+    expect(inTable('Banu'), findsOneWidget);
+    expect(inTable('Ali'), findsOneWidget);
+
+    // Hemşireler gizlenir: yalnız teknikerler.
+    await tester.tap(find.byKey(const ValueKey('show-nurse')));
+    await tester.pumpAndSettle();
+    expect(inTable('Banu'), findsNothing);
+    expect(inTable('Ali'), findsOneWidget);
+
+    // Son grup gizlenemez.
+    await tester.tap(find.byKey(const ValueKey('show-tech')));
+    await tester.pumpAndSettle();
+    expect(find.text('En az bir grup seçili olmalı.'), findsOneWidget);
+    expect(inTable('Ali'), findsOneWidget);
+
+    // Hemşireler geri, teknikerler gizli.
+    await tester.tap(find.byKey(const ValueKey('show-nurse')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('show-tech')));
+    await tester.pumpAndSettle();
+    expect(inTable('Banu'), findsOneWidget);
+    expect(inTable('Ali'), findsNothing);
+    // Veri silinmedi.
+    expect(saved().assignments.values.every((a) => a.techId != null), isTrue);
   });
 }

@@ -94,6 +94,88 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   /// Tabloda vurgulanan kişi (adına dokunulunca).
   String? _highlightId;
 
+  /// Tabloda gizlenen gruplar (üstteki onay kutuları). Yalnız ekrandaki
+  /// tablo ve özeti etkiler; paylaşılanlar her iki grubu da içerir.
+  final _hiddenRoles = <Role>{};
+
+  /// Onay kutusu: grup görünür / gizli. Yalnız hemşire listesi olan ayda
+  /// teknikerler işaretlenince eklenmeleri önerilir.
+  Future<void> _toggleRole(Role role, {required bool visible}) async {
+    final plan = _plan;
+    if (role == Role.radiologyTech && plan.nurseOnly) {
+      await _offerTechnicians();
+      return;
+    }
+    final other = role == Role.nurse ? Role.radiologyTech : Role.nurse;
+    final otherShown =
+        !_hiddenRoles.contains(other) &&
+        (other == Role.nurse || !plan.nurseOnly);
+    if (visible && !otherShown) {
+      _notify('En az bir grup seçili olmalı.');
+      return;
+    }
+    setState(() {
+      if (visible) {
+        _hiddenRoles.add(role);
+      } else {
+        _hiddenRoles.remove(role);
+      }
+    });
+  }
+
+  /// Yalnız hemşire listesi olan aya teknikerleri ekler: kurallara göre
+  /// oluşturarak ya da boş koltuklarla (elle girilir).
+  Future<void> _offerTechnicians() async {
+    if (!_ensureUnlocked()) return;
+    final generate = await showDialog<bool>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        key: const ValueKey('add-techs'),
+        title: const Text(
+          'Bu ayın listesi yalnız hemşirelerle oluşturuldu. Radyoloji '
+          'teknikerleri eklensin mi?',
+        ),
+        children: [
+          SimpleDialogOption(
+            key: const ValueKey('add-techs-generate'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const ListTile(
+              leading: Icon(Icons.auto_awesome),
+              title: Text('Tekniker listesini oluştur'),
+              subtitle: Text(
+                'Kurallara göre dağıtılır; hemşire nöbetleri aynen kalır.',
+              ),
+            ),
+          ),
+          SimpleDialogOption(
+            key: const ValueKey('add-techs-empty'),
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const ListTile(
+              leading: Icon(Icons.edit_note),
+              title: Text('Boş ekle, elle gireceğim'),
+              subtitle: Text('Tekniker satırları boş koltuklarla açılır.'),
+            ),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const ListTile(title: Text('Vazgeç')),
+          ),
+        ],
+      ),
+    );
+    if (generate == null || !mounted) return;
+    final ok = await ref
+        .read(monthPlanProvider.notifier)
+        .addTechnicians(generate: generate);
+    if (!mounted || !ok) return;
+    setState(() => _hiddenRoles.remove(Role.radiologyTech));
+    _notify(
+      generate
+          ? 'Tekniker listesi oluşturuldu; hemşire nöbetleri değişmedi.'
+          : 'Tekniker satırları eklendi; boş koltuklara dokunup yazabilirsin.',
+    );
+  }
+
   MonthPlan get _plan => ref.read(monthPlanProvider);
 
   void _notify(String message) {
@@ -2547,6 +2629,50 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         (id: r.personId, name: r.name, role: r.role),
     ];
     final roleById = {for (final r in rows) r.id: r.role};
+    // Ekranda görünen gruplar (onay kutuları); paylaşımlar hepsini içerir.
+    final techsEnabled = ref.watch(rosterSettingsProvider).techsPerDay > 0;
+    final showNurses = !_hiddenRoles.contains(Role.nurse);
+    final showTechs =
+        techsEnabled &&
+        !plan.nurseOnly &&
+        !_hiddenRoles.contains(Role.radiologyTech);
+    final viewRows = [
+      for (final r in rows)
+        if (r.role == Role.nurse ? showNurses : showTechs) r,
+    ];
+    final viewSummary = showNurses && (showTechs || plan.nurseOnly)
+        ? summary
+        : RosterSummary.build(
+            year: plan.year,
+            month: plan.month,
+            assignments: plan.assignments,
+            people: people,
+            holidays: holidays,
+            settings: settings,
+            onlyRoles: {
+              if (showNurses) Role.nurse,
+              if (showTechs) Role.radiologyTech,
+            },
+            leaveDays: plan.leaveDays,
+            dayShifts: dayShifts,
+          );
+    final viewMissing = <int, int>{
+      for (var d = 1; d <= plan.daysInMonth; d++)
+        if ((showNurses
+                    ? max(
+                        0,
+                        settings.nursesPerDay -
+                            (plan.assignments[d]?.nurseIds.length ?? 0),
+                      )
+                    : 0) +
+                (showTechs &&
+                        settings.techsPerDay > 0 &&
+                        plan.assignments[d]?.techId == null
+                    ? 1
+                    : 0)
+            case final n when n > 0)
+          d: n,
+    };
     final weekendDays = RosterGenerator.weekendDays(
       plan.year,
       plan.month,
@@ -2897,6 +3023,28 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (techsEnabled)
+                        Wrap(
+                          spacing: 4,
+                          children: [
+                            _RoleBox(
+                              key: const ValueKey('show-nurse'),
+                              label: 'Hemşireler',
+                              value: showNurses,
+                              onChanged: () =>
+                                  _toggleRole(Role.nurse, visible: showNurses),
+                            ),
+                            _RoleBox(
+                              key: const ValueKey('show-tech'),
+                              label: 'Teknikerler',
+                              value: showTechs,
+                              onChanged: () => _toggleRole(
+                                Role.radiologyTech,
+                                visible: showTechs,
+                              ),
+                            ),
+                          ],
+                        ),
                       Wrap(
                         spacing: 8,
                         runSpacing: 4,
@@ -2982,7 +3130,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             padding: const EdgeInsets.symmetric(vertical: 8),
             sliver: RosterTable(
               plan: plan,
-              rows: rows,
+              rows: viewRows,
               personColors: {for (final p in people) p.id: PersonColors.of(p)},
               highlightedId: _highlightId,
               onNameTap: (id) =>
@@ -2990,7 +3138,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
               weekendDays: weekendDays,
               holidayDays: holidayDays,
               shiftHours: settings.shiftHours,
-              missingByDay: missingByDay,
+              missingByDay: viewMissing,
               dayShifts: dayShifts,
               violationCells: {
                 for (final v in violations)
@@ -3035,7 +3183,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: Text('Özet', style: theme.textTheme.titleMedium),
                 ),
-                SummaryTable(summary: summary),
+                SummaryTable(summary: viewSummary),
               ],
             ),
           ),
@@ -3043,6 +3191,36 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       ),
     );
   }
+}
+
+/// Grup onay kutusu (Hemşireler / Radyoloji Teknikerleri).
+class _RoleBox extends StatelessWidget {
+  const _RoleBox({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final bool value;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    borderRadius: BorderRadius.circular(8),
+    onTap: onChanged,
+    child: Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Checkbox(value: value, onChanged: (_) => onChanged()),
+          Text(label),
+        ],
+      ),
+    ),
+  );
 }
 
 /// Kural ihlalleri, önem sırasıyla ayrı kutularda: boş günler (en üstte),
