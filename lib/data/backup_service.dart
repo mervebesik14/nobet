@@ -70,7 +70,9 @@ class BackupService {
       throw const BackupFormatException('Dosya geçerli bir JSON değil.');
     }
     if (decoded is! Map<String, dynamic> || decoded['format'] != format) {
-      throw const BackupFormatException('Bu dosya bir Baykuş yedeği değil.');
+      throw const BackupFormatException(
+        'Bu dosya bir Sabaha Kadar yedeği değil.',
+      );
     }
     final v = decoded['version'];
     if (v is! int || v > version) {

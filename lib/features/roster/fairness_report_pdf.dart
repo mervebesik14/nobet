@@ -206,7 +206,7 @@ Future<Uint8List> buildFairnessReportPdf({
         mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
         children: [
           pw.Text(
-            'Baykuş ile hazırlandı · $date',
+            'Sabaha Kadar ile hazırlandı · $date',
             style: const pw.TextStyle(fontSize: 8, color: _muted),
           ),
           pw.Text(

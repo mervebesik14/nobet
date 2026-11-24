@@ -2071,7 +2071,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     final access = await calendar.requestAccess();
     if (access == CalendarAccess.none) {
       _notify(
-        'Takvim izni yok. Telefonun Ayarlar > Baykuş > Takvimler bölümünden '
+        'Takvim izni yok. Telefonun Ayarlar > Sabaha Kadar > Takvimler bölümünden '
         'izin verin.',
       );
       return;

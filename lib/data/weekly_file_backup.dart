@@ -11,7 +11,7 @@ import 'backup_service.dart';
 import 'providers.dart';
 
 /// Haftalık yedeklerin yazıldığı klasör: uygulamanın Belgeler klasöründe
-/// "Yedekler". iPhone'da Dosyalar › iPhone'umda › Baykuş › Yedekler'de
+/// "Yedekler". iPhone'da Dosyalar › iPhone'umda › Sabaha Kadar › Yedekler'de
 /// görünür (Info.plist: UIFileSharingEnabled); telefonun iCloud yedeğine
 /// de girer. Testlerde geçici bir klasörle değiştirilir.
 class BackupFolder {

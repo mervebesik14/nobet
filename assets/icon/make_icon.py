@@ -1,5 +1,6 @@
-"""Baykuş uygulama simgesi: lacivert gece zemini, yıldızlar, iri gözlü
-baykuş; göğsünde küçük sağlık artısı. 4 kat büyük çizilip 1024'e
+"""Sabaha Kadar uygulama simgesi: lacivert gece göğü, hilal ve yıldızlar,
+ufuktan doğan güneş ve ufuk boyunca uzanan beyaz kalp ritmi (EKG) çizgisi:
+geceden sabaha süren 24 saatlik nöbet. 4 kat büyük çizilip 1024'e
 küçültülür.
 
 Kullanım: python3 assets/icon/make_icon.py assets/icon
@@ -14,31 +15,30 @@ S = 4  # süper örnekleme
 N = 1024 * S
 OUT = sys.argv[1] if len(sys.argv) > 1 else "."
 
-NIGHT_TOP = (36, 58, 120)
-NIGHT_BOTTOM = (11, 20, 52)
-BODY = (58, 92, 170)
-BODY_DARK = (44, 72, 140)
-FACE = (240, 232, 214)
-IRIS = (255, 200, 69)
-PUPIL = (12, 22, 54)
-BEAK = (242, 150, 52)
-STAR = (255, 214, 110)
+SKY_TOP = (10, 18, 52)
+SKY_LOW = (38, 58, 128)
+GROUND = (9, 15, 42)
+SUN_IN = (255, 214, 102)
+SUN_OUT = (255, 138, 76)
+MOON = (255, 232, 170)
+STAR = (255, 224, 150)
 WHITE = (255, 255, 255)
+
+HORIZON = 610
 
 
 def s(v):
     return int(round(v * S))
 
 
-def gradient(size, c1, c2):
-    """Yukarıdan aşağı geçiş (gece göğü)."""
+def vgradient(size, c1, c2):
     w, h = size
-    small = Image.new("RGB", (1, 256))
-    px = small.load()
+    col = Image.new("RGB", (1, 256))
+    px = col.load()
     for y in range(256):
         t = y / 255
         px[0, y] = tuple(round(a + (b - a) * t) for a, b in zip(c1, c2))
-    return small.resize((w, h), Image.BICUBIC)
+    return col.resize((w, h), Image.BICUBIC)
 
 
 def star(d, cx, cy, big, small):
@@ -51,97 +51,119 @@ def star(d, cx, cy, big, small):
 
 
 def background():
-    bg = gradient((N, N), NIGHT_TOP, NIGHT_BOTTOM).convert("RGBA")
+    """Gece göğü, ufuk ışığı, hilal, yıldızlar ve koyu zemin."""
+    img = vgradient((N, N), SKY_TOP, SKY_LOW).convert("RGBA")
+
+    # Ufukta sabah ışığı (turuncu-pembe hale).
     glow = Image.new("RGBA", (N, N), (0, 0, 0, 0))
     gd = ImageDraw.Draw(glow)
-    gd.ellipse([s(212), s(180), s(812), s(780)], fill=(120, 160, 255, 60))
-    glow = glow.filter(ImageFilter.GaussianBlur(s(120)))
-    bg = Image.alpha_composite(bg, glow)
-    d = ImageDraw.Draw(bg)
-    star(d, 160, 170, 30, 9)
-    star(d, 868, 210, 22, 7)
-    star(d, 120, 420, 14, 5)
-    star(d, 900, 470, 16, 5)
-    return bg
+    gd.ellipse(
+        [s(112), s(HORIZON - 300), s(912), s(HORIZON + 300)],
+        fill=(255, 140, 90, 150),
+    )
+    glow = glow.filter(ImageFilter.GaussianBlur(s(110)))
+    img = Image.alpha_composite(img, glow)
+
+    # Hilal: dolu daireden kaydırılmış daire maskeyle çıkarılır.
+    mx, my, mr = 250, 238, 92
+    ox, oy = mx + 42, my - 30
+    mask = Image.new("L", (N, N), 0)
+    md = ImageDraw.Draw(mask)
+    md.ellipse([s(mx - mr), s(my - mr), s(mx + mr), s(my + mr)], fill=255)
+    md.ellipse([s(ox - mr), s(oy - mr), s(ox + mr), s(oy + mr)], fill=0)
+    moon = Image.new("RGBA", (N, N), MOON + (255,))
+    img.paste(moon, (0, 0), mask)
+    d = ImageDraw.Draw(img)
+    star(d, 470, 150, 26, 8)
+    star(d, 790, 230, 34, 10)
+    star(d, 640, 330, 14, 5)
+    star(d, 150, 430, 16, 5)
+    star(d, 900, 420, 14, 5)
+    return img
 
 
-def owl():
-    """Baykuş, saydam katman (1024 koordinatlarında)."""
+def sun_and_ground():
+    """Doğan güneş (ufkun üstündeki yarım daire) ve koyu zemin."""
     layer = Image.new("RGBA", (N, N), (0, 0, 0, 0))
-
-    # Gölge.
-    shadow = Image.new("RGBA", (N, N), (0, 0, 0, 0))
-    ImageDraw.Draw(shadow).ellipse(
-        [s(250), s(300), s(774), s(900)], fill=(0, 0, 20, 120)
-    )
-    shadow = shadow.filter(ImageFilter.GaussianBlur(s(40)))
-    layer = Image.alpha_composite(layer, shadow)
+    r = 225
+    sun = Image.new("RGBA", (N, N), (0, 0, 0, 0))
+    grad = vgradient((s(2 * r), s(2 * r)), SUN_IN, SUN_OUT).convert("RGBA")
+    mask = Image.new("L", grad.size, 0)
+    ImageDraw.Draw(mask).ellipse([0, 0, grad.width - 1, grad.height - 1], fill=255)
+    sun.paste(grad, (s(512 - r), s(HORIZON - r)), mask)
+    layer = Image.alpha_composite(layer, sun)
     d = ImageDraw.Draw(layer)
-
-    # Kulak tüyleri ve gövde.
-    d.polygon([(s(262), s(400)), (s(286), s(168)), (s(440), s(300))], fill=BODY)
-    d.polygon([(s(762), s(400)), (s(738), s(168)), (s(584), s(300))], fill=BODY)
-    d.ellipse([s(236), s(250), s(788), s(880)], fill=BODY)
-
-    # Göğüs tüyleri (hafif koyu kavisler).
-    for row, y in enumerate((690, 752, 814)):
-        xs = (420, 512, 604) if row % 2 == 0 else (466, 558)
-        for x in xs:
-            d.arc(
-                [s(x - 34), s(y - 26), s(x + 34), s(y + 26)],
-                start=20,
-                end=160,
-                fill=BODY_DARK,
-                width=s(12),
-            )
-
-    # Yüz diski: iki örtüşen daire.
-    for cx in (398, 626):
-        d.ellipse([s(cx - 150), s(326), s(cx + 150), s(626)], fill=FACE)
-
-    # Gözler: altın iris, lacivert göz bebeği, beyaz parıltı.
-    for cx in (398, 626):
-        cy = 476
-        d.ellipse([s(cx - 108), s(cy - 108), s(cx + 108), s(cy + 108)], fill=IRIS)
-        d.ellipse([s(cx - 62), s(cy - 62), s(cx + 62), s(cy + 62)], fill=PUPIL)
-        d.ellipse([s(cx - 38), s(cy - 44), s(cx - 6), s(cy - 12)], fill=WHITE)
-
-    # Gaga.
-    d.polygon([(s(478), s(590)), (s(546), s(590)), (s(512), s(662))], fill=BEAK)
-
-    # Göğüste sağlık artısı.
-    cx, cy, arm, th = 512, 790, 44, 26
-    d.rounded_rectangle(
-        [s(cx - th / 2), s(cy - arm), s(cx + th / 2), s(cy + arm)],
-        radius=s(8),
-        fill=WHITE,
+    # Zemin ufkun altını örter; güneş yarısıyla doğuyor görünür.
+    d.rectangle([0, s(HORIZON), N, N], fill=GROUND)
+    # Zeminde hafif ışık yansıması.
+    refl = Image.new("RGBA", (N, N), (0, 0, 0, 0))
+    ImageDraw.Draw(refl).ellipse(
+        [s(272), s(HORIZON + 10), s(752), s(HORIZON + 90)],
+        fill=(255, 150, 90, 70),
     )
-    d.rounded_rectangle(
-        [s(cx - arm), s(cy - th / 2), s(cx + arm), s(cy + th / 2)],
-        radius=s(8),
-        fill=WHITE,
+    refl = refl.filter(ImageFilter.GaussianBlur(s(26)))
+    return Image.alpha_composite(layer, refl)
+
+
+def ecg():
+    """Ufuk boyunca kalp ritmi çizgisi; ortada belirgin atım."""
+    layer = Image.new("RGBA", (N, N), (0, 0, 0, 0))
+    y = HORIZON
+    pts = [
+        (60, y),
+        (330, y),
+        (370, y - 46),
+        (410, y),
+        (450, y),
+        (500, y - 250),
+        (560, y + 150),
+        (604, y),
+        (650, y),
+        (690, y - 60),
+        (730, y),
+        (964, y),
+    ]
+    width = 40
+    # Hafif parıltı.
+    glow = Image.new("RGBA", (N, N), (0, 0, 0, 0))
+    ImageDraw.Draw(glow).line(
+        [(s(x), s(v)) for x, v in pts], fill=(255, 255, 255, 120),
+        width=s(width + 34), joint="curve",
     )
+    glow = glow.filter(ImageFilter.GaussianBlur(s(18)))
+    layer = Image.alpha_composite(layer, glow)
+    d = ImageDraw.Draw(layer)
+    d.line([(s(x), s(v)) for x, v in pts], fill=WHITE, width=s(width),
+           joint="curve")
+    # Uçlar yuvarlak.
+    for x, v in (pts[0], pts[-1]):
+        rr = width / 2
+        d.ellipse([s(x - rr), s(v - rr), s(x + rr), s(v + rr)], fill=WHITE)
     return layer
 
 
 def main():
     bg = background()
-    em = owl()
-    full = Image.alpha_composite(bg, em).resize((1024, 1024), Image.LANCZOS)
+    fg = Image.alpha_composite(sun_and_ground(), ecg())
+    full = Image.alpha_composite(bg, fg).resize((1024, 1024), Image.LANCZOS)
     full.convert("RGB").save(f"{OUT}/icon.png")
 
-    # Android uyarlanabilir simge: zemin ve ön plan ayrı. Ön plan güvenli
-    # alana (orta ~%66) sığsın diye küçültülüp ortalanır.
+    # Android uyarlanabilir simge: zemin (gök) ve ön plan (güneş, zemin,
+    # EKG). Ön plan güvenli alana sığsın diye küçültülüp ortalanır; zemin
+    # şeridi tam genişlikte kalsın diye ön planın alt kısmı da genişletilir.
     bg.resize((1024, 1024), Image.LANCZOS).convert("RGB").save(
         f"{OUT}/icon_background.png"
     )
-    scale = 0.68
-    small = em.resize((round(N * scale), round(N * scale)), Image.LANCZOS)
-    fg = Image.new("RGBA", (N, N), (0, 0, 0, 0))
+    scale = 0.72
+    small = fg.resize((round(N * scale), round(N * scale)), Image.LANCZOS)
+    out = Image.new("RGBA", (N, N), (0, 0, 0, 0))
     off = (N - small.width) // 2
-    # Baykuşun merkezi (512, 540) tuval merkezine gelsin.
-    fg.paste(small, (off, off - round(28 * S * scale)), small)
-    fg.resize((1024, 1024), Image.LANCZOS).save(f"{OUT}/icon_foreground.png")
+    shift = round((HORIZON - 512) * S * scale)
+    top = off - shift
+    ImageDraw.Draw(out).rectangle([0, top + small.height // 2 + shift, N, N],
+                                  fill=GROUND)
+    out.paste(small, (off, top), small)
+    out.resize((1024, 1024), Image.LANCZOS).save(f"{OUT}/icon_foreground.png")
 
 
 main()
