@@ -79,6 +79,22 @@ class RosterTable extends StatefulWidget {
   static const _rowHeight = 36.0;
   static const _groupHeight = 28.0;
 
+  /// Tablonun kaydırmasız tam boyu: tam ekran görünümde ölçeklemek için.
+  static Size contentSize({
+    required List<RosterRow> rows,
+    required int days,
+    bool hasMissing = false,
+  }) {
+    final groups = <Role>{for (final r in rows) r.role}.length;
+    return Size(
+      _labelWidth + days * _cellWidth,
+      _headerHeight +
+          groups * _groupHeight +
+          rows.length * _rowHeight +
+          (hasMissing ? _rowHeight : 0),
+    );
+  }
+
   @override
   State<RosterTable> createState() => _RosterTableState();
 }

@@ -62,6 +62,7 @@ import 'whatsapp_send_page.dart';
 import 'roster_history_page.dart';
 import 'roster_pdf.dart';
 import 'roster_flow.dart';
+import 'roster_fullscreen_page.dart';
 import 'roster_table.dart';
 import 'summary_table.dart';
 import '../../shared/app_colors.dart';
@@ -2687,7 +2688,70 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       'tr_TR',
     ).format(DateTime(plan.year, plan.month));
 
+    final violationCells = {
+      for (final v in violations)
+        if (v.personId case final id?)
+          for (final d in v.days) (personId: id, day: d),
+    };
+    Widget table(String? highlightId, ValueChanged<String> onNameTap) =>
+        RosterTable(
+          plan: plan,
+          rows: viewRows,
+          personColors: {for (final p in people) p.id: PersonColors.of(p)},
+          highlightedId: highlightId,
+          onNameTap: onNameTap,
+          weekendDays: weekendDays,
+          holidayDays: holidayDays,
+          shiftHours: settings.shiftHours,
+          missingByDay: viewMissing,
+          dayShifts: dayShifts,
+          violationCells: violationCells,
+          selectedCell: _swapFrom,
+          onCellTap: (cell) => _onCellTap(cell, roleById[cell.personId]!),
+          onCellLongPress: (cell) =>
+              _onCellLongPress(cell, roleById[cell.personId]!),
+          onMissingTap: _onMissingTap,
+        );
+
+    void openFullscreen() {
+      setState(() => _swapFrom = null);
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          fullscreenDialog: true,
+          builder: (_) => RosterFullscreenPage(
+            title: '$monthTitle Nöbet Listesi',
+            initialHighlightId: _highlightId,
+            contentSize: RosterTable.contentSize(
+              rows: viewRows,
+              days: plan.daysInMonth,
+              hasMissing: viewMissing.isNotEmpty,
+            ),
+            // Tam ekranda yalnız bakılır; düzenleme ana ekranda.
+            tableBuilder: (highlightId, onNameTap) => RosterTable(
+              plan: plan,
+              rows: viewRows,
+              personColors: {for (final p in people) p.id: PersonColors.of(p)},
+              highlightedId: highlightId,
+              onNameTap: onNameTap,
+              weekendDays: weekendDays,
+              holidayDays: holidayDays,
+              shiftHours: settings.shiftHours,
+              missingByDay: viewMissing,
+              dayShifts: dayShifts,
+              violationCells: violationCells,
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
+      floatingActionButton: FloatingActionButton.extended(
+        key: const ValueKey('fullscreen'),
+        onPressed: openFullscreen,
+        icon: const Icon(Icons.fullscreen),
+        label: const Text('Tam ekran'),
+      ),
       appBar: AppBar(
         title: Text('$monthTitle Nöbet Listesi'),
         actions: [
@@ -3128,32 +3192,15 @@ class _RosterPageState extends ConsumerState<RosterPage> {
           ),
           SliverPadding(
             padding: const EdgeInsets.symmetric(vertical: 8),
-            sliver: RosterTable(
-              plan: plan,
-              rows: viewRows,
-              personColors: {for (final p in people) p.id: PersonColors.of(p)},
-              highlightedId: _highlightId,
-              onNameTap: (id) =>
+            sliver: table(
+              _highlightId,
+              (id) =>
                   setState(() => _highlightId = _highlightId == id ? null : id),
-              weekendDays: weekendDays,
-              holidayDays: holidayDays,
-              shiftHours: settings.shiftHours,
-              missingByDay: viewMissing,
-              dayShifts: dayShifts,
-              violationCells: {
-                for (final v in violations)
-                  if (v.personId case final id?)
-                    for (final d in v.days) (personId: id, day: d),
-              },
-              selectedCell: _swapFrom,
-              onCellTap: (cell) => _onCellTap(cell, roleById[cell.personId]!),
-              onCellLongPress: (cell) =>
-                  _onCellLongPress(cell, roleById[cell.personId]!),
-              onMissingTap: _onMissingTap,
             ),
           ),
           SliverPadding(
-            padding: const EdgeInsets.only(bottom: 24),
+            // Alttaki "Tam ekran" düğmesi son satırı örtmesin.
+            padding: const EdgeInsets.only(bottom: 88),
             sliver: SliverList.list(
               children: [
                 if (violations.isNotEmpty && !plan.isLocked)

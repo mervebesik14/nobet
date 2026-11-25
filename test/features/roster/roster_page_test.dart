@@ -807,6 +807,51 @@ void main() {
     },
   );
 
+  testWidgets('tam ekran: tablo kaydırmadan sığar, kapatınca geri döner', (
+    tester,
+  ) async {
+    await pumpMonthPage(tester);
+    await tester.tap(find.text('Listeyi Oluştur'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hemşire + Tekniker'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('fullscreen')));
+    await tester.pumpAndSettle();
+
+    final viewer = find.byKey(const ValueKey('fullscreen-viewer'));
+    expect(viewer, findsOneWidget);
+    final table = find.descendant(
+      of: viewer,
+      matching: find.byType(RosterTable),
+    );
+    expect(table, findsOneWidget);
+    // Ayın son günü ve son kişi ekranın içinde: kaydırmak gerekmez.
+    final screen = tester.getRect(viewer);
+    final lastDay = find
+        .descendant(of: viewer, matching: find.text('31'))
+        .first;
+    expect(screen.contains(tester.getRect(lastDay).center), isTrue);
+    final lastName = find.descendant(of: viewer, matching: find.text('Ali'));
+    expect(screen.contains(tester.getRect(lastName).center), isTrue);
+
+    // İsme dokununca vurgulanır (yalnız tam ekranda).
+    await tester.tap(lastName);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<RosterTable>(
+            find.descendant(of: viewer, matching: find.byType(RosterTable)),
+          )
+          .highlightedId,
+      isNotNull,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('fullscreen-close')));
+    await tester.pumpAndSettle();
+    expect(viewer, findsNothing);
+    expect(find.byKey(const ValueKey('fullscreen')), findsOneWidget);
+  });
+
   testWidgets('onay kutuları: grup gizlenir, en az biri seçili kalır', (
     tester,
   ) async {
