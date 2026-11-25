@@ -154,7 +154,7 @@ class YearlySummary {
         leaveDays: plan.leaveDays,
         dayShifts: allDayShifts,
         // Yalnız hemşire listesinde teknikerler o ay sayılmaz.
-        onlyRoles: plan.nurseOnly ? const {Role.nurse} : null,
+        onlyRoles: plan.showsNursesOnly ? const {Role.nurse} : null,
       );
       for (final r in summary.people) {
         info[r.personId] = (r.name, r.role);

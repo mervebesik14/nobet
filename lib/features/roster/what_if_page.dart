@@ -146,7 +146,7 @@ class _WhatIfPageState extends ConsumerState<WhatIfPage> {
     final people = [
       for (final p in ref.watch(peopleProvider))
         if (p.worksInMonth(plan.year, plan.month) &&
-            (!plan.nurseOnly || p.role == Role.nurse))
+            (!plan.showsNursesOnly || p.role == Role.nurse))
           p,
     ]..sort((a, b) => compareTurkish(a.name, b.name));
     final names = {for (final p in ref.watch(peopleProvider)) p.id: p.name};

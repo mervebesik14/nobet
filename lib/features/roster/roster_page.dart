@@ -102,14 +102,14 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   /// teknikerler işaretlenince eklenmeleri önerilir.
   Future<void> _toggleRole(Role role, {required bool visible}) async {
     final plan = _plan;
-    if (role == Role.radiologyTech && plan.nurseOnly) {
+    if (role == Role.radiologyTech && plan.showsNursesOnly) {
       await _offerTechnicians();
       return;
     }
     final other = role == Role.nurse ? Role.radiologyTech : Role.nurse;
     final otherShown =
         !_hiddenRoles.contains(other) &&
-        (other == Role.nurse || !plan.nurseOnly);
+        (other == Role.nurse || !plan.showsNursesOnly);
     if (visible && !otherShown) {
       _notify('En az bir grup seçili olmalı.');
       return;
@@ -2612,7 +2612,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       people: people,
       holidays: holidays,
       settings: settings,
-      onlyRoles: plan.nurseOnly ? const {Role.nurse} : null,
+      onlyRoles: plan.showsNursesOnly ? const {Role.nurse} : null,
       leaveDays: plan.leaveDays,
       dayShifts: dayShifts,
     );
@@ -2634,13 +2634,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     final showNurses = !_hiddenRoles.contains(Role.nurse);
     final showTechs =
         techsEnabled &&
-        !plan.nurseOnly &&
+        !plan.showsNursesOnly &&
         !_hiddenRoles.contains(Role.radiologyTech);
     final viewRows = [
       for (final r in rows)
         if (r.role == Role.nurse ? showNurses : showTechs) r,
     ];
-    final viewSummary = showNurses && (showTechs || plan.nurseOnly)
+    final viewSummary = showNurses && (showTechs || plan.showsNursesOnly)
         ? summary
         : RosterSummary.build(
             year: plan.year,

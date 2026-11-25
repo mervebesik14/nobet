@@ -194,7 +194,7 @@ class PeopleController extends Notifier<List<Person>> {
       }
       final settings = effectiveSettings(
         ref.read(rosterSettingsProvider),
-        nurseOnly: plan.nurseOnly,
+        nurseOnly: plan.showsNursesOnly,
       );
       final result = RosterRepair.removePerson(
         year: plan.year,
@@ -344,7 +344,7 @@ class PeopleController extends Notifier<List<Person>> {
         people: state,
         settings: effectiveSettings(
           ref.read(rosterSettingsProvider),
-          nurseOnly: plan.nurseOnly,
+          nurseOnly: plan.showsNursesOnly,
         ),
         blockedDays: computeEffectiveBlockedDays(
           plan,

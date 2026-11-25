@@ -63,6 +63,8 @@ class MonthPlan {
   final int? seed;
 
   /// Bu ay yalnız hemşire listesi olarak oluşturuldu (tekniker yok).
+  /// Okurken çoğunlukla [showsNursesOnly] kullanılır: sonradan tekniker
+  /// nöbeti girilmişse ay iki gruplu sayılır.
   final bool nurseOnly;
 
   /// Bu ay fazla mesai isteyen kişiler; nöbet sayıları diğerlerinden birkaç
@@ -171,6 +173,15 @@ class MonthPlan {
 
   /// Nöbet listesi oluşturulmuş mu?
   bool get hasRoster => assignments.isNotEmpty;
+
+  /// Listede en az bir tekniker nöbeti (24 ya da 16B) var mı?
+  bool get hasTechShifts =>
+      assignments.values.any((a) => a.techId != null || a.tech16bId != null);
+
+  /// Ay gerçekten yalnız hemşire mi: "yalnız hemşire" diye açılmış ve
+  /// içinde tekniker nöbeti yok. Tekniker nöbeti girilmişse (elle, Excel'den,
+  /// yazarak) teknikerler gizlenmez ve silinmez.
+  bool get showsNursesOnly => nurseOnly && !hasTechShifts;
 
   /// Kişinin [type] türündeki izin günleri [days] olan kopya (boşsa kayıt
   /// kaldırılır).

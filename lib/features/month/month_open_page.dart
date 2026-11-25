@@ -58,7 +58,7 @@ class _MonthOpenPageState extends ConsumerState<MonthOpenPage> {
     return [
       for (final p in ref.read(peopleProvider))
         if (p.worksInMonth(plan.year, plan.month) &&
-            (!plan.nurseOnly || p.role == Role.nurse))
+            (!plan.showsNursesOnly || p.role == Role.nurse))
           p,
     ]..sort((a, b) => compareTurkish(a.name, b.name));
   }

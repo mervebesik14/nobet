@@ -762,6 +762,51 @@ void main() {
     expect(inTable('Ali'), findsOneWidget);
   });
 
+  testWidgets(
+    'yalnız hemşire işaretli ama tekniker girilmiş ay: teknikerler görünür',
+    (tester) async {
+      await boxes.monthPlans.put(
+        '2026-10',
+        MonthPlan(
+          year: 2026,
+          month: 10,
+          nurseOnly: true,
+          assignments: {
+            for (var d = 1; d <= 31; d++)
+              d: DayAssignment(
+                day: d,
+                nurseIds: d.isOdd ? const ['n1', 'n2'] : const ['n3', 'n4'],
+                techId: d == 11 ? 't1' : null,
+              ),
+          },
+        ),
+      );
+      expect(boxes.monthPlans.get('2026-10')!.showsNursesOnly, isFalse);
+      await pumpMonthPage(tester);
+      await tester.tap(find.text('Listeyi Gör'));
+      await tester.pumpAndSettle();
+
+      final table = find.byType(RosterTable);
+      expect(
+        find.descendant(of: table, matching: find.text('Ali')),
+        findsOneWidget,
+      );
+      // Teknikerler kutusu işaretli; dokununca yalnız gizlenir, liste
+      // oluşturma önerilmez ve girilen nöbet silinmez.
+      final box = tester.widget<Checkbox>(
+        find.descendant(
+          of: find.byKey(const ValueKey('show-tech')),
+          matching: find.byType(Checkbox),
+        ),
+      );
+      expect(box.value, isTrue);
+      await tester.tap(find.byKey(const ValueKey('show-tech')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('add-techs')), findsNothing);
+      expect(saved().assignments[11]!.techId, 't1');
+    },
+  );
+
   testWidgets('onay kutuları: grup gizlenir, en az biri seçili kalır', (
     tester,
   ) async {

@@ -354,7 +354,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
   /// rastgele tohum kullanılır (her "Yeniden oluştur" farklı liste verir).
   /// Kilit burada kontrol edilmez; onayı ekran ister.
   Future<RosterResult> generate({int? seed, bool? nurseOnly}) async {
-    final onlyNurses = nurseOnly ?? state.nurseOnly;
+    final onlyNurses = nurseOnly ?? state.showsNursesOnly;
     final generator = _generator(state, onlyNurses: onlyNurses, seed: seed);
     final result = await ref.read(rosterRunnerProvider)(generator);
     await applyResult(result, nurseOnly: onlyNurses);
@@ -442,7 +442,8 @@ class MonthPlanController extends Notifier<MonthPlan> {
     if (state.isLocked || !state.nurseOnly) return false;
     final before = state;
     var assignments = state.assignments;
-    if (generate) {
+    // Elle girilmiş tekniker nöbetleri varsa üzerine yazılmaz.
+    if (generate && !state.hasTechShifts) {
       final full = state.copyWith(nurseOnly: false);
       final result = await ref.read(rosterRunnerProvider)(
         _generator(full, onlyNurses: false),
@@ -523,7 +524,7 @@ class MonthPlanController extends Notifier<MonthPlan> {
     final plan = state;
     final generator = _generator(
       plan,
-      onlyNurses: plan.nurseOnly,
+      onlyNurses: plan.showsNursesOnly,
       existing: plan.assignments,
     );
     final result = await ref.read(rosterRunnerProvider)(generator);
@@ -564,7 +565,11 @@ class MonthPlanController extends Notifier<MonthPlan> {
             ...days,
           });
     final result = await ref.read(rosterRunnerProvider)(
-      _generator(hypo, onlyNurses: hypo.nurseOnly, existing: hypo.assignments),
+      _generator(
+        hypo,
+        onlyNurses: hypo.showsNursesOnly,
+        existing: hypo.assignments,
+      ),
     );
     return (
       plan: hypo.copyWith(assignments: result.assignments),
@@ -833,7 +838,9 @@ RosterSettings effectiveSettings(
 
 /// Seçili ayın, (yalnız hemşire ise) teknikeri kapatılmış etkin ayarları.
 final effectiveSettingsProvider = Provider<RosterSettings>((ref) {
-  final nurseOnly = ref.watch(monthPlanProvider.select((p) => p.nurseOnly));
+  final nurseOnly = ref.watch(
+    monthPlanProvider.select((p) => p.showsNursesOnly),
+  );
   return effectiveSettings(
     ref.watch(rosterSettingsProvider),
     nurseOnly: nurseOnly,
@@ -1091,7 +1098,7 @@ final todayOverviewProvider = Provider<List<DayOverview>>((ref) {
   final shiftsByMonth = <String, List<DayShift>>{};
 
   List<DayShift> dayShiftsOf(MonthPlan plan) => shiftsByMonth[plan.key] ??= () {
-    final settings = effectiveSettings(base, nurseOnly: plan.nurseOnly);
+    final settings = effectiveSettings(base, nurseOnly: plan.showsNursesOnly);
     final tail = previousMonthTailOf(repo, plan);
     return [
       ...DayShiftPlanner.plan(
@@ -1149,14 +1156,17 @@ final todayOverviewProvider = Provider<List<DayOverview>>((ref) {
           backupIds: [
             for (final role in [
               Role.nurse,
-              if (!plan.nurseOnly) Role.radiologyTech,
+              if (!plan.showsNursesOnly) Role.radiologyTech,
             ])
               for (final p in BackupPicker.candidates(
                 plan: plan,
                 people: people,
                 day: date.day,
                 role: role,
-                settings: effectiveSettings(base, nurseOnly: plan.nurseOnly),
+                settings: effectiveSettings(
+                  base,
+                  nurseOnly: plan.showsNursesOnly,
+                ),
                 blockReasons: computeBlockReasons(
                   plan,
                   holidays,
@@ -1167,7 +1177,7 @@ final todayOverviewProvider = Provider<List<DayOverview>>((ref) {
                   plan.year,
                   plan.month,
                   holidays,
-                  effectiveSettings(base, nurseOnly: plan.nurseOnly),
+                  effectiveSettings(base, nurseOnly: plan.showsNursesOnly),
                 ),
                 count: 1,
               ))

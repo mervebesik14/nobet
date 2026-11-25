@@ -33,7 +33,7 @@ class _PersonCalendarPageState extends ConsumerState<PersonCalendarPage> {
       [
         for (final p in ref.read(peopleProvider))
           if (p.worksInMonth(plan.year, plan.month) &&
-              (!plan.nurseOnly || p.role == Role.nurse))
+              (!plan.showsNursesOnly || p.role == Role.nurse))
             p,
       ]..sort((a, b) {
         final r = a.role.index.compareTo(b.role.index);
