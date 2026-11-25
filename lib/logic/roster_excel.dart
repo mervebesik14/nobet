@@ -14,9 +14,9 @@ import 'xlsx_writer.dart';
 class RosterExcel {
   const RosterExcel._();
 
-  static const _weekend = 0xCAE2DC;
+  static const _weekend = 0xD3DCF2;
   static const _holiday = 0xF6E1C4;
-  static const _group = 0xB9E9E1;
+  static const _group = 0xC3D0F0;
   static const _missing = 0xF9D6D2;
   static const _header = 0xEEEEEE;
   static const _dayShift = 0xF5E3C8;

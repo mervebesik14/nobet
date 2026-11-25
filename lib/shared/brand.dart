@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Marka renkleri: yeşil degrade başlık, nane tonlu hap etiketler, beyaz
+/// Marka renkleri: gece mavisi degrade başlık, açık mavi hap etiketler, beyaz
 /// kart grupları (Tasarım 3 · "güçlü marka"). Açık ve koyu temada ayrı
 /// değerler; `Theme.of(context).extension<BrandColors>()` ya da
 /// `context.brand` ile okunur.
@@ -34,33 +34,33 @@ class BrandColors extends ThemeExtension<BrandColors> {
   final Color divider;
 
   static const light = BrandColors(
-    headerStart: Color(0xFF138567),
-    headerEnd: Color(0xFF0A5847),
+    headerStart: Color(0xFF2C4A9A),
+    headerEnd: Color(0xFF142659),
     onHeader: Colors.white,
     onHeaderMuted: Color(0xD9FFFFFF),
-    background: Color(0xFFEBF2EF),
+    background: Color(0xFFEEF1F8),
     card: Colors.white,
-    pill: Color(0xFFD3EAE3),
-    onPill: Color(0xFF0D6A54),
-    stepper: Color(0xFF117A61),
-    stepperValue: Color(0xFF2C9177),
-    divider: Color(0xFFE6EEEB),
+    pill: Color(0xFFDCE3F5),
+    onPill: Color(0xFF1F3A85),
+    stepper: Color(0xFF24438F),
+    stepperValue: Color(0xFF3B5DB0),
+    divider: Color(0xFFE3E8F2),
   );
 
-  /// Gerçek koyu tasarım: siyaha yakın zemin, derin yeşil başlık, parlak
-  /// nane-yeşili vurgular (gece nöbetinde göz yormaz).
+  /// Gerçek koyu tasarım: siyaha yakın gece zemini, derin lacivert başlık,
+  /// açık mavi vurgular (gece nöbetinde göz yormaz).
   static const dark = BrandColors(
-    headerStart: Color(0xFF0F5C49),
-    headerEnd: Color(0xFF05231B),
+    headerStart: Color(0xFF1B2F66),
+    headerEnd: Color(0xFF070E26),
     onHeader: Colors.white,
-    onHeaderMuted: Color(0xB3E6FFF5),
-    background: Color(0xFF050807),
-    card: Color(0xFF101614),
-    pill: Color(0xFF0E2B22),
-    onPill: Color(0xFF5BF0B4),
-    stepper: Color(0xFF1AAE7C),
-    stepperValue: Color(0xFF26C98F),
-    divider: Color(0xFF1A2420),
+    onHeaderMuted: Color(0xB3E6EDFF),
+    background: Color(0xFF05070D),
+    card: Color(0xFF0E1220),
+    pill: Color(0xFF141F3D),
+    onPill: Color(0xFF9DB6FF),
+    stepper: Color(0xFF3E62C8),
+    stepperValue: Color(0xFF5A7FE0),
+    divider: Color(0xFF1A2133),
   );
 
   /// Başlık zemini.
@@ -98,43 +98,43 @@ extension BrandContext on BuildContext {
       Theme.of(this).extension<BrandColors>() ?? BrandColors.light;
 }
 
-/// Uygulamanın teması: DM Sans, marka yeşili, yuvarlak kartlar.
+/// Uygulamanın teması: DM Sans, gece mavisi, yuvarlak kartlar.
 ThemeData brandTheme(Brightness brightness) {
   final dark = brightness == Brightness.dark;
   final brand = dark ? BrandColors.dark : BrandColors.light;
-  final primary = dark ? const Color(0xFF3DDC97) : const Color(0xFF0F7A61);
+  final primary = dark ? const Color(0xFF9DB6FF) : const Color(0xFF1F3A85);
   final scheme =
       ColorScheme.fromSeed(
-        seedColor: const Color(0xFF0F7A61),
+        seedColor: const Color(0xFF1F3A85),
         brightness: brightness,
       ).copyWith(
         primary: primary,
-        onPrimary: dark ? const Color(0xFF00301F) : Colors.white,
+        onPrimary: dark ? const Color(0xFF0A1A45) : Colors.white,
         surface: brand.card,
-        onSurface: dark ? const Color(0xFFE8F2EE) : const Color(0xFF16211D),
+        onSurface: dark ? const Color(0xFFE8ECF5) : const Color(0xFF141A2A),
         onSurfaceVariant: dark
-            ? const Color(0xFF8FA39C)
-            : const Color(0xFF66766F),
+            ? const Color(0xFF8F98AC)
+            : const Color(0xFF626B80),
         surfaceContainerLowest: brand.background,
-        // Bilgi kartları (yedek, ay başı hatırlatması) nane tonunda.
+        // Bilgi kartları (yedek, ay başı hatırlatması) açık mavi tonda.
         secondaryContainer: dark
-            ? const Color(0xFF0C2A21)
-            : const Color(0xFFDDF0EA),
+            ? const Color(0xFF111C38)
+            : const Color(0xFFE1E7F6),
         onSecondaryContainer: dark
-            ? const Color(0xFFBFEBDD)
-            : const Color(0xFF0D4F40),
+            ? const Color(0xFFC4D2F5)
+            : const Color(0xFF172E6B),
         tertiaryContainer: dark
-            ? const Color(0xFF0D2C28)
-            : const Color(0xFFD5EEEA),
+            ? const Color(0xFF0F1C33)
+            : const Color(0xFFDDE6F7),
         onTertiaryContainer: dark
-            ? const Color(0xFFB5E6DC)
-            : const Color(0xFF0B4A42),
+            ? const Color(0xFFB8CBEE)
+            : const Color(0xFF16305F),
         outlineVariant: brand.divider,
         // Koyu temada yüzey basamakları siyaha yakın zemine uysun.
-        surfaceContainerLow: dark ? const Color(0xFF0C1210) : null,
-        surfaceContainer: dark ? const Color(0xFF121A17) : null,
-        surfaceContainerHigh: dark ? const Color(0xFF18221E) : null,
-        surfaceContainerHighest: dark ? const Color(0xFF1E2925) : null,
+        surfaceContainerLow: dark ? const Color(0xFF0B0F1B) : null,
+        surfaceContainer: dark ? const Color(0xFF111728) : null,
+        surfaceContainerHigh: dark ? const Color(0xFF171E31) : null,
+        surfaceContainerHighest: dark ? const Color(0xFF1D2539) : null,
       );
   final base = ThemeData(
     useMaterial3: true,
@@ -150,7 +150,7 @@ ThemeData brandTheme(Brightness brightness) {
       titleMedium: text.titleMedium?.copyWith(fontWeight: FontWeight.w600),
       titleSmall: text.titleSmall?.copyWith(fontWeight: FontWeight.w600),
     ),
-    // Alt sayfalar (liste, kişi formu…) düz marka yeşili başlık.
+    // Alt sayfalar (liste, kişi formu…) düz lacivert başlık.
     appBarTheme: AppBarTheme(
       backgroundColor: brand.headerEnd,
       foregroundColor: brand.onHeader,
@@ -188,12 +188,12 @@ ThemeData brandTheme(Brightness brightness) {
       thumbColor: WidgetStateProperty.resolveWith(
         (s) => s.contains(WidgetState.selected) || !dark
             ? Colors.white
-            : const Color(0xFFC6D1CD),
+            : const Color(0xFFC6CCD9),
       ),
       trackColor: WidgetStateProperty.resolveWith(
         (s) => s.contains(WidgetState.selected)
             ? brand.stepper
-            : (dark ? const Color(0xFF34423E) : const Color(0xFFD3DDD9)),
+            : (dark ? const Color(0xFF343C50) : const Color(0xFFD3D9E6)),
       ),
       trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
       thumbIcon: const WidgetStatePropertyAll(null),

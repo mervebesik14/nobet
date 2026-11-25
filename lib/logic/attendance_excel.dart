@@ -9,7 +9,7 @@ import 'xlsx_writer.dart';
 class AttendanceExcel {
   const AttendanceExcel._();
 
-  static const _closed = 0xCAE2DC;
+  static const _closed = 0xD3DCF2;
   static const _header = 0xEEEEEE;
   static const _off = 0xF2F2F2;
   static const _weekdays = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];

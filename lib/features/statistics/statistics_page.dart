@@ -725,16 +725,16 @@ class _ShareBar extends StatelessWidget {
   final num shifts;
   final num max;
 
-  static const _techColor = Color(0xFF3F51B5);
+  static const _techColor = Color(0xFFB26A00);
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final brand = context.brand;
     final isTech = role == Role.radiologyTech;
-    // Koyu zeminde lacivert okunmaz; açık tonu.
+    // Koyu zeminde koyu turuncu okunmaz; açık tonu.
     final techColor = theme.brightness == Brightness.dark
-        ? const Color(0xFF8C9EFF)
+        ? const Color(0xFFFFB74D)
         : _techColor;
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,

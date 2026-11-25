@@ -10,12 +10,12 @@ import '../../logic/turkish_dates.dart';
 import '../../models/models.dart';
 import '../settings/report_info.dart';
 
-const _primary = PdfColor.fromInt(0xFF0F7A61);
-const _tint = PdfColor.fromInt(0xFFE6F2EE);
+const _primary = PdfColor.fromInt(0xFF1F3A85);
+const _tint = PdfColor.fromInt(0xFFE6EBF7);
 const _line = PdfColor.fromInt(0xFFB0BEC5);
 const _muted = PdfColor.fromInt(0xFF607D8B);
 const _warn = PdfColor.fromInt(0xFFB3261E);
-const _okBg = PdfColor.fromInt(0xFFE6F2EE);
+const _okBg = PdfColor.fromInt(0xFFE6EBF7);
 const _warnBg = PdfColor.fromInt(0xFFFBE9E7);
 
 /// Adalet belgesi (A4 dikey): listenin nasıl dağıtıldığı. Uygulanan

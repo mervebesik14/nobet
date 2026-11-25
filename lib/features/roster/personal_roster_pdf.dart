@@ -87,11 +87,11 @@ Future<Uint8List> buildPersonalRosterPdf({
   return doc.save();
 }
 
-const _primary = PdfColor.fromInt(0xFF00695C);
-const _primaryDark = PdfColor.fromInt(0xFF004D40);
-const _primaryTint = PdfColor.fromInt(0xFFE0F2F1);
-const _secondaryTint = PdfColor.fromInt(0xFFB2DFDB);
-const _weekendTint = PdfColor.fromInt(0xFFF1F5F4);
+const _primary = PdfColor.fromInt(0xFF1F3A85);
+const _primaryDark = PdfColor.fromInt(0xFF142659);
+const _primaryTint = PdfColor.fromInt(0xFFE6EBF7);
+const _secondaryTint = PdfColor.fromInt(0xFFC3D0F0);
+const _weekendTint = PdfColor.fromInt(0xFFF1F3F9);
 const _holidayTint = PdfColor.fromInt(0xFFFFF6BF);
 const _dayShift = PdfColor.fromInt(0xFFB26A00);
 const _dayShiftTint = PdfColor.fromInt(0xFFF8E6CC);

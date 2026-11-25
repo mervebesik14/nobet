@@ -8,8 +8,8 @@ import '../../logic/turkish_collation.dart';
 import '../../logic/turkish_dates.dart';
 import '../settings/report_info.dart';
 
-const _primary = PdfColor.fromInt(0xFF0F7A61);
-const _closed = PdfColor.fromInt(0xFFCAE2DC);
+const _primary = PdfColor.fromInt(0xFF1F3A85);
+const _closed = PdfColor.fromInt(0xFFD3DCF2);
 const _off = PdfColor.fromInt(0xFFF2F2F2);
 const _line = PdfColor.fromInt(0xFFB0BEC5);
 const _muted = PdfColor.fromInt(0xFF607D8B);

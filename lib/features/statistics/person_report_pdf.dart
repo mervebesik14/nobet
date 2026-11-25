@@ -11,9 +11,9 @@ import '../../logic/turkish_dates.dart';
 import '../../logic/yearly_summary.dart';
 import '../../models/models.dart';
 
-const _primary = PdfColor.fromInt(0xFF0F7A61);
-const _primaryDark = PdfColor.fromInt(0xFF0A5847);
-const _tint = PdfColor.fromInt(0xFFE6F2EE);
+const _primary = PdfColor.fromInt(0xFF1F3A85);
+const _primaryDark = PdfColor.fromInt(0xFF142659);
+const _tint = PdfColor.fromInt(0xFFE6EBF7);
 const _line = PdfColor.fromInt(0xFFB0BEC5);
 const _muted = PdfColor.fromInt(0xFF607D8B);
 

@@ -67,14 +67,14 @@ extension AppTints on ColorScheme {
   /// 7A hücresi zemini.
   Color get dayShiftTint => _tint(dayShiftColor, 0.14);
 
-  /// Listede vardiya etiketinin (hap) rengi: 24 marka yeşili, 16A mor, 16B
-  /// lacivert, 7A turuncu, özel mesailer camgöbeği ([extra] ek mesai).
+  /// Listede vardiya etiketinin (hap) rengi: 24 marka laciverti, 16A mor,
+  /// 16B gri-mavi, 7A turuncu, özel mesailer camgöbeği ([extra] ek mesai).
   Color shiftColor(String code, {bool extra = false}) => switch (code) {
     '16A' => const Color(0xFF7B4FC9),
-    '16B' => const Color(0xFF3F51B5),
+    '16B' => const Color(0xFF546E7A),
     '7A' => dayShiftColor,
     _ when extra => const Color(0xFF00897B),
-    _ when int.tryParse(code) != null => const Color(0xFF0F7A61),
+    _ when int.tryParse(code) != null => const Color(0xFF2747A0),
     _ => const Color(0xFF00838F),
   };
 }
