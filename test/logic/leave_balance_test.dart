@@ -112,4 +112,61 @@ void main() {
     expect(YearLeaves.unitOf(LeaveType.annual), 'iş günü');
     expect(YearLeaves.unitOf(LeaveType.sick), 'gün');
   });
+
+  test(
+    'yıl içi izinler: yıllık izin boşluklarıyla (nöbet, 7A çalışılan gün)',
+    () {
+      // Ekim 2026: Ayşe 9 (Cuma) ve 19 (Pzt) nöbette; 12–16 izin.
+      final plans = [
+        MonthPlan(
+          year: 2026,
+          month: 10,
+          assignments: {
+            for (var d = 1; d <= 31; d++)
+              d: DayAssignment(
+                day: d,
+                nurseIds: [if (d == 9 || d == 19) 'a' else 'b'],
+              ),
+          },
+          annualLeave: const {
+            'a': [12, 13, 14, 15, 16],
+          },
+          // 8 Ekim rapor: boşluk orada durur (9 zaten nöbet).
+          sickLeave: const {
+            'a': [8],
+          },
+        ),
+      ];
+      final l = YearLeaves.forYear(
+        year: 2026,
+        plans: plans,
+        people: people,
+        holidays: holidays,
+        settings: const RosterSettings(),
+      )['a']!;
+      expect(l.stretches, hasLength(1));
+      expect(l.stretches.single.start, DateTime(2026, 10, 10));
+      expect(l.stretches.single.end, DateTime(2026, 10, 18));
+      expect(l.awayDays, 9);
+      expect(l.count(LeaveType.annual), 5);
+
+      // Listesi olmayan ayda boşluk hesaplanmaz: yalnız izin günleri.
+      final noRoster = YearLeaves.forYear(
+        year: 2026,
+        plans: const [
+          MonthPlan(
+            year: 2026,
+            month: 11,
+            annualLeave: {
+              'a': [2, 3],
+            },
+          ),
+        ],
+        people: people,
+        holidays: holidays,
+        settings: const RosterSettings(),
+      )['a']!;
+      expect(noRoster.awayDays, 2);
+    },
+  );
 }

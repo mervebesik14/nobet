@@ -114,7 +114,9 @@ void main() {
     expect(
       find.descendant(
         of: tile,
-        matching: find.text('Yıllık izin 5 iş günü · Şua izni 3 gün'),
+        matching: find.text(
+          'Yıllık izin 5 iş günü (boşluklarla 9 gün) · Şua izni 3 gün',
+        ),
       ),
       findsOneWidget,
     );
@@ -129,8 +131,14 @@ void main() {
     await tester.tap(tile);
     await tester.pumpAndSettle();
     final detail = find.byKey(const ValueKey('leave-detail'));
+    // n1 tek günlerde nöbette: 6 ve 14 Eylül boş → 6–14 arası 9 gün.
     expect(
-      find.descendant(of: detail, matching: find.textContaining('Eylül: 7')),
+      find.descendant(
+        of: detail,
+        matching: find.text(
+          '7 Eylül Pzt – 13 Eylül Paz: 5 iş günü izin + 4 gün boşluk = 9 gün',
+        ),
+      ),
       findsOneWidget,
     );
     expect(

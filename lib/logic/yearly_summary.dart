@@ -118,31 +118,13 @@ class YearlySummary {
       );
       final prev = DateTime(plan.year, plan.month - 1);
       final previous = byKey[MonthPlan.keyFor(prev.year, prev.month)];
-      final dayShifts = DayShiftPlanner.plan(
-        year: plan.year,
-        month: plan.month,
-        assignments: plan.assignments,
+      final allDayShifts = DayShiftPlanner.allFor(
+        plan: plan,
+        previous: previous,
         people: people,
-        holidays: monthHolidays,
+        holidays: holidays,
         settings: settings,
-        leaveDays: plan.leaveDays,
-        unavailableDays: plan.unavailableDays,
-        previousMonthLastDay: {
-          ...?previous?.assignments[previous.daysInMonth]?.personIds,
-        },
-        overrides: plan.dayShiftOverrides,
       );
-      final allDayShifts = [
-        ...dayShifts.values,
-        ...DayShiftPlanner.manual(
-          year: plan.year,
-          month: plan.month,
-          days: plan.techDayShifts,
-          assignments: plan.assignments,
-          holidays: monthHolidays,
-          settings: settings,
-        ),
-      ];
       final summary = RosterSummary.build(
         year: plan.year,
         month: plan.month,

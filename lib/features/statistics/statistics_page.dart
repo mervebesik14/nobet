@@ -521,7 +521,8 @@ extension on _StatisticsPageState {
               final parts = [
                 for (final t in LeaveType.values)
                   if (l.count(t) > 0 || (t == LeaveType.annual && b != null))
-                    '${t.label} ${l.count(t)} ${YearLeaves.unitOf(t)}',
+                    '${t.label} ${l.count(t)} ${YearLeaves.unitOf(t)}'
+                        '${t == LeaveType.annual && l.awayDays > l.count(t) ? ' (boşluklarla ${l.awayDays} gün)' : ''}',
               ];
               return ListTile(
                 key: ValueKey('leave-${p.id}'),
@@ -569,6 +570,7 @@ extension on _StatisticsPageState {
 void _showLeaves(BuildContext context, int year, String name, YearLeaves l) {
   final theme = Theme.of(context);
   final monthName = DateFormat.MMMM('tr_TR');
+  final dayName = DateFormat('d MMMM EEE', 'tr_TR');
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -587,14 +589,38 @@ void _showLeaves(BuildContext context, int year, String name, YearLeaves l) {
                 '${t.label}: ${l.count(t)} ${YearLeaves.unitOf(t)}',
                 style: theme.textTheme.titleSmall,
               ),
-              for (final e in months.entries)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    '${monthName.format(DateTime(year, e.key))}: '
-                    '${RequestParser.compactDays(e.value)}',
+              if (t == LeaveType.annual)
+                for (final x in l.stretches)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${dayName.format(x.leaveStart)} – '
+                          '${dayName.format(x.leaveEnd)}: '
+                          '${x.leaveWorkdays} iş günü izin + '
+                          '${x.gapDays} gün boşluk = ${x.totalDays} gün',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          'Uzakta: ${dayName.format(x.start)} – '
+                          '${dayName.format(x.end)}'
+                          '${x.gapBefore > 0 || x.gapAfter > 0 ? ' (önünde ${x.gapBefore}, arkasında ${x.gapAfter} gün boş)' : ''}',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ],
+                    ),
+                  )
+              else
+                for (final e in months.entries)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      '${monthName.format(DateTime(year, e.key))}: '
+                      '${RequestParser.compactDays(e.value)}',
+                    ),
                   ),
-                ),
             ],
         ],
       ),

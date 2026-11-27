@@ -1,5 +1,8 @@
 import '../models/models.dart';
 import 'day_shift_planner.dart';
+import 'leave_stretch.dart';
+
+export 'leave_stretch.dart';
 
 /// Bir kişinin yıllık izin bakiyesi.
 typedef LeaveBalance = ({int allowance, int used, int remaining});
@@ -69,7 +72,11 @@ class LeaveBalances {
 /// ve sayılar. Yıllık izin iş günü (hafta sonu ve tam gün tatil sayılmaz),
 /// şua izni ve rapor takvim günü olarak sayılır.
 class YearLeaves {
-  const YearLeaves({required this.days, required this.counts});
+  const YearLeaves({
+    required this.days,
+    required this.counts,
+    this.stretches = const [],
+  });
 
   /// Tür → ay → günler (sıralı).
   final Map<LeaveType, Map<int, List<int>>> days;
@@ -77,7 +84,13 @@ class YearLeaves {
   /// Tür → sayı ([countOf] kuralıyla).
   final Map<LeaveType, int> counts;
 
+  /// Yıllık izin blokları, önündeki ve arkasındaki boşluklarla.
+  final List<LeaveStretch> stretches;
+
   int count(LeaveType type) => counts[type] ?? 0;
+
+  /// Yıllık izinle birlikte uzak kalınan toplam gün (izin + boşluklar).
+  int get awayDays => stretches.fold(0, (s, x) => s + x.totalDays);
 
   bool get isEmpty => counts.values.every((c) => c == 0);
 
@@ -123,6 +136,39 @@ class YearLeaves {
   }) {
     final sorted = plans.where((p) => p.year == year).toList()
       ..sort((a, b) => a.month.compareTo(b.month));
+    final byKey = {for (final p in plans) p.key: p};
+    final dayShiftCache = <String, Set<(String, int)>>{};
+    Set<(String, int)> dayShiftsOf(MonthPlan plan) =>
+        dayShiftCache[plan.key] ??= () {
+          final prev = DateTime(plan.year, plan.month - 1);
+          return {
+            for (final s in DayShiftPlanner.allFor(
+              plan: plan,
+              previous: byKey[MonthPlan.keyFor(prev.year, prev.month)],
+              people: people,
+              holidays: holidays,
+              settings: settings,
+            ))
+              (s.personId, s.day),
+          };
+        }();
+
+    // Kişi o gün hiç çalışmıyor ve izinde/pasif değil mi? Ayın listesi
+    // yoksa bilinmez (null).
+    bool? free(Person person, DateTime day) {
+      final plan = byKey[MonthPlan.keyFor(day.year, day.month)];
+      if (plan == null || !plan.hasRoster) return null;
+      final d = day.day;
+      final a = plan.assignments[d];
+      if (a != null &&
+          (a.includes(person.id) || a.extraShiftOf(person.id) != null)) {
+        return false;
+      }
+      if (plan.leaveDaysOf(person.id).contains(d)) return false;
+      if (person.inactiveDaysIn(day.year, day.month).contains(d)) return false;
+      return !dayShiftsOf(plan).contains((person.id, d));
+    }
+
     return {
       for (final person in people)
         person.id: () {
@@ -146,7 +192,28 @@ class YearLeaves {
                   );
             }
           }
-          return YearLeaves(days: days, counts: counts);
+          return YearLeaves(
+            days: days,
+            counts: counts,
+            stretches: LeaveStretches.build(
+              leaveDays: [
+                for (final MapEntry(key: m, value: list)
+                    in (days[LeaveType.annual] ?? const <int, List<int>>{})
+                        .entries)
+                  for (final d in list) DateTime(year, m, d),
+              ],
+              isFree: (day) => free(person, day),
+              isWorkday: (day) =>
+                  DayShiftPlanner.workdayHours(
+                    year: day.year,
+                    month: day.month,
+                    day: day.day,
+                    holidays: holidays,
+                    settings: settings,
+                  ) !=
+                  null,
+            ),
+          );
         }(),
     };
   }

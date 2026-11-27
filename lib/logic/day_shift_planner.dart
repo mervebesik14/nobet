@@ -1,5 +1,6 @@
 import '../models/day_assignment.dart';
 import '../models/holiday.dart';
+import '../models/month_plan.dart';
 import '../models/person.dart';
 import '../models/role.dart';
 import '../models/roster_settings.dart';
@@ -222,4 +223,44 @@ class DayShiftPlanner {
               case final hours?)
             DayShift(day: d, personId: id, hours: hours, isSubstitute: false),
   ]..sort((a, b) => a.day.compareTo(b.day));
+
+  /// Bir ayın tüm 7A'ları: otomatik plan ([plan]) ve elle yazılanlar
+  /// ([manual]). [previous]: önceki ayın planı (ay başındaki nöbet ertesi
+  /// için). Liste yoksa boş.
+  static List<DayShift> allFor({
+    required MonthPlan plan,
+    MonthPlan? previous,
+    required Iterable<Person> people,
+    required Iterable<Holiday> holidays,
+    required RosterSettings settings,
+  }) {
+    if (!plan.hasRoster) return const [];
+    final monthHolidays = holidays.where(
+      (h) => h.date.year == plan.year && h.date.month == plan.month,
+    );
+    return [
+      ...DayShiftPlanner.plan(
+        year: plan.year,
+        month: plan.month,
+        assignments: plan.assignments,
+        people: people,
+        holidays: monthHolidays,
+        settings: settings,
+        leaveDays: plan.leaveDays,
+        unavailableDays: plan.unavailableDays,
+        previousMonthLastDay: {
+          ...?previous?.assignments[previous.daysInMonth]?.personIds,
+        },
+        overrides: plan.dayShiftOverrides,
+      ).values,
+      ...manual(
+        year: plan.year,
+        month: plan.month,
+        days: plan.techDayShifts,
+        assignments: plan.assignments,
+        holidays: monthHolidays,
+        settings: settings,
+      ),
+    ];
+  }
 }
