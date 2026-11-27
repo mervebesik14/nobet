@@ -35,7 +35,18 @@ void main() {
     plan(10, {
       4: ['b'],
       10: ['b', 'a'],
-    }, 't'),
+    }, 't').copyWith(
+      // 26–31 Ekim: 29 resmi tatil, 31 Cmt → 4 iş günü yıllık izin.
+      annualLeave: {
+        'a': [26, 27, 28, 29, 30, 31],
+      },
+      radiationLeave: {
+        'b': [24, 25], // hafta sonu: gereken saat değişmez
+      },
+      sickLeave: {
+        'a': [12, 13, 14],
+      },
+    ),
     // Kasım: liste yok → sayılmaz.
     const MonthPlan(year: 2026, month: 11),
     // Başka yıl → sayılmaz.
@@ -68,6 +79,19 @@ void main() {
     expect(ayse.requiredHours, 154 + 145);
     expect(ayse.months, 2);
     expect(s.byId['t']!.shifts, 6);
+  });
+
+  test('izin günleri: yıllık izin iş günü, şua ve rapor gün', () {
+    final s = build();
+    final zeynep = s.byId['a']!;
+    expect(zeynep.annualLeaveDays, 4);
+    expect(zeynep.sickLeaveDays, 3);
+    expect(zeynep.radiationLeaveDays, 0);
+    expect(s.byId['b']!.radiationLeaveDays, 2);
+    expect(
+      s.rows.firstWhere((r) => r.personId == 'a').byMonth[10]!.annualLeaveDays,
+      4,
+    );
   });
 
   test('rol ortalaması (yıllık toplam)', () {

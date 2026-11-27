@@ -17,6 +17,9 @@ class PersonTotals {
     this.longGaps = 0,
     this.dayShifts = 0,
     this.attendedDays = 0,
+    this.annualLeaveDays = 0,
+    this.radiationLeaveDays = 0,
+    this.sickLeaveDays = 0,
     this.workedHours = 0,
     this.requiredHours = 0,
     this.overtimeHours = 0,
@@ -85,6 +88,15 @@ class PersonTotals {
 
   /// Hastaneye geldiği gün sayısı (nöbet, 7A ya da ek mesai olan günler).
   final int attendedDays;
+
+  /// Yıllık izin (iş günü: hafta sonu ve tam gün tatil sayılmaz).
+  final int annualLeaveDays;
+
+  /// Şua izni (takvim günü).
+  final int radiationLeaveDays;
+
+  /// Rapor (takvim günü).
+  final int sickLeaveDays;
   final double workedHours;
   final double requiredHours;
 
@@ -113,6 +125,9 @@ class PersonTotals {
     longGaps: longGaps + o.longGaps,
     dayShifts: dayShifts + o.dayShifts,
     attendedDays: attendedDays + o.attendedDays,
+    annualLeaveDays: annualLeaveDays + o.annualLeaveDays,
+    radiationLeaveDays: radiationLeaveDays + o.radiationLeaveDays,
+    sickLeaveDays: sickLeaveDays + o.sickLeaveDays,
     workedHours: workedHours + o.workedHours,
     requiredHours: requiredHours + o.requiredHours,
     overtimeHours: overtimeHours + o.overtimeHours,

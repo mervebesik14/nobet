@@ -292,7 +292,8 @@ void main() {
     expect(cell(n1, 7), '0'); // dini bayram nöbeti
     expect(cell(n1, 12), '0'); // 7A gün
     expect(cell(n1, 13), '${15 + n1October}'); // geldiği gün
-    expect(cell(n1, 14), '${(15 + n1October) * 24}'); // çalışılan saat
+    expect(cell(n1, 14), '0'); // yıllık izin
+    expect(cell(n1, 17), '${(15 + n1October) * 24}'); // çalışılan saat
 
     // Aylara göre karşılaştırma: Eylül ve Ekim sütunları, ölçü değişir.
     await tester.dragUntilVisible(

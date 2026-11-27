@@ -73,6 +73,72 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('izinler bölümü: sayılar ve ay ay günler', (tester) async {
+    await boxes.monthPlans.put(
+      '2026-09',
+      boxes.monthPlans
+          .get('2026-09')!
+          .copyWith(
+            // 7–11 Eylül Pzt–Cuma: 5 iş günü; 12–13 hafta sonu sayılmaz.
+            annualLeave: {
+              'n1': [7, 8, 9, 10, 11, 12, 13],
+            },
+            sickLeave: {
+              'n2': [21, 22],
+            },
+          ),
+    );
+    // Listesi olmayan ayın izni de sayılır.
+    await boxes.monthPlans.put(
+      '2026-12',
+      const MonthPlan(
+        year: 2026,
+        month: 12,
+        radiationLeave: {
+          'n1': [1, 2, 3],
+        },
+      ),
+    );
+    await pump(tester);
+    final tile = find.byKey(const ValueKey('leave-n1'));
+    await tester.scrollUntilVisible(
+      tile,
+      300,
+      scrollable: find
+          .byWidgetPredicate(
+            (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: tile,
+        matching: find.text('Yıllık izin 5 iş günü · Şua izni 3 gün'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('leave-n2')),
+        matching: find.text('Rapor 2 gün'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('leave-n3')), findsNothing);
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    final detail = find.byKey(const ValueKey('leave-detail'));
+    expect(
+      find.descendant(of: detail, matching: find.textContaining('Eylül: 7')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: detail, matching: find.textContaining('Aralık: 1')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('yıl sonu tahmini bölümü görünür', (tester) async {
     await pump(tester);
     final tile = find.byKey(const ValueKey('projection-n1'));

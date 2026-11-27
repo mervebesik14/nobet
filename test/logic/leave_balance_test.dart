@@ -51,4 +51,65 @@ void main() {
       '7 / 5 gün kullanıldı · 2 gün aşıldı',
     );
   });
+
+  test('yıl içi izinler: yıllık izin iş günü, şua ve rapor takvim günü', () {
+    final plans = [
+      const MonthPlan(
+        year: 2026,
+        month: 10,
+        // 26–31 Ekim: 29 resmi tatil, 31 Cmt → 4 iş günü.
+        annualLeave: {
+          'a': [26, 27, 28, 29, 30, 31],
+        },
+        sickLeave: {
+          'b': [3, 4, 5],
+        },
+      ),
+      const MonthPlan(
+        year: 2026,
+        month: 3,
+        radiationLeave: {
+          'a': [10, 11, 9],
+        },
+        sickLeave: {
+          'b': [1],
+        },
+      ),
+      const MonthPlan(
+        year: 2025,
+        month: 12,
+        sickLeave: {
+          'b': [1, 2],
+        },
+      ),
+    ];
+    final l = YearLeaves.forYear(
+      year: 2026,
+      plans: plans,
+      people: people,
+      holidays: holidays,
+      settings: const RosterSettings(),
+    );
+    expect(l['a']!.count(LeaveType.annual), 4);
+    expect(l['a']!.count(LeaveType.radiation), 3);
+    expect(l['a']!.count(LeaveType.sick), 0);
+    expect(l['a']!.days[LeaveType.radiation], {
+      3: [9, 10, 11],
+    });
+    expect(l['b']!.count(LeaveType.sick), 4);
+    expect(l['b']!.days[LeaveType.sick]!.keys, [3, 10]);
+    expect(l['b']!.isEmpty, isFalse);
+    expect(
+      YearLeaves.forYear(
+        year: 2026,
+        plans: const [],
+        people: people,
+        holidays: holidays,
+        settings: const RosterSettings(),
+      )['a']!.isEmpty,
+      isTrue,
+    );
+    expect(YearLeaves.unitOf(LeaveType.annual), 'iş günü');
+    expect(YearLeaves.unitOf(LeaveType.sick), 'gün');
+  });
 }

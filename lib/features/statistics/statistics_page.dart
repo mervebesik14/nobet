@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/providers.dart';
 import '../../logic/every_other_day_chains.dart';
 import '../../logic/fatigue_score.dart';
 import '../../logic/leave_balance.dart';
+import '../../logic/request_parser.dart';
 import '../../logic/request_fulfillment.dart';
 import '../../logic/file_names.dart';
 import '../../logic/totals_columns.dart';
@@ -328,6 +330,12 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
                     DataColumn(label: Text('Yorgun-\nluk'), numeric: true),
                     DataColumn(label: Text('7A\ngün'), numeric: true),
                     DataColumn(label: Text('Geldiği\ngün'), numeric: true),
+                    DataColumn(
+                      label: Text('Yıllık izin\n(iş günü)'),
+                      numeric: true,
+                    ),
+                    DataColumn(label: Text('Şua izni\n(gün)'), numeric: true),
+                    DataColumn(label: Text('Rapor\n(gün)'), numeric: true),
                     DataColumn(label: Text('Çalışılan\nsaat'), numeric: true),
                     DataColumn(label: Text('Fazla\nmesai'), numeric: true),
                     if (hasPay)
@@ -354,6 +362,9 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
                           DataCell(Text(fmt(r.totals.fatigue))),
                           DataCell(Text(fmt(r.totals.dayShifts))),
                           DataCell(Text(fmt(r.totals.attendedDays))),
+                          DataCell(Text(fmt(r.totals.annualLeaveDays))),
+                          DataCell(Text(fmt(r.totals.radiationLeaveDays))),
+                          DataCell(Text(fmt(r.totals.sickLeaveDays))),
                           DataCell(Text(fmt(r.totals.workedHours))),
                           DataCell(Text(fmt(r.totals.overtimeHours))),
                           if (hasPay)
@@ -480,44 +491,115 @@ class _StatisticsPageState extends ConsumerState<StatisticsPage> {
               ],
             ),
           ],
-          if (ref.watch(leaveBalancesProvider(_year)) case final balances
-              when balances.isNotEmpty) ...[
-            const PillHeader('Yıllık izin bakiyesi', end: 'İş günü'),
-            GroupCard(
-              children: [
-                for (final p in ref.watch(peopleProvider))
-                  if (balances[p.id] case final b?)
-                    ListTile(
-                      key: ValueKey('leave-${p.id}'),
-                      title: Text(p.name),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(LeaveBalances.label(b)),
-                          const SizedBox(height: 4),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(99),
-                            child: LinearProgressIndicator(
-                              value: b.allowance == 0
-                                  ? 1
-                                  : (b.used / b.allowance).clamp(0.0, 1.0),
-                              minHeight: 6,
-                              color: b.remaining < 0
-                                  ? theme.colorScheme.error
-                                  : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-              ],
-            ),
-          ],
+          ..._leaveSection(context, theme),
           if (summary.rows.isNotEmpty) MonthlyComparison(summary: summary),
         ],
       ),
     );
   }
+}
+
+/// İzinler: kişi başına yıl içi yıllık izin (iş günü, hakkı girilmişse
+/// bakiyesiyle), şua izni ve rapor (gün); dokununca ay ay günler.
+extension on _StatisticsPageState {
+  List<Widget> _leaveSection(BuildContext context, ThemeData theme) {
+    final leaves = ref.watch(yearLeavesProvider(_year));
+    final balances = ref.watch(leaveBalancesProvider(_year));
+    final people = [
+      for (final p in ref.watch(peopleProvider))
+        if (!(leaves[p.id]?.isEmpty ?? true) || balances.containsKey(p.id)) p,
+    ];
+    if (people.isEmpty) return const [];
+    return [
+      const PillHeader('İzinler', end: 'Yıl içi'),
+      GroupCard(
+        children: [
+          for (final p in people)
+            () {
+              final l = leaves[p.id] ?? const YearLeaves(days: {}, counts: {});
+              final b = balances[p.id];
+              final parts = [
+                for (final t in LeaveType.values)
+                  if (l.count(t) > 0 || (t == LeaveType.annual && b != null))
+                    '${t.label} ${l.count(t)} ${YearLeaves.unitOf(t)}',
+              ];
+              return ListTile(
+                key: ValueKey('leave-${p.id}'),
+                title: Text(p.name),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(parts.join(' · ')),
+                    if (b != null) ...[
+                      Text(
+                        'Yıllık izin hakkı: ${LeaveBalances.label(b)}',
+                        style: b.remaining < 0
+                            ? TextStyle(color: theme.colorScheme.error)
+                            : null,
+                      ),
+                      const SizedBox(height: 4),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(99),
+                        child: LinearProgressIndicator(
+                          value: b.allowance == 0
+                              ? 1
+                              : (b.used / b.allowance).clamp(0.0, 1.0),
+                          minHeight: 6,
+                          color: b.remaining < 0
+                              ? theme.colorScheme.error
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                trailing: l.isEmpty ? null : const Icon(Icons.chevron_right),
+                onTap: l.isEmpty
+                    ? null
+                    : () => _showLeaves(context, _year, p.name, l),
+              );
+            }(),
+        ],
+      ),
+    ];
+  }
+}
+
+/// Kişinin yıl içindeki izinleri, türüne göre ay ay.
+void _showLeaves(BuildContext context, int year, String name, YearLeaves l) {
+  final theme = Theme.of(context);
+  final monthName = DateFormat.MMMM('tr_TR');
+  showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    showDragHandle: true,
+    builder: (context) => SafeArea(
+      child: ListView(
+        key: const ValueKey('leave-detail'),
+        shrinkWrap: true,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          Text('$name · $year izinleri', style: theme.textTheme.titleMedium),
+          for (final t in LeaveType.values)
+            if (l.days[t] case final months? when months.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Text(
+                '${t.label}: ${l.count(t)} ${YearLeaves.unitOf(t)}',
+                style: theme.textTheme.titleSmall,
+              ),
+              for (final e in months.entries)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    '${monthName.format(DateTime(year, e.key))}: '
+                    '${RequestParser.compactDays(e.value)}',
+                  ),
+                ),
+            ],
+        ],
+      ),
+    ),
+  );
 }
 
 /// Yorgunluk puanının dökümü ve aylara göre değeri.

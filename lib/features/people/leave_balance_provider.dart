@@ -21,3 +21,18 @@ final leaveBalancesProvider = Provider.family<Map<String, LeaveBalance>, int>((
     settings: ref.watch(rosterSettingsProvider),
   );
 });
+
+/// Yıl → kişi başına yıl içindeki izinler (yıllık izin, şua, rapor).
+final yearLeavesProvider = Provider.family<Map<String, YearLeaves>, int>((
+  ref,
+  year,
+) {
+  ref.watch(monthPlanProvider);
+  return YearLeaves.forYear(
+    year: year,
+    plans: ref.watch(monthPlanRepositoryProvider).getAll(),
+    people: ref.watch(peopleProvider),
+    holidays: ref.watch(holidaysProvider),
+    settings: ref.watch(rosterSettingsProvider),
+  );
+});

@@ -4,6 +4,7 @@ import '../models/person.dart';
 import '../models/role.dart';
 import '../models/roster_settings.dart';
 import 'day_shift_planner.dart';
+import 'leave_balance.dart';
 import 'person_totals.dart';
 import 'roster_summary.dart';
 import 'turkish_collation.dart';
@@ -156,6 +157,14 @@ class YearlySummary {
         // Yalnız hemşire listesinde teknikerler o ay sayılmaz.
         onlyRoles: plan.showsNursesOnly ? const {Role.nurse} : null,
       );
+      int leave(LeaveType type, String id) => YearLeaves.countOf(
+        type,
+        year: plan.year,
+        month: plan.month,
+        days: plan.leaveOf(id, type),
+        holidays: monthHolidays,
+        settings: settings,
+      );
       for (final r in summary.people) {
         info[r.personId] = (r.name, r.role);
         if (r.isChargeNurse) charge.add(r.personId);
@@ -173,6 +182,9 @@ class YearlySummary {
           longGaps: r.longGaps,
           dayShifts: r.dayShifts,
           attendedDays: r.attendedDays,
+          annualLeaveDays: leave(LeaveType.annual, r.personId),
+          radiationLeaveDays: leave(LeaveType.radiation, r.personId),
+          sickLeaveDays: leave(LeaveType.sick, r.personId),
           workedHours: r.workedHours,
           requiredHours: r.requiredHours,
           overtimeHours: r.overtimeHours,
